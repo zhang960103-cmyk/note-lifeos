@@ -5,6 +5,8 @@ import { PenLine, TrendingUp, Target } from "lucide-react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { useMemo } from "react";
 import { format, subDays, isAfter } from "date-fns";
+import TodoSummary from "@/components/TodoSummary";
+import ReminderSettings from "@/components/ReminderSettings";
 
 const Dashboard = () => {
   const { entries } = useLifeOs();
@@ -91,6 +93,9 @@ const Dashboard = () => {
         ))}
       </div>
 
+      {/* Todo Summary */}
+      <TodoSummary />
+
       {/* Life Wheel */}
       <div className="bg-surface-2 border border-border rounded-xl p-4 mb-5">
         <div className="flex items-center gap-2 mb-3">
@@ -142,8 +147,11 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* Reminder Settings */}
+      <ReminderSettings />
+
       {/* Recent Entries */}
-      <div className="mb-5">
+      <div className="mb-5 mt-5">
         <h2 className="font-serif-sc text-sm text-white mb-3">最近日记</h2>
         {entries.length === 0 ? (
           <div className="bg-surface-2 border border-border rounded-xl p-6 text-center text-muted-foreground text-xs">
