@@ -1,0 +1,24 @@
+{
+  "name": "Life OS v4.1 · 生命罗盘",
+  "short_name": "Life OS",
+  "description": "你的数字化人生参谋长——日记算法路由、生命之轮、AI导师、认知升维",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0b08",
+  "theme_color": "#c5943a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
