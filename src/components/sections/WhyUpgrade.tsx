@@ -5,7 +5,7 @@ const issues = [
   ["Telegram Webhook URL格式不一致", "致命", "消息无法触发工作流", "OpenClaw原生grammY库，无此问题"],
   ["Telegram只允许一个webhook，测试/生产互斥", "致命", "切换环境导致失效", "OpenClaw本地运行，无webhook冲突"],
   ["Railway重新部署后encryptionKey变化", "致命", "所有凭证解密失败，系统瘫痪", "配置存本地~/.openclaw/，不依赖Railway加密"],
-  ["WEBHOOK_URL环境变量不匹配", "致命", "404/403，看起来"系统坏了"", "OpenClaw无此配置项"],
+  ["WEBHOOK_URL环境变量不匹配", "致命", '404/403，看起来"系统坏了"', "OpenClaw无此配置项"],
   ["DeepSeek Authorization格式错误", "致命", "AI调用失败", "重写为标准HTTP Request格式"],
   ["工作流C月度报告节点未连接", "致命", "触发后无动作", "OpenClaw Cron直接调用Skill，无此问题"],
   ["Whisper URL写死host.docker.internal", "重要", "Linux服务器迁移会失败", "环境变量化，支持任意主机名"],
