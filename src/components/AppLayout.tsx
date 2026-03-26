@@ -1,9 +1,10 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Home, PenLine, Clock, BarChart3, Compass } from "lucide-react";
+import { Home, PenLine, Clock, BarChart3, Target, Compass } from "lucide-react";
 
 const navItems = [
   { to: "/", icon: Home, label: "首页" },
   { to: "/diary", icon: PenLine, label: "写日记" },
+  { to: "/wheel", icon: Target, label: "之轮" },
   { to: "/history", icon: Clock, label: "历史" },
   { to: "/review", icon: BarChart3, label: "复盘" },
   { to: "/whitepaper", icon: Compass, label: "白皮书" },
