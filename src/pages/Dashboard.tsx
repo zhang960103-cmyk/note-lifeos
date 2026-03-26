@@ -93,6 +93,9 @@ const Dashboard = () => {
         ))}
       </div>
 
+      {/* Todo Summary */}
+      <TodoSummary />
+
       {/* Life Wheel */}
       <div className="bg-surface-2 border border-border rounded-xl p-4 mb-5">
         <div className="flex items-center gap-2 mb-3">
