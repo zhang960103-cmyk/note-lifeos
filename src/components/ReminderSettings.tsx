@@ -96,7 +96,7 @@ export default function ReminderSettings() {
           className={`w-10 h-5 rounded-full transition-all relative ${config.enabled ? "bg-gold" : "bg-border"}`}
         >
           <div
-            className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all ${config.enabled ? "left-5.5" : "left-0.5"}`}
+            className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all ${config.enabled ? "left-[22px]" : "left-0.5"}`}
           />
         </button>
       </div>
