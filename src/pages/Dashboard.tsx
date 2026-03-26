@@ -1,7 +1,7 @@
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { ALL_DOMAINS, ALGORITHM_INFO } from "@/types/lifeOs";
 import { Link } from "react-router-dom";
-import { PenLine, TrendingUp, Target } from "lucide-react";
+import { PenLine, TrendingUp, Target, MessageCircle, Timer } from "lucide-react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { useMemo } from "react";
 import { format, subDays, isAfter } from "date-fns";
