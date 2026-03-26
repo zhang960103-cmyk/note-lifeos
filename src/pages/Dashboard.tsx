@@ -5,6 +5,8 @@ import { PenLine, TrendingUp, Target } from "lucide-react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { useMemo } from "react";
 import { format, subDays, isAfter } from "date-fns";
+import TodoSummary from "@/components/TodoSummary";
+import ReminderSettings from "@/components/ReminderSettings";
 
 const Dashboard = () => {
   const { entries } = useLifeOs();
