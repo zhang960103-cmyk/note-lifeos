@@ -10,6 +10,8 @@ import DiaryPage from "@/pages/DiaryPage";
 import HistoryPage from "@/pages/HistoryPage";
 import ReviewPage from "@/pages/ReviewPage";
 import WheelPage from "@/pages/WheelPage";
+import MentorPage from "@/pages/MentorPage";
+import CronPage from "@/pages/CronPage";
 import WhitepaperPage from "@/pages/WhitepaperPage";
 import NotFound from "@/pages/NotFound";
 
@@ -29,7 +31,9 @@ const App = () => (
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/review" element={<ReviewPage />} />
               <Route path="/wheel" element={<WheelPage />} />
+              <Route path="/cron" element={<CronPage />} />
             </Route>
+            <Route path="/mentor" element={<MentorPage />} />
             <Route path="/whitepaper" element={<WhitepaperPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

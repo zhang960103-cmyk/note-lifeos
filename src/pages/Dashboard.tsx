@@ -1,7 +1,7 @@
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { ALL_DOMAINS, ALGORITHM_INFO } from "@/types/lifeOs";
 import { Link } from "react-router-dom";
-import { PenLine, TrendingUp, Target } from "lucide-react";
+import { PenLine, TrendingUp, Target, MessageCircle, Timer } from "lucide-react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { useMemo } from "react";
 import { format, subDays, isAfter } from "date-fns";
@@ -62,19 +62,33 @@ const Dashboard = () => {
         <p className="text-muted-foreground text-xs mt-1">{format(new Date(), "yyyy年M月d日 EEEE")}</p>
       </div>
 
-      {/* Quick Action */}
-      <Link
-        to="/diary"
-        className="flex items-center gap-3 bg-gold-light border border-gold-border rounded-xl p-4 mb-5 group hover:bg-gold/10 transition-all"
-      >
-        <div className="w-10 h-10 rounded-full bg-gold flex items-center justify-center text-background">
-          <PenLine size={18} />
-        </div>
-        <div>
-          <div className="text-white text-sm font-medium">开始写日记</div>
-          <div className="text-muted-foreground text-[11px]">AI 会自动选择最适合的算法</div>
-        </div>
-      </Link>
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <Link
+          to="/diary"
+          className="flex items-center gap-3 bg-gold-light border border-gold-border rounded-xl p-4 group hover:bg-gold/10 transition-all"
+        >
+          <div className="w-9 h-9 rounded-full bg-gold flex items-center justify-center text-background">
+            <PenLine size={16} />
+          </div>
+          <div>
+            <div className="text-foreground text-sm font-medium">写日记</div>
+            <div className="text-muted-foreground text-[10px]">AI自动选算法</div>
+          </div>
+        </Link>
+        <Link
+          to="/mentor"
+          className="flex items-center gap-3 bg-los-purple-light border border-los-purple/20 rounded-xl p-4 group hover:bg-los-purple/10 transition-all"
+        >
+          <div className="w-9 h-9 rounded-full bg-los-purple flex items-center justify-center text-background">
+            <MessageCircle size={16} />
+          </div>
+          <div>
+            <div className="text-foreground text-sm font-medium">AI导师</div>
+            <div className="text-muted-foreground text-[10px]">人生参谋在线</div>
+          </div>
+        </Link>
+      </div>
 
       {/* Stats Row */}
       <div className="grid grid-cols-4 gap-2 mb-5">
