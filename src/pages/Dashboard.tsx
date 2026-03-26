@@ -147,8 +147,11 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* Reminder Settings */}
+      <ReminderSettings />
+
       {/* Recent Entries */}
-      <div className="mb-5">
+      <div className="mb-5 mt-5">
         <h2 className="font-serif-sc text-sm text-white mb-3">最近日记</h2>
         {entries.length === 0 ? (
           <div className="bg-surface-2 border border-border rounded-xl p-6 text-center text-muted-foreground text-xs">
