@@ -9,6 +9,7 @@ import Dashboard from "@/pages/Dashboard";
 import DiaryPage from "@/pages/DiaryPage";
 import HistoryPage from "@/pages/HistoryPage";
 import ReviewPage from "@/pages/ReviewPage";
+import WheelPage from "@/pages/WheelPage";
 import WhitepaperPage from "@/pages/WhitepaperPage";
 import NotFound from "@/pages/NotFound";
 
