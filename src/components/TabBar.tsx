@@ -1,9 +1,9 @@
-import { ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const tabs = [
   { path: "/", icon: "🧭", label: "今天" },
   { path: "/todos", icon: "✅", label: "待办" },
+  { path: "/wheel", icon: "🎯", label: "罗盘" },
   { path: "/history", icon: "🕐", label: "历史" },
   { path: "/review", icon: "📊", label: "复盘" },
 ];
