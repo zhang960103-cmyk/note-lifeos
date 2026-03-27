@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
-import { CheckSquare, Square, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { CheckSquare, Square, ChevronDown, ChevronUp, Trash2, FileText } from "lucide-react";
 import { format, parseISO, subDays, isAfter } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 
