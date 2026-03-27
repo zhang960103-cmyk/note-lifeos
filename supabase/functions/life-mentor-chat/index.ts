@@ -213,6 +213,54 @@ serve(async (req) => {
       );
     }
 
+    // Wheel evaluation mode
+    if (mode === "wheel-eval") {
+      const userTexts = messages
+        .filter((m: any) => m.role === "user")
+        .map((m: any) => m.content)
+        .join("\n");
+
+      const wheelResp = await fetch(
+        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: WHEEL_EVAL_PROMPT },
+              { role: "user", content: userTexts || "用户最近没有写日记。" },
+            ],
+          }),
+        }
+      );
+
+      if (!wheelResp.ok) {
+        return new Response(
+          JSON.stringify({ error: "评估失败" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const wheelData = await wheelResp.json();
+      const raw = wheelData.choices?.[0]?.message?.content || "{}";
+      let parsed;
+      try {
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+      } catch {
+        parsed = {};
+      }
+
+      return new Response(
+        JSON.stringify(parsed),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Parse-todo mode
     if (mode === "parse-todo") {
       const userText = messages[messages.length - 1]?.content || "";
