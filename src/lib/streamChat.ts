@@ -1,6 +1,5 @@
-export type ChatMessage = { role: "user" | "assistant"; content: string };
-
-export type ChatMode = "default" | "weekly-review" | "monthly-review" | "soul-patch";
+export type ChatMsg = { role: "user" | "assistant"; content: string };
+export type ChatMode = "default" | "weekly-review" | "monthly-review" | "extract";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
 
@@ -11,7 +10,7 @@ export async function streamChat({
   onDone,
   signal,
 }: {
-  messages: ChatMessage[];
+  messages: ChatMsg[];
   mode?: ChatMode;
   onDelta: (text: string) => void;
   onDone: () => void;
@@ -64,7 +63,6 @@ export async function streamChat({
     }
   }
 
-  // Flush remaining
   if (buffer.trim()) {
     for (let raw of buffer.split("\n")) {
       if (!raw) continue;
@@ -81,4 +79,26 @@ export async function streamChat({
   }
 
   onDone();
+}
+
+export async function extractMeta(messages: ChatMsg[]): Promise<{
+  emotionTags: string[];
+  topicTags: string[];
+  todos: string[];
+  emotionScore: number;
+}> {
+  try {
+    const resp = await fetch(CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify({ messages, mode: "extract" }),
+    });
+    if (!resp.ok) return { emotionTags: [], topicTags: [], todos: [], emotionScore: 5 };
+    return await resp.json();
+  } catch {
+    return { emotionTags: [], topicTags: [], todos: [], emotionScore: 5 };
+  }
 }

@@ -1,25 +1,34 @@
 import { createContext, useContext, ReactNode } from "react";
-import { useEntries, useWheelScores } from "@/hooks/useLifeOs";
-import type { DiaryEntry, WheelScore } from "@/types/lifeOs";
+import { useDayEntries, useWheelScores, useOnboarding } from "@/hooks/useLifeOs";
+import type { DayEntry, WheelScore, ChatMessage, TodoItem } from "@/types/lifeOs";
 
 interface LifeOsContextType {
-  entries: DiaryEntry[];
-  addEntry: (entry: DiaryEntry) => void;
+  entries: DayEntry[];
+  todayEntry: DayEntry | null;
+  todayKey: string;
+  addMessage: (msg: ChatMessage) => void;
+  updateAssistantMessage: (content: string) => void;
+  updateDayMeta: (date: string, meta: { emotionTags?: string[]; topicTags?: string[]; todos?: TodoItem[]; emotionScore?: number }) => void;
+  toggleTodo: (date: string, todoId: string) => void;
   deleteEntry: (id: string) => void;
-  updateEntry: (id: string, updates: Partial<DiaryEntry>) => void;
-  toggleTask: (entryId: string, taskId: string) => void;
   wheelScores: WheelScore[];
   addWheelScore: (score: WheelScore) => void;
+  onboarded: boolean;
+  completeOnboarding: () => void;
 }
 
 const LifeOsContext = createContext<LifeOsContextType | null>(null);
 
 export function LifeOsProvider({ children }: { children: ReactNode }) {
-  const { entries, addEntry, deleteEntry, updateEntry, toggleTask } = useEntries();
+  const { entries, todayEntry, todayKey, addMessage, updateAssistantMessage, updateDayMeta, toggleTodo, deleteEntry } = useDayEntries();
   const { scores: wheelScores, addScore: addWheelScore } = useWheelScores();
+  const { onboarded, completeOnboarding } = useOnboarding();
 
   return (
-    <LifeOsContext.Provider value={{ entries, addEntry, deleteEntry, updateEntry, toggleTask, wheelScores, addWheelScore }}>
+    <LifeOsContext.Provider value={{
+      entries, todayEntry, todayKey, addMessage, updateAssistantMessage, updateDayMeta, toggleTodo, deleteEntry,
+      wheelScores, addWheelScore, onboarded, completeOnboarding,
+    }}>
       {children}
     </LifeOsContext.Provider>
   );
