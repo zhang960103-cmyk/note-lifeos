@@ -1,17 +1,17 @@
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { ALL_DOMAINS } from "@/types/lifeOs";
-import { ArrowLeft, Mail, Loader2 } from "lucide-react";
+import { Mail, Loader2 } from "lucide-react";
 import { subDays, isAfter, subMonths, format, parseISO } from "date-fns";
 import { streamChat, type ChatMsg } from "@/lib/streamChat";
 
 const ReviewPage = () => {
-  const { entries, wheelScores } = useLifeOs();
-  const navigate = useNavigate();
+  const { entries, wheelScores, allTodos, monthFinanceStats } = useLifeOs();
   const [letter, setLetter] = useState<string | null>(null);
   const [letterType, setLetterType] = useState<"weekly" | "monthly" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const today = format(new Date(), "yyyy-MM-dd");
 
   const weekEntries = useMemo(() => {
     const cutoff = subDays(new Date(), 7);
@@ -34,10 +34,13 @@ const ReviewPage = () => {
     const topicCounts: Record<string, number> = {};
     topicTags.forEach(t => topicCounts[t] = (topicCounts[t] || 0) + 1);
     const topTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    const todoTotal = data.reduce((s, e) => s + e.todos.length, 0);
-    const todoDone = data.reduce((s, e) => s + e.todos.filter(t => t.completed).length, 0);
 
-    return { count, avgEmotion, topTags, topTopics, todoTotal, todoDone };
+    const allTodosInRange = data.flatMap(e => e.todos);
+    const todoTotal = allTodosInRange.length;
+    const todoDone = allTodosInRange.filter(t => t.status === "done").length;
+    const overdueTodos = allTodosInRange.filter(t => t.dueDate && t.dueDate < today && t.status !== "done");
+
+    return { count, avgEmotion, topTags, topTopics, todoTotal, todoDone, overdueTodos };
   };
 
   const generateLetter = async (type: "weekly" | "monthly") => {
@@ -59,12 +62,14 @@ const ReviewPage = () => {
 - 常见情绪：${stats.topTags.map(([t]) => t).join("、") || "无"}
 - 常见话题：${stats.topTopics.map(([t]) => t).join("、") || "无"}
 - 任务完成：${stats.todoDone}/${stats.todoTotal}
+- 逾期任务：${stats.overdueTodos.length}个
+${monthFinanceStats.count > 0 ? `- 本月收入：¥${monthFinanceStats.income}，支出：¥${monthFinanceStats.expense}，净值：¥${monthFinanceStats.net}` : ""}
 ${wheelScores[0] ? `- 生命之轮：${ALL_DOMAINS.map(d => `${d}${wheelScores[0].scores[d]}`).join("、")}` : ""}
 
 最近内容：
 ${recentContent}
 
-请给我写一封${type === "weekly" ? "周" : "月"}回顾信。`;
+请给我写一封${type === "weekly" ? "周" : "月"}回顾信。如果有适合我当前阶段学习的资源（书籍、工具、课程），请在末尾推荐1-2个。`;
 
     const msgs: ChatMsg[] = [{ role: "user", content: contextMsg }];
     let full = "";
@@ -88,29 +93,30 @@ ${recentContent}
   const weekStats = useMemo(() => buildSummary(weekEntries), [weekEntries]);
   const monthStats = useMemo(() => buildSummary(monthEntries), [monthEntries]);
 
-  const StatBlock = ({ label, stats }: { label: string; stats: ReturnType<typeof buildSummary> }) => (
-    <div className="grid grid-cols-3 gap-2 mb-3">
+  const StatBlock = ({ stats }: { stats: ReturnType<typeof buildSummary> }) => (
+    <div className="grid grid-cols-4 gap-2 mb-3">
       <div className="text-center">
         <div className="text-lg text-gold font-serif-sc">{stats.count}</div>
         <div className="text-[8px] text-muted-foreground">天</div>
       </div>
       <div className="text-center">
         <div className="text-lg text-gold font-serif-sc">{stats.avgEmotion}</div>
-        <div className="text-[8px] text-muted-foreground">情绪均值</div>
+        <div className="text-[8px] text-muted-foreground">情绪</div>
       </div>
       <div className="text-center">
         <div className="text-lg text-gold font-serif-sc">{stats.todoTotal > 0 ? Math.round((stats.todoDone / stats.todoTotal) * 100) : 0}%</div>
-        <div className="text-[8px] text-muted-foreground">任务完成</div>
+        <div className="text-[8px] text-muted-foreground">完成率</div>
+      </div>
+      <div className="text-center">
+        <div className="text-lg text-los-red font-serif-sc">{stats.overdueTodos.length}</div>
+        <div className="text-[8px] text-muted-foreground">逾期</div>
       </div>
     </div>
   );
 
   return (
-    <div className="pb-24 px-4 max-w-[600px] mx-auto">
-      <div className="flex items-center gap-3 py-4">
-        <button onClick={() => navigate("/")} className="text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft size={20} />
-        </button>
+    <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4">
+      <div className="py-4">
         <h1 className="font-serif-sc text-lg text-foreground">复盘</h1>
       </div>
 
@@ -118,15 +124,12 @@ ${recentContent}
       <div className="bg-surface-2 border border-border rounded-xl p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs text-foreground">本周</h2>
-          <button
-            onClick={() => generateLetter("weekly")}
-            disabled={isGenerating || weekStats.count === 0}
-            className="flex items-center gap-1 text-[10px] text-gold font-mono-jb disabled:opacity-30"
-          >
+          <button onClick={() => generateLetter("weekly")} disabled={isGenerating || weekStats.count === 0}
+            className="flex items-center gap-1 text-[10px] text-gold font-mono-jb disabled:opacity-30">
             <Mail size={12} /> 生成周信
           </button>
         </div>
-        <StatBlock label="周" stats={weekStats} />
+        <StatBlock stats={weekStats} />
         {weekStats.topTags.length > 0 && (
           <div className="flex gap-1 flex-wrap">
             {weekStats.topTags.map(([t, c]) => (
@@ -140,15 +143,12 @@ ${recentContent}
       <div className="bg-surface-2 border border-border rounded-xl p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs text-foreground">本月</h2>
-          <button
-            onClick={() => generateLetter("monthly")}
-            disabled={isGenerating || monthStats.count === 0}
-            className="flex items-center gap-1 text-[10px] text-gold font-mono-jb disabled:opacity-30"
-          >
+          <button onClick={() => generateLetter("monthly")} disabled={isGenerating || monthStats.count === 0}
+            className="flex items-center gap-1 text-[10px] text-gold font-mono-jb disabled:opacity-30">
             <Mail size={12} /> 生成月报
           </button>
         </div>
-        <StatBlock label="月" stats={monthStats} />
+        <StatBlock stats={monthStats} />
       </div>
 
       {/* Letter */}
@@ -160,9 +160,7 @@ ${recentContent}
             {isGenerating && <Loader2 size={12} className="animate-spin text-gold ml-auto" />}
           </div>
           <p className="text-[13px] text-foreground/90 leading-[1.8] whitespace-pre-line">{letter}</p>
-          {!isGenerating && (
-            <p className="text-[11px] text-muted-foreground mt-4 italic">—— 罗盘</p>
-          )}
+          {!isGenerating && <p className="text-[11px] text-muted-foreground mt-4 italic">—— 罗盘</p>}
         </div>
       )}
     </div>

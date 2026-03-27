@@ -1,17 +1,27 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { Send, Loader2, Clock, BarChart3, Target } from "lucide-react";
+import { Send, Loader2, DollarSign, X } from "lucide-react";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { createTodoFromExtract } from "@/hooks/useLifeOs";
 import { format } from "date-fns";
 import type { TodoItem } from "@/types/lifeOs";
 
+const CATEGORIES = ["教学", "内容", "餐饮", "交通", "购物", "其他"];
+
 const HomePage = () => {
-  const navigate = useNavigate();
-  const { todayEntry, todayKey, addMessage, updateAssistantMessage, updateDayMeta } = useLifeOs();
+  const {
+    todayEntry, todayKey, addMessage, updateDayMeta,
+    addFinanceEntry, todayFinanceStats,
+  } = useLifeOs();
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [showFinance, setShowFinance] = useState(false);
+  const [financeType, setFinanceType] = useState<"income" | "expense" | null>(null);
+  const [financeAmount, setFinanceAmount] = useState("");
+  const [financeCategory, setFinanceCategory] = useState("其他");
+  const [financeNote, setFinanceNote] = useState("");
+  const [financeToast, setFinanceToast] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -25,7 +35,6 @@ const HomePage = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [displayMessages.length, streamingContent]);
 
-  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -60,29 +69,36 @@ const HomePage = () => {
           setStreamingContent(full);
         },
         onDone: () => {
-          // Save the complete assistant message
           addMessage({ role: "assistant", content: full, timestamp: new Date().toISOString() });
           setStreamingContent("");
           setIsLoading(false);
 
           // Background extraction
-          const msgsForExtract = [
-            ...allMsgs,
-            { role: "assistant" as const, content: full },
-          ];
+          const msgsForExtract = [...allMsgs, { role: "assistant" as const, content: full }];
           extractMeta(msgsForExtract).then(meta => {
-            if (meta.emotionTags.length || meta.topicTags.length || meta.todos.length) {
-              const todoItems: TodoItem[] = meta.todos.map(t => ({
-                id: crypto.randomUUID(),
-                text: t,
-                completed: false,
-                createdAt: new Date().toISOString(),
-              }));
+            const todoItems: TodoItem[] = (meta.todos || []).map(t =>
+              createTodoFromExtract(t, todayKey)
+            );
+
+            if (meta.emotionTags.length || meta.topicTags.length || todoItems.length) {
               updateDayMeta(todayKey, {
                 emotionTags: meta.emotionTags,
                 topicTags: meta.topicTags,
                 todos: todoItems.length > 0 ? todoItems : undefined,
                 emotionScore: meta.emotionScore || undefined,
+              });
+            }
+
+            // Auto-save finance hints
+            if (meta.financeHints && meta.financeHints.length > 0) {
+              meta.financeHints.forEach(hint => {
+                addFinanceEntry({
+                  date: todayKey,
+                  type: hint.type,
+                  amount: hint.amount,
+                  category: hint.category,
+                  note: hint.note,
+                });
               });
             }
           });
@@ -96,7 +112,7 @@ const HomePage = () => {
       setStreamingContent("");
       setIsLoading(false);
     }
-  }, [isLoading, messages, addMessage, updateDayMeta, todayKey]);
+  }, [isLoading, messages, addMessage, updateDayMeta, todayKey, addFinanceEntry]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -105,26 +121,25 @@ const HomePage = () => {
     }
   };
 
-  return (
-    <div className="flex flex-col h-[100dvh] max-w-[600px] mx-auto">
-      {/* Minimal header */}
-      <div className="flex items-center justify-between px-4 py-3">
-        <span className="text-[10px] text-muted-foreground font-mono-jb">
-          {format(new Date(), "M月d日")}
-        </span>
-        <div className="flex gap-3">
-          <button onClick={() => navigate("/history")} className="text-muted-foreground hover:text-foreground transition-colors">
-            <Clock size={18} />
-          </button>
-          <button onClick={() => navigate("/review")} className="text-muted-foreground hover:text-foreground transition-colors">
-            <BarChart3 size={18} />
-          </button>
-          <button onClick={() => navigate("/wheel")} className="text-muted-foreground hover:text-foreground transition-colors">
-            <Target size={18} />
-          </button>
-        </div>
-      </div>
+  const handleFinanceSave = () => {
+    if (!financeType || !financeAmount) return;
+    addFinanceEntry({
+      date: todayKey,
+      type: financeType,
+      amount: parseFloat(financeAmount),
+      category: financeCategory,
+      note: financeNote,
+    });
+    setFinanceType(null);
+    setFinanceAmount("");
+    setFinanceNote("");
+    setShowFinance(false);
+    setFinanceToast(true);
+    setTimeout(() => setFinanceToast(false), 2000);
+  };
 
+  return (
+    <div className="flex flex-col h-full max-w-[600px] mx-auto relative">
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-2">
         {displayMessages.length === 0 && (
@@ -179,9 +194,22 @@ const HomePage = () => {
         </div>
       )}
 
+      {/* Finance toast */}
+      {financeToast && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-los-green text-background text-xs px-4 py-1.5 rounded-full animate-pulse">
+          已记录 ✓
+        </div>
+      )}
+
       {/* Input */}
-      <div className="px-4 py-3 pb-[env(safe-area-inset-bottom,12px)]">
+      <div className="px-4 py-3 pb-2">
         <div className="flex gap-2 items-end">
+          <button
+            onClick={() => setShowFinance(!showFinance)}
+            className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
+          >
+            <DollarSign size={18} />
+          </button>
           <textarea
             ref={textareaRef}
             value={input}
@@ -201,6 +229,76 @@ const HomePage = () => {
           </button>
         </div>
       </div>
+
+      {/* Finance Sheet */}
+      {showFinance && (
+        <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl p-5 z-50 animate-in slide-in-from-bottom">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-xs text-foreground font-serif-sc">记账</span>
+            <button onClick={() => { setShowFinance(false); setFinanceType(null); }} className="text-muted-foreground">
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Today summary */}
+          <div className="flex gap-3 text-center mb-4">
+            <div className="flex-1 bg-surface-2 rounded-lg py-2">
+              <div className="text-[10px] text-muted-foreground">收入</div>
+              <div className="text-sm text-los-green font-mono-jb">¥{todayFinanceStats.income}</div>
+            </div>
+            <div className="flex-1 bg-surface-2 rounded-lg py-2">
+              <div className="text-[10px] text-muted-foreground">支出</div>
+              <div className="text-sm text-los-orange font-mono-jb">¥{todayFinanceStats.expense}</div>
+            </div>
+            <div className="flex-1 bg-surface-2 rounded-lg py-2">
+              <div className="text-[10px] text-muted-foreground">净值</div>
+              <div className="text-sm text-gold font-mono-jb">¥{todayFinanceStats.net}</div>
+            </div>
+          </div>
+
+          {!financeType ? (
+            <div className="flex gap-3">
+              <button onClick={() => setFinanceType("income")} className="flex-1 bg-los-green/20 text-los-green py-3 rounded-xl text-sm hover:bg-los-green/30 transition">+ 收入</button>
+              <button onClick={() => setFinanceType("expense")} className="flex-1 bg-los-orange/20 text-los-orange py-3 rounded-xl text-sm hover:bg-los-orange/30 transition">- 支出</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <input
+                type="number"
+                value={financeAmount}
+                onChange={e => setFinanceAmount(e.target.value)}
+                placeholder="金额"
+                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-foreground text-lg font-mono-jb focus:outline-none focus:border-gold-border"
+                autoFocus
+              />
+              <div className="flex gap-1.5 flex-wrap">
+                {CATEGORIES.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setFinanceCategory(c)}
+                    className={`text-xs px-3 py-1 rounded-full transition ${financeCategory === c ? "bg-gold text-background" : "bg-surface-2 text-muted-foreground"}`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+              <input
+                value={financeNote}
+                onChange={e => setFinanceNote(e.target.value)}
+                placeholder="备注（可选）"
+                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2 text-sm text-foreground focus:outline-none focus:border-gold-border"
+              />
+              <button
+                onClick={handleFinanceSave}
+                disabled={!financeAmount}
+                className="w-full bg-gold text-background py-2.5 rounded-xl text-sm disabled:opacity-30 hover:bg-gold/90 transition"
+              >
+                确认
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

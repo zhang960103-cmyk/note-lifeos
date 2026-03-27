@@ -1,5 +1,5 @@
 export type ChatMsg = { role: "user" | "assistant"; content: string };
-export type ChatMode = "default" | "weekly-review" | "monthly-review" | "extract";
+export type ChatMode = "default" | "weekly-review" | "monthly-review" | "extract" | "parse-todo";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
 
@@ -84,8 +84,9 @@ export async function streamChat({
 export async function extractMeta(messages: ChatMsg[]): Promise<{
   emotionTags: string[];
   topicTags: string[];
-  todos: string[];
+  todos: Array<{ text: string; priority?: string; dueDate?: string; tags?: string[] }>;
   emotionScore: number;
+  financeHints: Array<{ type: 'income' | 'expense'; amount: number; category: string; note: string }>;
 }> {
   try {
     const resp = await fetch(CHAT_URL, {
@@ -96,9 +97,33 @@ export async function extractMeta(messages: ChatMsg[]): Promise<{
       },
       body: JSON.stringify({ messages, mode: "extract" }),
     });
-    if (!resp.ok) return { emotionTags: [], topicTags: [], todos: [], emotionScore: 5 };
+    if (!resp.ok) return { emotionTags: [], topicTags: [], todos: [], emotionScore: 5, financeHints: [] };
+    const data = await resp.json();
+    return {
+      emotionTags: data.emotionTags || [],
+      topicTags: data.topicTags || [],
+      todos: data.todos || [],
+      emotionScore: data.emotionScore || 5,
+      financeHints: data.financeHints || [],
+    };
+  } catch {
+    return { emotionTags: [], topicTags: [], todos: [], emotionScore: 5, financeHints: [] };
+  }
+}
+
+export async function parseTodoNL(text: string): Promise<any> {
+  try {
+    const resp = await fetch(CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify({ messages: [{ role: "user", content: text }], mode: "parse-todo" }),
+    });
+    if (!resp.ok) return null;
     return await resp.json();
   } catch {
-    return { emotionTags: [], topicTags: [], todos: [], emotionScore: 5 };
+    return null;
   }
 }

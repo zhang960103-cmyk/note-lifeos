@@ -24,6 +24,9 @@ const Onboarding = () => {
     if (step < steps.length - 1) {
       setStep(step + 1);
     } else {
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+      }
       completeOnboarding();
     }
   };
