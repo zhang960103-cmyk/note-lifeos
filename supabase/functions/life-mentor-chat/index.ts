@@ -102,6 +102,38 @@ financeHints提取规则：
 
 只返回JSON，不要有其他文字。`;
 
+const WHEEL_EVAL_PROMPT = `你是一个生命平衡评估专家。基于用户近期的日记对话内容，对以下7大领域进行专业评分（1-10分）。
+
+评分依据（心理学专业标准）：
+- 学习成长：是否有新知识输入、技能提升、认知突破？提到学习/阅读/课程/思考=加分
+- 感情婚姻：是否有亲密关系的互动、冲突处理、情感表达？提到伴侣/约会/沟通=加分
+- 家庭关系：是否有家人联系、家庭事务、亲情表达？提到父母/孩子/家人=加分
+- 事业财务：是否有工作成就、收入增长、职业发展？提到工作/项目/收入/客户=加分
+- 身心健康：是否有运动、睡眠、饮食、情绪管理？提到锻炼/休息/健康=加分
+- 社会连接：是否有社交活动、人际互动、社区参与？提到朋友/聚会/社交=加分
+- 人生意义：是否有目标感、价值感、使命感？提到意义/目标/梦想/使命=加分
+
+如果某个领域在日记中完全没有提及，给3-4分（说明被忽视）。
+频繁提及且正向=7-10分，提及但有困扰=4-6分。
+
+同时，识别用户日记中可能遗漏的重要维度，给出温和的提醒。
+
+返回JSON格式：
+{
+  "scores": {
+    "学习成长": 7,
+    "感情婚姻": 4,
+    "家庭关系": 5,
+    "事业财务": 8,
+    "身心健康": 3,
+    "社会连接": 6,
+    "人生意义": 5
+  },
+  "insights": "简短的一句话总结（≤30字）",
+  "blind_spots": ["你好像很少提到身心健康，最近运动了吗？", "家庭关系维度几乎空白，要不要给家人打个电话？"]
+}
+只返回JSON。`;
+
 const PARSE_TODO_PROMPT = `你是一个任务解析器。把用户的自然语言转化为结构化任务JSON。返回格式：
 {
   "text": "任务名称（动词+对象）",
@@ -167,6 +199,54 @@ serve(async (req) => {
 
       const extractData = await extractResp.json();
       const raw = extractData.choices?.[0]?.message?.content || "{}";
+      let parsed;
+      try {
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+      } catch {
+        parsed = {};
+      }
+
+      return new Response(
+        JSON.stringify(parsed),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Wheel evaluation mode
+    if (mode === "wheel-eval") {
+      const userTexts = messages
+        .filter((m: any) => m.role === "user")
+        .map((m: any) => m.content)
+        .join("\n");
+
+      const wheelResp = await fetch(
+        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: WHEEL_EVAL_PROMPT },
+              { role: "user", content: userTexts || "用户最近没有写日记。" },
+            ],
+          }),
+        }
+      );
+
+      if (!wheelResp.ok) {
+        return new Response(
+          JSON.stringify({ error: "评估失败" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const wheelData = await wheelResp.json();
+      const raw = wheelData.choices?.[0]?.message?.content || "{}";
       let parsed;
       try {
         const jsonMatch = raw.match(/\{[\s\S]*\}/);

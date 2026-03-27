@@ -3,7 +3,7 @@ import PromptBlock from "../PromptBlock";
 
 const patches = [
   { title: "🔄 反直觉对冲", status: "已集成到 evening.md ✅", desc: '每日晚间强制包含"反向视角"模块，挑战当日某个固有判断。防止陷入虚假勤奋、记流水账没有思维增量。' },
-  { title: "🌍 迪拜文化滤镜", status: "已集成到 MASTER PROMPT ✅", desc: "商业/内容类日记自动加地缘文化视角。穆斯林节奏、受众结构、脱口秀边界、中东AI机会——通用AI没有的本地化洞察。" },
+  { title: "🌍 地缘文化滤镜", status: "已集成到 MASTER PROMPT ✅", desc: "商业/内容类日记自动加地缘文化视角。本地节奏、受众结构、文化差异、AI机会——通用AI没有的本地化洞察。" },
   { title: "⚡ 心流状态捕捉", status: "已集成到 router.js + MASTER PROMPT ✅", desc: '情绪分≥9时AI强制追问：在做什么、什么环境、什么触发。把偶然的高效状态固化为可复制的"高效模板"。' },
   { title: "🤝 人际CRM追踪", status: "P2 · 下一版实现", desc: '记录含"认识了/见了/聊了重要人物"时，自动标记。3天后触发跟进提醒。高价值人脉不再烂在日记里。', isP2: true },
 ];

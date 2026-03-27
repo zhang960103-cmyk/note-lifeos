@@ -1,5 +1,5 @@
 export type ChatMsg = { role: "user" | "assistant"; content: string };
-export type ChatMode = "default" | "weekly-review" | "monthly-review" | "extract" | "parse-todo";
+export type ChatMode = "default" | "weekly-review" | "monthly-review" | "extract" | "parse-todo" | "wheel-eval";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
 

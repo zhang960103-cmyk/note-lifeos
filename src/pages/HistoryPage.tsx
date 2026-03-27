@@ -1,11 +1,13 @@
 import { useState, useMemo } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
-import { CheckSquare, Square, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { CheckSquare, Square, ChevronDown, ChevronUp, Trash2, FileText } from "lucide-react";
 import { format, parseISO, subDays, isAfter } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 
 const HistoryPage = () => {
   const { entries, toggleTodo, deleteEntry, monthFinanceStats, financeEntries } = useLifeOs();
+  const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const emotionData = useMemo(() => {
@@ -25,9 +27,17 @@ const HistoryPage = () => {
 
   return (
     <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4">
-      <div className="py-4">
-        <h1 className="font-serif-sc text-lg text-foreground">回顾</h1>
-        <span className="text-[10px] text-muted-foreground font-mono-jb">{entries.length} 天记录</span>
+      <div className="py-4 flex items-center justify-between">
+        <div>
+          <h1 className="font-serif-sc text-lg text-foreground">回顾</h1>
+          <span className="text-[10px] text-muted-foreground font-mono-jb">{entries.length} 天记录</span>
+        </div>
+        <button
+          onClick={() => navigate("/review")}
+          className="flex items-center gap-1.5 text-gold text-xs bg-gold-light px-3 py-1.5 rounded-full hover:bg-gold/20 transition"
+        >
+          <FileText size={14} /> 生成复盘信
+        </button>
       </div>
 
       {/* Emotion Curve */}

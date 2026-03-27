@@ -23,7 +23,7 @@ const plans = [
     price: "¥999+",
     name: "1对1定制",
     sub: "你的背景个性化",
-    features: ["远程1对1部署", "个性化提示词定制", "1个月支持", "迪拜/脱口秀等特定场景"],
+    features: ["远程1对1部署", "个性化提示词定制", "1个月支持", "地缘场景定制"],
     featured: false,
   },
 ];
@@ -41,7 +41,7 @@ const Pricing = () => (
     <SectionHeader num="⑨" title="商业化定价与出售方案" color="orange" />
 
     <Alert variant="gold" icon="⚖️" title="v4.1比v4.0更好卖">
-      MIT License可商业化 · 无硬伤不报错 · 买家30分钟跑起来 · 你的独特卖点（迪拜+脱口秀+AI开发背景）复制不了
+      MIT License可商业化 · 无硬伤不报错 · 买家30分钟跑起来 · 你的独特卖点（地缘优势+AI开发背景）复制不了
     </Alert>
 
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 my-4">

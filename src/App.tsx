@@ -10,6 +10,7 @@ import TodoPage from "@/pages/TodoPage";
 import HistoryPage from "@/pages/HistoryPage";
 import ReviewPage from "@/pages/ReviewPage";
 import WheelPage from "@/pages/WheelPage";
+import GuidePage from "@/pages/GuidePage";
 import AuthPage from "@/pages/AuthPage";
 import NotFound from "@/pages/NotFound";
 import Onboarding from "@/components/Onboarding";
@@ -46,6 +47,7 @@ const AppInner = () => {
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/review" element={<ReviewPage />} />
               <Route path="/wheel" element={<WheelPage />} />
+              <Route path="/guide" element={<GuidePage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </div>
