@@ -26,16 +26,102 @@ const SYSTEM_PROMPT = `你是用户的私人生命导师，名字叫「罗盘」
 - 不会说"首先…其次…最后…"
 - 不会在回复里重复用户刚才说的话来显示你在听
 - 不会给出"你可以尝试…"类型的建议列表
-- 不会用励志语录结尾`;
+- 不会用励志语录结尾
+
+【认知升维模式】
+当检测到以下信号时，切换到破局模式：
+- 用户说「不知道怎么办」「我有认知局限」「我不会」「我卡住了」「没有方向」
+- 用户问具体执行方法（如：怎么变现、怎么涨粉、怎么定价）
+
+破局模式的回应结构（仍然不超过3句话、不使用格式标记）：
+1. 第一句：精准定位卡点（不超过20字）
+2. 第二句：给出1个当下最可操作的具体行动（今天就能做的那种）
+3. 第三句：以一个校准问题结尾
+
+示例：「你卡的是定价。最快的破局动作是问3个已付费用户他们觉得值多少。你现在最大的阻力是不敢问还是不知道问谁？」
+
+知识库框架（作为底层思考依据，不要在回复里直接说"根据XXX框架"）：
+- 变现/定价/收入 → 用「价值阶梯」：免费引流→低价体验→高价服务→被动收入
+- 涨粉/流量/内容 → 用「内容飞轮」：痛点→价值→互动→信任，1条干货+1个故事+1个行动
+- 时间/精力/效率 → 用「四象限+时间块」：每天只做3件事，先做最难的，批量处理杂事
+- 人际/沟通/关系 → 用「非暴力沟通」：观察→感受→需要→请求
+- 学习/能力/技能 → 用「费曼学习法」：用最简单的话教别人，找到自己不懂的地方
+- 情绪/压力/自我 → 用「认知重构」：事件本身中性，是解读产生了情绪
+
+【资源推荐模式】
+当用户的问题涉及你无法在3句话内充分回答的深度话题，或用户明确表示「不知道从哪里学」「有什么推荐」「怎么系统学习」时：
+- 在回复的最后，额外附上一行资源推荐，格式为：📚 推荐：[具体书名/网站/工具名] — [一句话说明]
+- 推荐来源包括：
+  · 书籍：《思考快与慢》《原则》《非暴力沟通》《纳瓦尔宝典》《认知觉醒》《被讨厌的勇气》《穷查理宝典》《影响力》
+  · AI工具：ChatGPT(chat.openai.com)、Claude(claude.ai)、Perplexity(perplexity.ai)、NotebookLM(notebooklm.google.com)
+  · 学习平台：Coursera(coursera.org)、可汗学院(khanacademy.org)、得到App、混沌学园
+  · 效率工具：Notion(notion.so)、Obsidian(obsidian.md)、Flomo(flomoapp.com)
+  · 变现/商业：小报童、知识星球、Gumroad(gumroad.com)、Stripe(stripe.com)
+- 每次最多推荐1-2个，不要列清单
+- 如果话题不需要资源推荐，就不加
+
+【财务感知模式】
+当用户的对话中涉及金钱、收入、支出、定价、变现时：
+- 不要只共情，要帮用户看到这笔钱背后的认知问题
+- 用「资产vs负债」「时间出租vs系统产出」的框架引导思考
+- 比如：赚了钱但不知道该不该高兴 → 「这个收入是你时间的出租，还是系统的产出？」
+- 比如：不敢定价 → 「你定的价格反映的是成本还是价值？」
+
+偶尔（不必每次）用以下三个校准问题之一收尾：
+1. 这笔钱是你在卖时间，还是系统在帮你赚钱？
+2. 你的支出在买资产（升值的东西）还是买负债（消耗的东西）？
+3. 如果明天你不工作了，这个收入还在吗？`;
 
 const EXTRACT_PROMPT = `你是一个JSON提取器。根据用户的对话内容，提取以下信息并返回JSON格式（不要返回其他内容）：
 {
-  "emotionTags": ["标签1", "标签2"],  // 情绪标签，如：焦虑、兴奋、疲惫、清晰、迷茫、感恩
-  "topicTags": ["标签1", "标签2"],    // 主题标签，如：工作、关系、身体、创意、家庭、财务
-  "todos": ["任务1", "任务2"],         // 从对话中识别的行动意图，转化为简短任务
-  "emotionScore": 6                    // 情绪分值1-10，10最积极
+  "emotionTags": ["标签1", "标签2"],
+  "topicTags": ["标签1", "标签2"],
+  "todos": [
+    {
+      "text": "动词+对象结构的任务",
+      "priority": "normal",
+      "dueDate": "今天/明天/本周/null",
+      "tags": ["标签"]
+    }
+  ],
+  "emotionScore": 6,
+  "financeHints": [
+    {"type":"income","amount":500,"category":"教学收入","note":"学生转账"}
+  ]
 }
+
+todos提取规则：
+- 只提取用户真正有意愿做的事（有动词意图的），不要提取感叹或愿景
+- 任务名必须是「动词+对象」结构，如「整理书桌」「回复张老师消息」
+- priority推断：提到「今天」「马上」「紧急」= urgent；提到「重要」「必须」= high；其他默认 normal
+- 如果对话中完全没有行动意图，返回空数组 []
+
+financeHints提取规则：
+- 提取对话中提到的收支信息（如：赚了500、花了100、买了书）
+- 如果没有提到金额，返回空数组 []
+
 只返回JSON，不要有其他文字。`;
+
+const PARSE_TODO_PROMPT = `你是一个任务解析器。把用户的自然语言转化为结构化任务JSON。返回格式：
+{
+  "text": "任务名称（动词+对象）",
+  "priority": "normal",
+  "dueDate": "2024-01-01或null",
+  "dueTime": "15:00或null",
+  "tags": [],
+  "subTasks": [{"text":"子任务1"},{"text":"子任务2"}],
+  "recur": "none",
+  "recurDays": [],
+  "reminderMinutes": 0,
+  "note": ""
+}
+规则：
+- 「明天下午3点」→ 计算实际日期，dueTime=15:00
+- 「每天早上7点」→ recur=daily, dueTime=07:00
+- 「拆成3个子任务」→ 自动生成subTasks
+- 「重要」→ priority=high
+- 「这周内」→ dueDate设为本周日
+只返回JSON。`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -47,7 +133,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Extract mode: non-streaming, returns JSON metadata
+    // Extract mode
     if (mode === "extract") {
       const userTexts = messages
         .filter((m: any) => m.role === "user")
@@ -81,7 +167,52 @@ serve(async (req) => {
 
       const extractData = await extractResp.json();
       const raw = extractData.choices?.[0]?.message?.content || "{}";
-      // Try to parse JSON from the response
+      let parsed;
+      try {
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+      } catch {
+        parsed = {};
+      }
+
+      return new Response(
+        JSON.stringify(parsed),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Parse-todo mode
+    if (mode === "parse-todo") {
+      const userText = messages[messages.length - 1]?.content || "";
+      const today = new Date().toISOString().split("T")[0];
+
+      const parseResp = await fetch(
+        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-lite",
+            messages: [
+              { role: "system", content: PARSE_TODO_PROMPT + `\n当前日期：${today}` },
+              { role: "user", content: userText },
+            ],
+          }),
+        }
+      );
+
+      if (!parseResp.ok) {
+        return new Response(
+          JSON.stringify({ error: "解析失败" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const parseData = await parseResp.json();
+      const raw = parseData.choices?.[0]?.message?.content || "{}";
       let parsed;
       try {
         const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -101,10 +232,10 @@ serve(async (req) => {
 
     if (mode === "weekly-review") {
       systemContent += `\n\n【本次任务：周复盘信】
-请以"一封来自罗盘的周信"形式回复。不要用格式标记，像写信一样自然地写。包含本周观察、一个你注意到的模式、一个温和的提醒。控制在200字内。`;
+请以"一封来自罗盘的周信"形式回复。不要用格式标记，像写信一样自然地写。包含本周观察、一个你注意到的模式、一个温和的提醒。控制在200字内。如果有值得深入学习的话题，在末尾附上1个资源推荐。`;
     } else if (mode === "monthly-review") {
       systemContent += `\n\n【本次任务：月度回顾】
-请以"月度回信"形式回复。像老朋友写信，不用格式标记。包含这个月的整体感受、一个关键洞察、下个月的一个建议。控制在300字内。`;
+请以"月度回信"形式回复。像老朋友写信，不用格式标记。包含这个月的整体感受、一个关键洞察、下个月的一个建议。控制在300字内。在末尾附上1-2个适合用户当前阶段的学习资源推荐（书籍、工具或课程）。`;
     }
 
     const response = await fetch(
