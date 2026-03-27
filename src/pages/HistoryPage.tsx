@@ -7,6 +7,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "rec
 
 const HistoryPage = () => {
   const { entries, toggleTodo, deleteEntry, monthFinanceStats, financeEntries } = useLifeOs();
+  const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const emotionData = useMemo(() => {
