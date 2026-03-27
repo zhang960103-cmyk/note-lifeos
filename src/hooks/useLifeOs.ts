@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import type { DayEntry, WheelScore, ChatMessage, TodoItem, FinanceEntry, HabitItem } from "@/types/lifeOs";
 import { format, addDays, nextSunday } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
 
 const ENTRIES_KEY = "lifeos_days";
 const WHEEL_KEY = "lifeos_wheel";
