@@ -5,7 +5,7 @@ const tabs = [
   { path: "/todos", icon: "✅", label: "待办" },
   { path: "/wheel", icon: "🎯", label: "罗盘" },
   { path: "/history", icon: "🕐", label: "历史" },
-  { path: "/review", icon: "📊", label: "复盘" },
+  { path: "/guide", icon: "📖", label: "指南" },
 ];
 
 export default function TabBar() {
