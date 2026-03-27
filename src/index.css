@@ -36,7 +36,6 @@
 
     --radius: 0.625rem;
 
-    /* Custom Life OS colors */
     --gold: 39 58% 53%;
     --gold-light: 39 58% 53% / 0.1;
     --gold-border: 39 58% 53% / 0.25;
@@ -75,8 +74,9 @@
     @apply bg-background text-foreground;
     font-family: 'DM Sans', sans-serif;
     font-weight: 300;
-    line-height: 1.75;
+    line-height: 1.8;
     font-size: 14px;
+    -webkit-font-smoothing: antialiased;
   }
 
   html {
@@ -91,6 +91,14 @@
 
   .font-mono-jb {
     font-family: 'JetBrains Mono', monospace;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 }
 

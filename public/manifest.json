@@ -1,7 +1,7 @@
 {
-  "name": "Life OS v4.1 · 生命罗盘",
-  "short_name": "Life OS",
-  "description": "你的数字化人生参谋长——日记算法路由、生命之轮、AI导师、认知升维",
+  "name": "Life OS · 生命罗盘",
+  "short_name": "罗盘",
+  "description": "你的私人生命记录本",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0d0b08",

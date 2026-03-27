@@ -4,18 +4,37 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LifeOsProvider } from "@/contexts/LifeOsContext";
-import AppLayout from "@/components/AppLayout";
-import Dashboard from "@/pages/Dashboard";
-import DiaryPage from "@/pages/DiaryPage";
+import HomePage from "@/pages/HomePage";
 import HistoryPage from "@/pages/HistoryPage";
 import ReviewPage from "@/pages/ReviewPage";
 import WheelPage from "@/pages/WheelPage";
-import MentorPage from "@/pages/MentorPage";
-import CronPage from "@/pages/CronPage";
-import WhitepaperPage from "@/pages/WhitepaperPage";
 import NotFound from "@/pages/NotFound";
+import Onboarding from "@/components/Onboarding";
+import InstallBanner from "@/components/InstallBanner";
+import { useLifeOs } from "@/contexts/LifeOsContext";
 
 const queryClient = new QueryClient();
+
+const AppInner = () => {
+  const { onboarded } = useLifeOs();
+
+  if (!onboarded) return <Onboarding />;
+
+  return (
+    <>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="/review" element={<ReviewPage />} />
+          <Route path="/wheel" element={<WheelPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+      <InstallBanner />
+    </>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -23,21 +42,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <LifeOsProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/diary" element={<DiaryPage />} />
-              <Route path="/history" element={<HistoryPage />} />
-              <Route path="/review" element={<ReviewPage />} />
-              <Route path="/wheel" element={<WheelPage />} />
-              <Route path="/cron" element={<CronPage />} />
-            </Route>
-            <Route path="/mentor" element={<MentorPage />} />
-            <Route path="/whitepaper" element={<WhitepaperPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <AppInner />
       </LifeOsProvider>
     </TooltipProvider>
   </QueryClientProvider>
