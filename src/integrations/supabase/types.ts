@@ -14,7 +14,250 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chat_messages: {
+        Row: {
+          content: string
+          entry_id: string
+          id: string
+          role: string
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          entry_id: string
+          id?: string
+          role: string
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          entry_id?: string
+          id?: string
+          role?: string
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "day_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      day_entries: {
+        Row: {
+          date: string
+          emotion_score: number
+          emotion_tags: string[]
+          id: string
+          topic_tags: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          date: string
+          emotion_score?: number
+          emotion_tags?: string[]
+          id?: string
+          topic_tags?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          date?: string
+          emotion_score?: number
+          emotion_tags?: string[]
+          id?: string
+          topic_tags?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      finance_entries: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          date: string
+          id: string
+          note: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category?: string
+          created_at?: string
+          date: string
+          id?: string
+          note?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          date?: string
+          id?: string
+          note?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      habits: {
+        Row: {
+          check_ins: string[]
+          created_at: string
+          emoji: string
+          id: string
+          name: string
+          target_days: number[]
+          user_id: string
+        }
+        Insert: {
+          check_ins?: string[]
+          created_at?: string
+          emoji?: string
+          id?: string
+          name: string
+          target_days?: number[]
+          user_id: string
+        }
+        Update: {
+          check_ins?: string[]
+          created_at?: string
+          emoji?: string
+          id?: string
+          name?: string
+          target_days?: number[]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          onboarded: boolean
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          onboarded?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          onboarded?: boolean
+        }
+        Relationships: []
+      }
+      todos: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          due_date: string | null
+          due_time: string | null
+          emotion_tag: string | null
+          entry_id: string | null
+          id: string
+          note: string | null
+          priority: string
+          recur: string
+          recur_days: number[] | null
+          reminder_minutes: number | null
+          source_date: string | null
+          status: string
+          sub_tasks: Json
+          tags: string[]
+          text: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          due_time?: string | null
+          emotion_tag?: string | null
+          entry_id?: string | null
+          id?: string
+          note?: string | null
+          priority?: string
+          recur?: string
+          recur_days?: number[] | null
+          reminder_minutes?: number | null
+          source_date?: string | null
+          status?: string
+          sub_tasks?: Json
+          tags?: string[]
+          text: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          due_time?: string | null
+          emotion_tag?: string | null
+          entry_id?: string | null
+          id?: string
+          note?: string | null
+          priority?: string
+          recur?: string
+          recur_days?: number[] | null
+          reminder_minutes?: number | null
+          source_date?: string | null
+          status?: string
+          sub_tasks?: Json
+          tags?: string[]
+          text?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "todos_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "day_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wheel_scores: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          scores: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          scores: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          scores?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
