@@ -144,7 +144,7 @@ const WheelPage = () => {
   };
 
   const addActionToTodo = (action: string) => {
-    addTodo({
+    addTodoToDate(todayKey, {
       id: crypto.randomUUID(),
       text: action,
       status: "todo",
