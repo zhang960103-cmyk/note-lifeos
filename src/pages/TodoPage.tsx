@@ -500,7 +500,7 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
   editing: boolean; onEdit: () => void;
   onUpdate: (updates: Partial<TodoItem>) => void;
   onDelete: () => void;
-  onMove: (todo: TodoItem, status: string) => void;
+  onMove: (todo: TodoItem, status: TaskStatus) => void;
 }) {
   const isDone = todo.status === "done";
   const isDoing = todo.status === "doing";
