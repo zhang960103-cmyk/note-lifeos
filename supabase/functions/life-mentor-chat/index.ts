@@ -97,6 +97,11 @@ const SYSTEM_PROMPT = `你是用户的私人生命导师，名字叫「罗盘」
 
 const EXTRACT_PROMPT = `你是一个专业的任务管理AI。你的核心能力是从用户的自然对话中智能提取、拆分、排序任务。
 
+【重要】用户已有以下待办事项（避免重复创建语义相同的任务）：
+{EXISTING_TODOS}
+
+【重要】如果用户在对话中提到已经完成了某件事，请在 completedTodoIds 中返回对应的已有任务ID。
+
 根据用户的对话内容，提取以下信息并返回JSON格式（不要返回其他内容）：
 {
   "emotionTags": ["标签1", "标签2"],
@@ -112,12 +117,18 @@ const EXTRACT_PROMPT = `你是一个专业的任务管理AI。你的核心能力
       "note": "AI补充的执行建议或提醒"
     }
   ],
+  "completedTodoIds": ["已完成任务的ID"],
   "emotionScore": 6,
   "financeHints": [
     {"type":"income","amount":500,"category":"教学收入","note":"学生转账"}
   ],
   "clarifyNeeded": "如果用户说的内容模糊无法拆分为具体任务，这里写一句提醒，否则为null"
 }
+
+todos去重规则（最重要！）：
+- 如果用户说的任务和已有待办语义相同（如"涨粉"vs"启动涨粉"vs"开始涨粉计划"），不要再创建新任务
+- 只提取真正全新的、已有列表中不存在的任务
+- 如果用户说"XXX做完了/搞定了/完成了"，在completedTodoIds中返回对应的已有任务ID
 
 todos智能拆分规则：
 - 用户说"明天要开会，还要写方案，回复几个邮件"→ 拆分为3个独立任务
@@ -303,7 +314,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, mode, scores: inputScores } = await req.json();
+    const { messages, mode, scores: inputScores, existingTodos } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -333,7 +344,11 @@ serve(async (req) => {
     if (mode === "extract") {
       const userTexts = messages.filter((m: any) => m.role === "user").map((m: any) => m.content).join("\n");
       const today = new Date().toISOString().split("T")[0];
-      const parsed = await aiCall("google/gemini-2.5-flash", EXTRACT_PROMPT.replace("{TODAY}", today), userTexts);
+      const todosContext = existingTodos?.length > 0
+        ? existingTodos.map((t: any) => `[${t.id}] ${t.text} (${t.status}, ${t.priority})`).join("\n")
+        : "（暂无待办）";
+      const prompt = EXTRACT_PROMPT.replace("{TODAY}", today).replace("{EXISTING_TODOS}", todosContext);
+      const parsed = await aiCall("google/gemini-2.5-flash", prompt, userTexts);
       return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 

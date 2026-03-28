@@ -81,10 +81,11 @@ export async function streamChat({
   onDone();
 }
 
-export async function extractMeta(messages: ChatMsg[]): Promise<{
+export async function extractMeta(messages: ChatMsg[], existingTodos?: Array<{ id: string; text: string; status: string; priority: string }>): Promise<{
   emotionTags: string[];
   topicTags: string[];
   todos: Array<{ text: string; priority?: string; dueDate?: string; tags?: string[] }>;
+  completedTodoIds: string[];
   emotionScore: number;
   financeHints: Array<{ type: 'income' | 'expense'; amount: number; category: string; note: string }>;
 }> {
@@ -95,19 +96,20 @@ export async function extractMeta(messages: ChatMsg[]): Promise<{
         "Content-Type": "application/json",
         Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
-      body: JSON.stringify({ messages, mode: "extract" }),
+      body: JSON.stringify({ messages, mode: "extract", existingTodos }),
     });
-    if (!resp.ok) return { emotionTags: [], topicTags: [], todos: [], emotionScore: 5, financeHints: [] };
+    if (!resp.ok) return { emotionTags: [], topicTags: [], todos: [], completedTodoIds: [], emotionScore: 5, financeHints: [] };
     const data = await resp.json();
     return {
       emotionTags: data.emotionTags || [],
       topicTags: data.topicTags || [],
       todos: data.todos || [],
+      completedTodoIds: data.completedTodoIds || [],
       emotionScore: data.emotionScore || 5,
       financeHints: data.financeHints || [],
     };
   } catch {
-    return { emotionTags: [], topicTags: [], todos: [], emotionScore: 5, financeHints: [] };
+    return { emotionTags: [], topicTags: [], todos: [], completedTodoIds: [], emotionScore: 5, financeHints: [] };
   }
 }
 

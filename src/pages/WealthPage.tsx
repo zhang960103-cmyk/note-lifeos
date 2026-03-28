@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { format, parseISO, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isWithinInterval } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, LineChart, Line } from "recharts";
-import { TrendingUp, TrendingDown, Wallet, BookOpen } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from "recharts";
+import { TrendingUp, TrendingDown, Wallet, BookOpen, Trash2, Pencil, Check, X } from "lucide-react";
 
 const COLORS = ["hsl(39,58%,53%)", "hsl(0,65%,55%)", "hsl(142,60%,45%)", "hsl(210,60%,50%)", "hsl(280,55%,55%)", "hsl(30,50%,45%)"];
 
@@ -14,8 +14,11 @@ const FINANCE_TIPS = [
 ];
 
 const WealthPage = () => {
-  const { financeEntries, monthFinanceStats } = useLifeOs();
+  const { financeEntries, monthFinanceStats, deleteFinanceEntry, updateFinanceEntry } = useLifeOs();
   const [period, setPeriod] = useState<"week" | "month" | "all">("month");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editNote, setEditNote] = useState("");
 
   // Filter entries by period
   const filtered = useMemo(() => {
@@ -227,16 +230,47 @@ const WealthPage = () => {
           </p>
         ) : (
           <div className="space-y-1.5">
-            {filtered.slice(0, 10).map(f => (
-              <div key={f.id} className="flex items-center gap-2 text-xs">
-                <span className={f.type === "income" ? "text-los-green" : "text-los-orange"}>
-                  {f.type === "income" ? "↑" : "↓"}
-                </span>
-                <span className="text-muted-foreground flex-1 truncate">{f.category} {f.note && `· ${f.note}`}</span>
-                <span className={`font-mono-jb ${f.type === "income" ? "text-los-green" : "text-los-orange"}`}>
-                  {f.type === "income" ? "+" : "-"}¥{f.amount}
-                </span>
-                <span className="text-[8px] text-muted-foreground/60">{f.date.slice(5)}</span>
+            {filtered.slice(0, 20).map(f => (
+              <div key={f.id} className="flex items-center gap-2 text-xs group">
+                {editingId === f.id ? (
+                  <>
+                    <span className={f.type === "income" ? "text-los-green" : "text-los-orange"}>
+                      {f.type === "income" ? "↑" : "↓"}
+                    </span>
+                    <input
+                      value={editAmount}
+                      onChange={e => setEditAmount(e.target.value)}
+                      className="w-16 bg-surface-3 border border-border rounded px-1 py-0.5 text-xs font-mono-jb text-foreground"
+                      type="number"
+                    />
+                    <input
+                      value={editNote}
+                      onChange={e => setEditNote(e.target.value)}
+                      className="flex-1 bg-surface-3 border border-border rounded px-1 py-0.5 text-xs text-foreground"
+                      placeholder="备注"
+                    />
+                    <button onClick={() => {
+                      updateFinanceEntry(f.id, { amount: Number(editAmount), note: editNote });
+                      setEditingId(null);
+                    }} className="text-los-green"><Check size={12} /></button>
+                    <button onClick={() => setEditingId(null)} className="text-muted-foreground"><X size={12} /></button>
+                  </>
+                ) : (
+                  <>
+                    <span className={f.type === "income" ? "text-los-green" : "text-los-orange"}>
+                      {f.type === "income" ? "↑" : "↓"}
+                    </span>
+                    <span className="text-muted-foreground flex-1 truncate">{f.category} {f.note && `· ${f.note}`}</span>
+                    <span className={`font-mono-jb ${f.type === "income" ? "text-los-green" : "text-los-orange"}`}>
+                      {f.type === "income" ? "+" : "-"}¥{f.amount}
+                    </span>
+                    <span className="text-[8px] text-muted-foreground/60">{f.date.slice(5)}</span>
+                    <div className="hidden group-hover:flex gap-1">
+                      <button onClick={() => { setEditingId(f.id); setEditAmount(String(f.amount)); setEditNote(f.note || ""); }} className="text-muted-foreground hover:text-foreground"><Pencil size={10} /></button>
+                      <button onClick={() => deleteFinanceEntry(f.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={10} /></button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>

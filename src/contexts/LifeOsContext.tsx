@@ -21,6 +21,8 @@ interface LifeOsContextType {
   completeOnboarding: () => void;
   financeEntries: FinanceEntry[];
   addFinanceEntry: (e: Omit<FinanceEntry, 'id' | 'createdAt'>) => void;
+  deleteFinanceEntry: (id: string) => void;
+  updateFinanceEntry: (id: string, updates: Partial<Omit<FinanceEntry, 'id' | 'createdAt'>>) => void;
   todayFinanceStats: { income: number; expense: number; net: number; entries: FinanceEntry[] };
   monthFinanceStats: { income: number; expense: number; net: number; entries: FinanceEntry[]; count: number };
   habits: HabitItem[];
@@ -38,7 +40,7 @@ export function LifeOsProvider({ children, userId }: { children: ReactNode; user
   } = useDayEntries(userId);
   const { scores: wheelScores, addScore: addWheelScore } = useWheelScores(userId);
   const { onboarded, completeOnboarding } = useOnboarding(userId);
-  const { entries: financeEntries, addEntry: addFinanceEntry, todayStats: todayFinanceStats, monthStats: monthFinanceStats } = useFinance(userId);
+  const { entries: financeEntries, addEntry: addFinanceEntry, deleteEntry: deleteFinanceEntry, updateEntry: updateFinanceEntry, todayStats: todayFinanceStats, monthStats: monthFinanceStats } = useFinance(userId);
   const { habits, addHabit, checkIn: checkInHabit, deleteHabit } = useHabits(userId);
 
   return (
@@ -46,7 +48,7 @@ export function LifeOsProvider({ children, userId }: { children: ReactNode; user
       entries, todayEntry, todayKey, addMessage, updateAssistantMessage,
       updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, allTodos,
       wheelScores, addWheelScore, onboarded, completeOnboarding,
-      financeEntries, addFinanceEntry, todayFinanceStats, monthFinanceStats,
+      financeEntries, addFinanceEntry, deleteFinanceEntry, updateFinanceEntry, todayFinanceStats, monthFinanceStats,
       habits, addHabit, checkInHabit, deleteHabit,
     }}>
       {children}

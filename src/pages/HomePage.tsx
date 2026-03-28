@@ -33,7 +33,7 @@ const HomePage = () => {
   const { signOut } = useAuth();
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
-    addFinanceEntry, todayFinanceStats, wheelScores, entries,
+    addFinanceEntry, todayFinanceStats, wheelScores, entries, allTodos, toggleTodo,
   } = useLifeOs();
   const [dailyQuestion, setDailyQuestion] = useState<{ question: string; domain: string } | null>(null);
   const [input, setInput] = useState("");
@@ -140,7 +140,22 @@ const HomePage = () => {
           setIsLoading(false);
 
           const msgsForExtract = [...allMsgs, { role: "assistant" as const, content: full }];
-          extractMeta(msgsForExtract).then(meta => {
+          const existingTodosForAI = allTodos
+            .filter(t => t.status !== "dropped")
+            .map(t => ({ id: t.id, text: t.text, status: t.status, priority: t.priority }));
+          extractMeta(msgsForExtract, existingTodosForAI).then(meta => {
+            // Mark completed todos from AI recognition
+            if (meta.completedTodoIds?.length > 0) {
+              meta.completedTodoIds.forEach(todoId => {
+                const todo = allTodos.find(t => t.id === todoId);
+                if (todo && todo.status !== "done") {
+                  toggleTodo(todo.sourceDate || todayKey, todoId);
+                }
+              });
+              setTodoToast(`✅ 已标记 ${meta.completedTodoIds.length} 条任务完成`);
+              setTimeout(() => setTodoToast(null), 3000);
+            }
+
             const todoItems: TodoItem[] = (meta.todos || []).map(t =>
               createTodoFromExtract(t, todayKey)
             );
@@ -186,7 +201,7 @@ const HomePage = () => {
       setStreamingContent("");
       setIsLoading(false);
     }
-  }, [isLoading, messages, addMessage, updateDayMeta, todayKey, addFinanceEntry]);
+  }, [isLoading, messages, addMessage, updateDayMeta, todayKey, addFinanceEntry, allTodos, toggleTodo]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
