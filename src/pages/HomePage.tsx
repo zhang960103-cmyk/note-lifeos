@@ -153,6 +153,18 @@ const HomePage = () => {
 
   return (
     <div className="flex flex-col h-full max-w-[600px] mx-auto relative">
+      {/* Top bar with History & Guide */}
+      <div className="flex items-center justify-between px-4 py-2">
+        <span className="text-xs text-muted-foreground font-mono-jb">{format(new Date(), "M月d日")}</span>
+        <div className="flex gap-2">
+          <button onClick={() => navigate("/history")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2">
+            <Clock size={16} />
+          </button>
+          <button onClick={() => navigate("/guide")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2">
+            <BookOpen size={16} />
+          </button>
+        </div>
+      </div>
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-2">
         {displayMessages.length === 0 && (
