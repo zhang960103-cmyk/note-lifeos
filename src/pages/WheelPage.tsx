@@ -234,17 +234,7 @@ const WheelPage = () => {
               dataKey="domain"
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }}
             />
-            {/* Previous scores as dashed overlay */}
-            {prevScores && (
-              <Radar
-                dataKey="prev"
-                data={ALL_DOMAINS.map(d => ({ domain: d, prev: prevScores[d] }))}
-                stroke="hsl(var(--muted-foreground))"
-                fill="none"
-                strokeDasharray="4 4"
-                strokeWidth={1}
-              />
-            )}
+            {/* Previous scores as dashed overlay - include in main data */}
             <Radar
               dataKey="value"
               stroke="hsl(39 58% 53%)"
