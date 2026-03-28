@@ -101,19 +101,38 @@ const GuidePage = () => {
         </div>
       </section>
 
-      {/* Life Wheel Entry */}
+      {/* Quick navigation */}
       <section className="mb-6">
-        <button
-          onClick={() => navigate("/wheel")}
-          className="w-full bg-surface-2 border border-border rounded-xl px-4 py-4 flex items-center gap-3 hover:border-gold/40 transition-colors"
-        >
-          <Compass size={20} className="text-gold" />
-          <div className="text-left flex-1">
-            <span className="text-sm text-foreground font-serif-sc">生命之轮评估</span>
-            <p className="text-xs text-muted-foreground mt-0.5">7大领域打分，可视化你的生命平衡度</p>
-          </div>
-          <span className="text-muted-foreground text-xs">→</span>
-        </button>
+        <h2 className="text-xs text-gold font-mono-jb mb-3">🚀 快速入口</h2>
+        <div className="space-y-2">
+          <button onClick={() => navigate("/wheel")}
+            className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 flex items-center gap-3 hover:border-gold/40 transition-colors">
+            <Compass size={18} className="text-gold" />
+            <div className="text-left flex-1">
+              <span className="text-sm text-foreground font-serif-sc">生命之轮评估</span>
+              <p className="text-[10px] text-muted-foreground">7大领域打分，可视化生命平衡度</p>
+            </div>
+            <span className="text-muted-foreground text-xs">→</span>
+          </button>
+          <button onClick={() => navigate("/insights")}
+            className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 flex items-center gap-3 hover:border-gold/40 transition-colors">
+            <span className="text-lg">💡</span>
+            <div className="text-left flex-1">
+              <span className="text-sm text-foreground font-serif-sc">破局手册</span>
+              <p className="text-[10px] text-muted-foreground">从对话中提取的行动洞察库</p>
+            </div>
+            <span className="text-muted-foreground text-xs">→</span>
+          </button>
+          <button onClick={() => navigate("/goals")}
+            className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 flex items-center gap-3 hover:border-gold/40 transition-colors">
+            <span className="text-lg">🎯</span>
+            <div className="text-left flex-1">
+              <span className="text-sm text-foreground font-serif-sc">目标系统 OKR</span>
+              <p className="text-[10px] text-muted-foreground">季度目标管理，自动关联待办</p>
+            </div>
+            <span className="text-muted-foreground text-xs">→</span>
+          </button>
+        </div>
       </section>
 
       {/* Soul Patches */}
