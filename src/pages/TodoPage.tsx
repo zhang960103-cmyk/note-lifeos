@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { format, startOfWeek, addDays, isToday } from "date-fns";
 import { Play, Pause, X, Check, Trash2, Pencil, MessageCircle, LayoutGrid, List, ArrowRight } from "lucide-react";
-import type { TodoItem, HabitItem, Priority } from "@/types/lifeOs";
+import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
 import { useNavigate } from "react-router-dom";
 
 const PRIORITY_CONFIG: Record<Priority, { label: string; emoji: string; color: string }> = {
