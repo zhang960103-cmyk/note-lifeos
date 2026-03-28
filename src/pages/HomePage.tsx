@@ -14,8 +14,9 @@ const HomePage = () => {
   const navigate = useNavigate();
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
-    addFinanceEntry, todayFinanceStats,
+    addFinanceEntry, todayFinanceStats, wheelScores,
   } = useLifeOs();
+  const [dailyQuestion, setDailyQuestion] = useState<{ question: string; domain: string } | null>(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
