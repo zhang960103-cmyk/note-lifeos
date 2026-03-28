@@ -187,10 +187,22 @@ const HomePage = () => {
       <div className="flex-1 overflow-y-auto px-4 py-2">
         {displayMessages.length === 0 && (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center max-w-[260px]">
+            <div className="text-center max-w-[300px]">
               <div className="text-3xl mb-4">🧭</div>
               <p className="text-foreground text-sm leading-[1.8]">今天，你想说什么？</p>
               <p className="text-muted-foreground text-xs mt-2 leading-[1.8]">随便聊，我在听。</p>
+              {dailyQuestion && (
+                <div className="mt-6 bg-surface-2 border border-border rounded-xl px-4 py-3 text-left">
+                  <p className="text-[10px] text-gold font-mono-jb mb-1">💭 今日一问 · {dailyQuestion.domain}</p>
+                  <p className="text-xs text-foreground leading-[1.8] mb-2">{dailyQuestion.question}</p>
+                  <button
+                    onClick={() => setInput(dailyQuestion.question)}
+                    className="text-[10px] text-gold hover:text-gold/80 transition-colors"
+                  >
+                    回应这个问题 →
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
