@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Compass } from "lucide-react";
 
 const algorithms = [
   { num: "01", tag: "日常", emoji: "📖", title: "生活作业", desc: "捕捉每日最有故事价值的瞬间，构建人生叙事资产库。", trigger: "默认 ｜ /story" },
@@ -99,6 +99,21 @@ const GuidePage = () => {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Life Wheel Entry */}
+      <section className="mb-6">
+        <button
+          onClick={() => navigate("/wheel")}
+          className="w-full bg-surface-2 border border-border rounded-xl px-4 py-4 flex items-center gap-3 hover:border-gold/40 transition-colors"
+        >
+          <Compass size={20} className="text-gold" />
+          <div className="text-left flex-1">
+            <span className="text-sm text-foreground font-serif-sc">生命之轮评估</span>
+            <p className="text-xs text-muted-foreground mt-0.5">7大领域打分，可视化你的生命平衡度</p>
+          </div>
+          <span className="text-muted-foreground text-xs">→</span>
+        </button>
       </section>
 
       {/* Soul Patches */}
