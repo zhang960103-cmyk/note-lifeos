@@ -10,6 +10,7 @@ import type { TodoItem } from "@/types/lifeOs";
 const CATEGORIES = ["教学", "内容", "餐饮", "交通", "购物", "其他"];
 
 const HomePage = () => {
+  const navigate = useNavigate();
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
     addFinanceEntry, todayFinanceStats,
