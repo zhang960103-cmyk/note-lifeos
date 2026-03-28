@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
-import { format, parseISO, startOfWeek, addDays, isToday } from "date-fns";
-import { Plus, Zap, Play, Pause, RotateCcw, X, Check, Trash2 } from "lucide-react";
-import { parseTodoNL } from "@/lib/streamChat";
+import { format, startOfWeek, addDays, isToday } from "date-fns";
+import { Play, Pause, X, Check, Trash2, Pencil, MessageCircle } from "lucide-react";
 import type { TodoItem, HabitItem, Priority } from "@/types/lifeOs";
+import { useNavigate } from "react-router-dom";
 
 const PRIORITY_CONFIG: Record<Priority, { label: string; emoji: string; color: string }> = {
   urgent: { label: "紧急", emoji: "🔴", color: "text-los-red" },
@@ -14,15 +14,13 @@ const PRIORITY_CONFIG: Record<Priority, { label: string; emoji: string; color: s
 
 const TodoPage = () => {
   const {
-    allTodos, todayKey, toggleTodo, updateTodo, addTodoToDate, entries,
+    allTodos, todayKey, toggleTodo, updateTodo, addTodoToDate, deleteTodo,
     habits, addHabit, checkInHabit, deleteHabit,
   } = useLifeOs();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<"all" | "today" | "habits">("all");
-  const [showCreate, setShowCreate] = useState(false);
-  const [showNL, setShowNL] = useState(false);
-  const [nlInput, setNLInput] = useState("");
-  const [nlLoading, setNLLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Pomodoro state
   const [pomodoroActive, setPomodoroActive] = useState(false);
@@ -30,17 +28,6 @@ const TodoPage = () => {
   const [pomodoroTime, setPomodoroTime] = useState(25 * 60);
   const [pomodoroRunning, setPomodoroRunning] = useState(false);
   const pomodoroRef = useRef<number | null>(null);
-
-  // Create form state
-  const [newText, setNewText] = useState("");
-  const [newPriority, setNewPriority] = useState<Priority>("normal");
-  const [newDueDate, setNewDueDate] = useState("");
-  const [newDueTime, setNewDueTime] = useState("");
-  const [newTags, setNewTags] = useState<string[]>([]);
-  const [newTagInput, setNewTagInput] = useState("");
-  const [newNote, setNewNote] = useState("");
-  const [newSubTasks, setNewSubTasks] = useState<string[]>([]);
-  const [newSubInput, setNewSubInput] = useState("");
 
   // Habit create
   const [showHabitCreate, setShowHabitCreate] = useState(false);
@@ -95,52 +82,6 @@ const TodoPage = () => {
     }
   };
 
-  const handleCreate = () => {
-    if (!newText.trim()) return;
-    const now = new Date().toISOString();
-    const todo: TodoItem = {
-      id: crypto.randomUUID(),
-      text: newText,
-      status: "todo",
-      priority: newPriority,
-      dueDate: newDueDate || undefined,
-      dueTime: newDueTime || undefined,
-      tags: newTags,
-      subTasks: newSubTasks.map(t => ({ id: crypto.randomUUID(), text: t, done: false })),
-      recur: "none",
-      note: newNote || undefined,
-      sourceDate: todayKey,
-      createdAt: now,
-      updatedAt: now,
-    };
-    addTodoToDate(todayKey, todo);
-    resetCreateForm();
-  };
-
-  const resetCreateForm = () => {
-    setNewText(""); setNewPriority("normal"); setNewDueDate(""); setNewDueTime("");
-    setNewTags([]); setNewNote(""); setNewSubTasks([]); setShowCreate(false);
-  };
-
-  const handleNLParse = async () => {
-    if (!nlInput.trim()) return;
-    setNLLoading(true);
-    const result = await parseTodoNL(nlInput);
-    setNLLoading(false);
-    if (result) {
-      setNewText(result.text || nlInput);
-      setNewPriority(result.priority || "normal");
-      setNewDueDate(result.dueDate || "");
-      setNewDueTime(result.dueTime || "");
-      setNewTags(result.tags || []);
-      setNewNote(result.note || "");
-      setNewSubTasks(result.subTasks?.map((s: any) => s.text) || []);
-      setShowNL(false);
-      setNLInput("");
-      setShowCreate(true);
-    }
-  };
-
   // Week days for habits
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -185,14 +126,21 @@ const TodoPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
         <span className="font-serif-sc text-lg text-foreground">待办</span>
-        <div className="flex gap-2">
-          <button onClick={() => setShowNL(true)} className="text-xs text-gold bg-gold/10 px-3 py-1 rounded-full flex items-center gap-1">
-            <Zap size={12} /> 快速
-          </button>
-          <button onClick={() => setShowCreate(true)} className="text-xs text-gold bg-gold/10 px-3 py-1 rounded-full flex items-center gap-1">
-            <Plus size={12} /> 新建
-          </button>
-        </div>
+        <button
+          onClick={() => navigate("/")}
+          className="text-xs text-gold bg-gold/10 px-3 py-1 rounded-full flex items-center gap-1"
+        >
+          <MessageCircle size={12} /> 对话生成任务
+        </button>
+      </div>
+
+      {/* AI hint banner */}
+      <div className="mx-4 mb-3 bg-surface-2 border border-border rounded-xl px-4 py-2.5">
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          💡 所有待办由 AI 从对话中自动提取并评估优先级。回到「今天」告诉罗盘你要做的事，比如
+          <span className="text-gold">"明天下午3点开会，之前要准备PPT，还得回复老王消息"</span>
+          ，AI 会自动拆分、排序并生成清单。
+        </p>
       </div>
 
       {/* Tabs */}
@@ -221,10 +169,16 @@ const TodoPage = () => {
                   <div className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{cfg.emoji} {cfg.label}</div>
                   <div className="space-y-1.5">
                     {items.map(todo => (
-                      <TodoCard key={todo.id} todo={todo} onToggle={handleToggle} expanded={expandedId === todo.id}
+                      <TodoCard
+                        key={todo.id} todo={todo} onToggle={handleToggle}
+                        expanded={expandedId === todo.id}
                         onExpand={() => setExpandedId(expandedId === todo.id ? null : todo.id)}
                         celebrating={celebrateId === todo.id}
                         onStartPomodoro={() => { setPomodoroTask(todo.text); setPomodoroActive(true); setPomodoroRunning(true); setPomodoroTime(25 * 60); }}
+                        editing={editingId === todo.id}
+                        onEdit={() => setEditingId(editingId === todo.id ? null : todo.id)}
+                        onUpdate={(updates) => { updateTodo(todo.sourceDate || todayKey, todo.id, updates); setEditingId(null); }}
+                        onDelete={() => deleteTodo(todo.sourceDate || todayKey, todo.id)}
                       />
                     ))}
                   </div>
@@ -232,7 +186,11 @@ const TodoPage = () => {
               );
             })}
             {allTodos.filter(t => t.status !== "done" && t.status !== "dropped").length === 0 && (
-              <div className="text-center py-12 text-muted-foreground text-xs">暂无待办</div>
+              <div className="text-center py-12">
+                <div className="text-3xl mb-3">📝</div>
+                <div className="text-muted-foreground text-xs mb-2">暂无待办</div>
+                <p className="text-[10px] text-muted-foreground/60">回到「今天」和罗盘聊聊，说出你要做的事</p>
+              </div>
             )}
           </div>
         )}
@@ -251,13 +209,24 @@ const TodoPage = () => {
             </div>
             <div className="space-y-1.5">
               {todayTodos.map(todo => (
-                <TodoCard key={todo.id} todo={todo} onToggle={handleToggle} expanded={expandedId === todo.id}
+                <TodoCard
+                  key={todo.id} todo={todo} onToggle={handleToggle}
+                  expanded={expandedId === todo.id}
                   onExpand={() => setExpandedId(expandedId === todo.id ? null : todo.id)}
                   celebrating={celebrateId === todo.id}
                   onStartPomodoro={() => { setPomodoroTask(todo.text); setPomodoroActive(true); setPomodoroRunning(true); setPomodoroTime(25 * 60); }}
+                  editing={editingId === todo.id}
+                  onEdit={() => setEditingId(editingId === todo.id ? null : todo.id)}
+                  onUpdate={(updates) => { updateTodo(todo.sourceDate || todayKey, todo.id, updates); setEditingId(null); }}
+                  onDelete={() => deleteTodo(todo.sourceDate || todayKey, todo.id)}
                 />
               ))}
-              {todayTodos.length === 0 && <div className="text-center py-12 text-muted-foreground text-xs">今天没有待办 🎉</div>}
+              {todayTodos.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="text-muted-foreground text-xs">今天没有待办 🎉</div>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">和罗盘说说你的计划吧</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -301,97 +270,6 @@ const TodoPage = () => {
         )}
       </div>
 
-      {/* NL Input Modal */}
-      {showNL && (
-        <div className="absolute inset-0 bg-background/90 z-50 flex items-center justify-center p-6">
-          <div className="bg-surface-1 border border-border rounded-2xl p-5 w-full max-w-md">
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-xs text-foreground font-serif-sc">⚡ 快速创建</span>
-              <button onClick={() => setShowNL(false)}><X size={16} className="text-muted-foreground" /></button>
-            </div>
-            <input
-              value={nlInput}
-              onChange={e => setNLInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleNLParse()}
-              placeholder="用自然语言描述任务，如：明天下午3点联系客户谈合作"
-              className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-gold-border mb-3"
-              autoFocus
-            />
-            <button onClick={handleNLParse} disabled={nlLoading || !nlInput.trim()} className="w-full bg-gold text-background py-2 rounded-xl text-sm disabled:opacity-30">
-              {nlLoading ? "解析中..." : "解析并创建"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Create Sheet */}
-      {showCreate && (
-        <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl p-5 z-50 max-h-[80vh] overflow-y-auto">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-xs text-foreground font-serif-sc">新建任务</span>
-            <button onClick={resetCreateForm}><X size={16} className="text-muted-foreground" /></button>
-          </div>
-          <input value={newText} onChange={e => setNewText(e.target.value)} placeholder="任务名称" autoFocus
-            className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 text-foreground text-base mb-3 focus:outline-none focus:border-gold-border" />
-
-          {/* Priority */}
-          <div className="flex gap-1.5 mb-3">
-            {(["urgent", "high", "normal", "low"] as Priority[]).map(p => (
-              <button key={p} onClick={() => setNewPriority(p)}
-                className={`text-xs px-3 py-1.5 rounded-full transition ${newPriority === p ? "bg-gold text-background" : "bg-surface-2 text-muted-foreground"}`}>
-                {PRIORITY_CONFIG[p].emoji} {PRIORITY_CONFIG[p].label}
-              </button>
-            ))}
-          </div>
-
-          {/* Date & Time */}
-          <div className="flex gap-2 mb-3">
-            <input type="date" value={newDueDate} onChange={e => setNewDueDate(e.target.value)}
-              className="flex-1 bg-surface-2 border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none" />
-            <input type="time" value={newDueTime} onChange={e => setNewDueTime(e.target.value)}
-              className="w-28 bg-surface-2 border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none" />
-          </div>
-
-          {/* Sub tasks */}
-          <div className="mb-3">
-            <div className="space-y-1 mb-1.5">
-              {newSubTasks.map((s, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs text-foreground">
-                  <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full" />
-                  <span className="flex-1">{s}</span>
-                  <button onClick={() => setNewSubTasks(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground"><X size={10} /></button>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input value={newSubInput} onChange={e => setNewSubInput(e.target.value)} placeholder="+ 添加子任务"
-                onKeyDown={e => { if (e.key === "Enter" && newSubInput.trim()) { setNewSubTasks(prev => [...prev, newSubInput.trim()]); setNewSubInput(""); } }}
-                className="flex-1 bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none" />
-            </div>
-          </div>
-
-          {/* Tags */}
-          <div className="flex gap-1 flex-wrap mb-3">
-            {newTags.map(t => (
-              <span key={t} className="text-[9px] bg-gold-light text-gold px-2 py-0.5 rounded-full flex items-center gap-1">
-                {t} <button onClick={() => setNewTags(prev => prev.filter(x => x !== t))}><X size={8} /></button>
-              </span>
-            ))}
-            <input value={newTagInput} onChange={e => setNewTagInput(e.target.value)} placeholder="标签"
-              onKeyDown={e => { if (e.key === "Enter" && newTagInput.trim()) { setNewTags(prev => [...prev, newTagInput.trim()]); setNewTagInput(""); } }}
-              className="bg-transparent text-xs text-foreground focus:outline-none w-16" />
-          </div>
-
-          {/* Note */}
-          <textarea value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="备注（可选）" rows={2}
-            className="w-full bg-surface-2 border border-border rounded-xl px-3 py-2 text-xs text-foreground resize-none focus:outline-none mb-3" />
-
-          <button onClick={handleCreate} disabled={!newText.trim()} className="w-full bg-gold text-background py-2.5 rounded-xl text-sm disabled:opacity-30 hover:bg-gold/90 transition">
-            保存
-          </button>
-        </div>
-      )}
-
       {/* Habit Create */}
       {showHabitCreate && (
         <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl p-5 z-50">
@@ -421,12 +299,20 @@ const TodoPage = () => {
   );
 };
 
-// TodoCard component
-function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomodoro }: {
+// Enhanced TodoCard with inline editing
+function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomodoro, editing, onEdit, onUpdate, onDelete }: {
   todo: TodoItem; onToggle: (t: TodoItem) => void; expanded: boolean;
   onExpand: () => void; celebrating: boolean; onStartPomodoro: () => void;
+  editing: boolean; onEdit: () => void;
+  onUpdate: (updates: Partial<TodoItem>) => void;
+  onDelete: () => void;
 }) {
   const isDone = todo.status === "done";
+  const [editText, setEditText] = useState(todo.text);
+  const [editPriority, setEditPriority] = useState(todo.priority);
+  const [editDueDate, setEditDueDate] = useState(todo.dueDate || "");
+  const [editNote, setEditNote] = useState(todo.note || "");
+
   return (
     <div className={`bg-surface-2 border border-border rounded-xl overflow-hidden transition-all ${celebrating ? "ring-2 ring-gold animate-pulse" : ""}`}>
       <div className="flex items-center gap-2.5 px-3 py-2.5">
@@ -447,11 +333,18 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
             )}
           </div>
         </button>
-        <button onClick={onStartPomodoro} className="text-muted-foreground hover:text-gold transition p-1">
-          <Play size={12} />
-        </button>
+        <div className="flex gap-1">
+          <button onClick={onEdit} className="text-muted-foreground hover:text-gold transition p-1">
+            <Pencil size={12} />
+          </button>
+          <button onClick={onStartPomodoro} className="text-muted-foreground hover:text-gold transition p-1">
+            <Play size={12} />
+          </button>
+        </div>
       </div>
-      {expanded && (
+
+      {/* Expanded view */}
+      {expanded && !editing && (
         <div className="px-3 pb-3 border-t border-border pt-2 space-y-1.5">
           {todo.subTasks?.map(st => (
             <div key={st.id} className="flex items-center gap-2 text-xs">
@@ -463,6 +356,45 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
           ))}
           {todo.note && <p className="text-[10px] text-muted-foreground">{todo.note}</p>}
           {todo.sourceDate && <p className="text-[8px] text-muted-foreground font-mono-jb">来源：{todo.sourceDate}</p>}
+        </div>
+      )}
+
+      {/* Inline edit mode */}
+      {editing && (
+        <div className="px-3 pb-3 border-t border-border pt-2 space-y-2">
+          <input
+            value={editText}
+            onChange={e => setEditText(e.target.value)}
+            className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-gold-border"
+          />
+          <div className="flex gap-1">
+            {(["urgent", "high", "normal", "low"] as Priority[]).map(p => (
+              <button key={p} onClick={() => setEditPriority(p)}
+                className={`text-[10px] px-2 py-0.5 rounded-full transition ${editPriority === p ? "bg-gold text-background" : "bg-surface-3 text-muted-foreground"}`}>
+                {PRIORITY_CONFIG[p].emoji}
+              </button>
+            ))}
+          </div>
+          <input
+            type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)}
+            className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none"
+          />
+          <textarea
+            value={editNote} onChange={e => setEditNote(e.target.value)}
+            placeholder="备注" rows={2}
+            className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-foreground resize-none focus:outline-none"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => onUpdate({ text: editText, priority: editPriority, dueDate: editDueDate || undefined, note: editNote || undefined })}
+              className="flex-1 bg-gold text-background py-1.5 rounded-lg text-xs"
+            >
+              保存
+            </button>
+            <button onClick={onDelete} className="px-3 py-1.5 text-xs text-destructive bg-destructive/10 rounded-lg">
+              删除
+            </button>
+          </div>
         </div>
       )}
     </div>
