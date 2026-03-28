@@ -117,7 +117,7 @@ const TodoPage = () => {
     }
   };
 
-  const moveToStatus = (todo: TodoItem, newStatus: string) => {
+  const moveToStatus = (todo: TodoItem, newStatus: TaskStatus) => {
     const sourceDate = todo.sourceDate || todayKey;
     updateTodo(sourceDate, todo.id, {
       status: newStatus,
