@@ -317,6 +317,13 @@ export function useDayEntries(userId: string | undefined) {
     await supabase.from("day_entries").delete().eq("id", id);
   }, []);
 
+  const deleteTodo = useCallback(async (date: string, todoId: string) => {
+    setEntries(prev => prev.map(e =>
+      e.date === date ? { ...e, todos: e.todos.filter(t => t.id !== todoId) } : e
+    ));
+    await supabase.from("todos").delete().eq("id", todoId);
+  }, []);
+
   const allTodos = useMemo(() => {
     return entries.flatMap(e => e.todos.map(t => ({ ...t, sourceDate: t.sourceDate || e.date })));
   }, [entries]);
@@ -325,7 +332,7 @@ export function useDayEntries(userId: string | undefined) {
 
   return {
     entries, todayEntry, todayKey, addMessage, updateAssistantMessage,
-    updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, allTodos,
+    updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, allTodos,
   };
 }
 
