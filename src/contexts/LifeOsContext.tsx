@@ -21,6 +21,8 @@ interface LifeOsContextType {
   completeOnboarding: () => void;
   financeEntries: FinanceEntry[];
   addFinanceEntry: (e: Omit<FinanceEntry, 'id' | 'createdAt'>) => void;
+  deleteFinanceEntry: (id: string) => void;
+  updateFinanceEntry: (id: string, updates: Partial<Omit<FinanceEntry, 'id' | 'createdAt'>>) => void;
   todayFinanceStats: { income: number; expense: number; net: number; entries: FinanceEntry[] };
   monthFinanceStats: { income: number; expense: number; net: number; entries: FinanceEntry[]; count: number };
   habits: HabitItem[];
