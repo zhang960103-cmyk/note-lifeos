@@ -140,7 +140,22 @@ const HomePage = () => {
           setIsLoading(false);
 
           const msgsForExtract = [...allMsgs, { role: "assistant" as const, content: full }];
-          extractMeta(msgsForExtract).then(meta => {
+          const existingTodosForAI = allTodos
+            .filter(t => t.status !== "dropped")
+            .map(t => ({ id: t.id, text: t.text, status: t.status, priority: t.priority }));
+          extractMeta(msgsForExtract, existingTodosForAI).then(meta => {
+            // Mark completed todos from AI recognition
+            if (meta.completedTodoIds?.length > 0) {
+              meta.completedTodoIds.forEach(todoId => {
+                const todo = allTodos.find(t => t.id === todoId);
+                if (todo && todo.status !== "done") {
+                  toggleTodo(todo.sourceDate || todayKey, todoId);
+                }
+              });
+              setTodoToast(`✅ 已标记 ${meta.completedTodoIds.length} 条任务完成`);
+              setTimeout(() => setTodoToast(null), 3000);
+            }
+
             const todoItems: TodoItem[] = (meta.todos || []).map(t =>
               createTodoFromExtract(t, todayKey)
             );
