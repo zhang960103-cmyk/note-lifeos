@@ -15,7 +15,7 @@ function resolveDueDate(hint?: string): string | undefined {
 }
 
 export function createTodoFromExtract(
-  raw: { text: string; priority?: string; dueDate?: string; tags?: string[] },
+  raw: { text: string; priority?: string; dueDate?: string; dueTime?: string; tags?: string[]; subTasks?: Array<{text: string}>; note?: string },
   sourceDate: string
 ): TodoItem {
   const now = new Date().toISOString();
@@ -25,9 +25,11 @@ export function createTodoFromExtract(
     status: "todo",
     priority: (raw.priority as any) || "normal",
     dueDate: resolveDueDate(raw.dueDate),
+    dueTime: raw.dueTime,
     tags: raw.tags || [],
-    subTasks: [],
+    subTasks: (raw.subTasks || []).map(s => ({ id: crypto.randomUUID(), text: s.text, done: false })),
     recur: "none",
+    note: raw.note,
     sourceDate,
     createdAt: now,
     updatedAt: now,

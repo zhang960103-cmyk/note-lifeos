@@ -12,6 +12,7 @@ interface LifeOsContextType {
   toggleTodo: (date: string, todoId: string) => void;
   updateTodo: (date: string, todoId: string, updates: Partial<TodoItem>) => void;
   addTodoToDate: (date: string, todo: TodoItem) => void;
+  deleteTodo: (date: string, todoId: string) => void;
   deleteEntry: (id: string) => void;
   allTodos: TodoItem[];
   wheelScores: WheelScore[];
@@ -33,7 +34,7 @@ const LifeOsContext = createContext<LifeOsContextType | null>(null);
 export function LifeOsProvider({ children, userId }: { children: ReactNode; userId: string }) {
   const {
     entries, todayEntry, todayKey, addMessage, updateAssistantMessage,
-    updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, allTodos,
+    updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, allTodos,
   } = useDayEntries(userId);
   const { scores: wheelScores, addScore: addWheelScore } = useWheelScores(userId);
   const { onboarded, completeOnboarding } = useOnboarding(userId);
@@ -43,7 +44,7 @@ export function LifeOsProvider({ children, userId }: { children: ReactNode; user
   return (
     <LifeOsContext.Provider value={{
       entries, todayEntry, todayKey, addMessage, updateAssistantMessage,
-      updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, allTodos,
+      updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, allTodos,
       wheelScores, addWheelScore, onboarded, completeOnboarding,
       financeEntries, addFinanceEntry, todayFinanceStats, monthFinanceStats,
       habits, addHabit, checkInHabit, deleteHabit,
