@@ -344,7 +344,11 @@ serve(async (req) => {
     if (mode === "extract") {
       const userTexts = messages.filter((m: any) => m.role === "user").map((m: any) => m.content).join("\n");
       const today = new Date().toISOString().split("T")[0];
-      const parsed = await aiCall("google/gemini-2.5-flash", EXTRACT_PROMPT.replace("{TODAY}", today), userTexts);
+      const todosContext = existingTodos?.length > 0
+        ? existingTodos.map((t: any) => `[${t.id}] ${t.text} (${t.status}, ${t.priority})`).join("\n")
+        : "（暂无待办）";
+      const prompt = EXTRACT_PROMPT.replace("{TODAY}", today).replace("{EXISTING_TODOS}", todosContext);
+      const parsed = await aiCall("google/gemini-2.5-flash", prompt, userTexts);
       return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
