@@ -3,9 +3,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 const tabs = [
   { path: "/", icon: "🧭", label: "今天" },
   { path: "/todos", icon: "✅", label: "待办" },
+  { path: "/wheel", icon: "⚖️", label: "罗盘" },
   { path: "/wealth", icon: "💰", label: "财富" },
-  { path: "/history", icon: "🕐", label: "历史" },
-  { path: "/guide", icon: "📖", label: "指南" },
 ];
 
 export default function TabBar() {
