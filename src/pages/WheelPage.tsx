@@ -33,7 +33,7 @@ type InsightResult = Record<string, DomainInsight> & {
 };
 
 const WheelPage = () => {
-  const { wheelScores, addWheelScore, entries, addTodo } = useLifeOs();
+  const { wheelScores, addWheelScore, entries, addTodoToDate, todayKey } = useLifeOs();
   const navigate = useNavigate();
   const insightRef = useRef<HTMLDivElement>(null);
 
