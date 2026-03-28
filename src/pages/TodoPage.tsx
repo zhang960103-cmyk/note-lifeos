@@ -415,7 +415,7 @@ const TodoPage = () => {
 // Board Card for Kanban view
 function BoardCard({ todo, column, onMove, onToggle, onStartPomodoro, editing, onEdit, onUpdate, onDelete }: {
   todo: TodoItem; column: StatusColumn;
-  onMove: (todo: TodoItem, status: string) => void;
+  onMove: (todo: TodoItem, status: TaskStatus) => void;
   onToggle: (t: TodoItem) => void;
   onStartPomodoro: () => void;
   editing: boolean; onEdit: () => void;
