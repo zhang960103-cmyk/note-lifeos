@@ -96,7 +96,7 @@ const HomePage = () => {
               }
             }
 
-            // Auto-save finance hints
+            // Auto-save finance hints with visible feedback
             if (meta.financeHints && meta.financeHints.length > 0) {
               meta.financeHints.forEach(hint => {
                 addFinanceEntry({
@@ -107,6 +107,11 @@ const HomePage = () => {
                   note: hint.note,
                 });
               });
+              const total = meta.financeHints.reduce((s, h) => s + h.amount, 0);
+              const types = meta.financeHints.map(h => h.type === "income" ? "收入" : "支出").join("、");
+              setFinanceToast(true);
+              setTodoToast(`💰 已自动记录${types} ¥${total}`);
+              setTimeout(() => { setFinanceToast(false); setTodoToast(null); }, 3000);
             }
           });
         },
