@@ -22,6 +22,7 @@ const HomePage = () => {
   const [financeCategory, setFinanceCategory] = useState("其他");
   const [financeNote, setFinanceNote] = useState("");
   const [financeToast, setFinanceToast] = useState(false);
+  const [todoToast, setTodoToast] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
