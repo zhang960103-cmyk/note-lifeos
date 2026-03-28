@@ -47,6 +47,7 @@ const AppInner = () => {
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/review" element={<ReviewPage />} />
               <Route path="/wheel" element={<WheelPage />} />
+              <Route path="/wealth" element={<WealthPage />} />
               <Route path="/guide" element={<GuidePage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
