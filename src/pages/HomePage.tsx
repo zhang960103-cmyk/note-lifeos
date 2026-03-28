@@ -88,6 +88,12 @@ const HomePage = () => {
                 todos: todoItems.length > 0 ? todoItems : undefined,
                 emotionScore: meta.emotionScore || undefined,
               });
+
+              // Show toast for auto-created todos
+              if (todoItems.length > 0) {
+                setTodoToast(`已自动生成 ${todoItems.length} 条待办`);
+                setTimeout(() => setTodoToast(null), 3000);
+              }
             }
 
             // Auto-save finance hints

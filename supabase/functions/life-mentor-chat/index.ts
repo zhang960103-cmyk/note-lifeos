@@ -205,6 +205,9 @@ serve(async (req) => {
         .map((m: any) => m.content)
         .join("\n");
 
+      const today = new Date().toISOString().split("T")[0];
+      const promptWithDate = EXTRACT_PROMPT.replace("{TODAY}", today);
+
       const extractResp = await fetch(
         "https://ai.gateway.lovable.dev/v1/chat/completions",
         {
@@ -214,9 +217,9 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash-lite",
+            model: "google/gemini-2.5-flash",
             messages: [
-              { role: "system", content: EXTRACT_PROMPT },
+              { role: "system", content: promptWithDate },
               { role: "user", content: userTexts },
             ],
           }),
