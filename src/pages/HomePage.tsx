@@ -1,20 +1,39 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Send, Loader2, DollarSign, X, Clock, BookOpen } from "lucide-react";
+import { Send, Loader2, DollarSign, X, Clock, BookOpen, LogOut, Zap } from "lucide-react";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { createTodoFromExtract } from "@/hooks/useLifeOs";
+import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import type { TodoItem } from "@/types/lifeOs";
 
 const CATEGORIES = ["教学", "内容", "餐饮", "交通", "购物", "其他"];
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
+const ENERGY_LEVELS = [
+  { value: "high", emoji: "🔥", label: "高" },
+  { value: "medium", emoji: "⚡", label: "中" },
+  { value: "low", emoji: "🔋", label: "低" },
+];
+
+// Greeting based on time
+const getGreeting = () => {
+  const h = new Date().getHours();
+  if (h < 6) return "夜深了，还在思考什么？";
+  if (h < 9) return "早安，新的一天开始了";
+  if (h < 12) return "上午好，今天有什么计划？";
+  if (h < 14) return "中午好，休息一下";
+  if (h < 18) return "下午好，精力如何？";
+  if (h < 21) return "晚上好，今天过得怎么样？";
+  return "夜深了，今天有什么收获？";
+};
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
-    addFinanceEntry, todayFinanceStats, wheelScores,
+    addFinanceEntry, todayFinanceStats, wheelScores, entries,
   } = useLifeOs();
   const [dailyQuestion, setDailyQuestion] = useState<{ question: string; domain: string } | null>(null);
   const [input, setInput] = useState("");
@@ -27,6 +46,8 @@ const HomePage = () => {
   const [financeNote, setFinanceNote] = useState("");
   const [financeToast, setFinanceToast] = useState(false);
   const [todoToast, setTodoToast] = useState<string | null>(null);
+  const [showEnergyPicker, setShowEnergyPicker] = useState(false);
+  const [energyLevel, setEnergyLevel] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -51,6 +72,23 @@ const HomePage = () => {
     }
   }, [messages.length, wheelScores]);
 
+  // AI greeting based on last emotion
+  const [aiGreeting, setAiGreeting] = useState<string | null>(null);
+  useEffect(() => {
+    if (messages.length > 0) return;
+    const lastEntry = entries.find(e => e.date !== todayKey && e.emotionScore > 0);
+    if (!lastEntry) return;
+    const timeGreeting = getGreeting();
+    const score = lastEntry.emotionScore;
+    if (score <= 3) {
+      setAiGreeting(`${timeGreeting}。上次你的状态不太好，今天感觉怎么样？`);
+    } else if (score >= 8) {
+      setAiGreeting(`${timeGreeting}。上次状态很不错，保持住这个势头！`);
+    } else {
+      setAiGreeting(timeGreeting);
+    }
+  }, [messages.length, entries, todayKey]);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [displayMessages.length, streamingContent]);
@@ -61,6 +99,14 @@ const HomePage = () => {
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + "px";
     }
   }, [input]);
+
+  const handleEnergyLog = (level: string) => {
+    setEnergyLevel(level);
+    setShowEnergyPicker(false);
+    const emoji = ENERGY_LEVELS.find(e => e.value === level)?.emoji || "⚡";
+    const text = `[精力记录] ${emoji} 当前精力：${level === "high" ? "高" : level === "medium" ? "中" : "低"}`;
+    sendMessage(text);
+  };
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -93,7 +139,6 @@ const HomePage = () => {
           setStreamingContent("");
           setIsLoading(false);
 
-          // Background extraction
           const msgsForExtract = [...allMsgs, { role: "assistant" as const, content: full }];
           extractMeta(msgsForExtract).then(meta => {
             const todoItems: TodoItem[] = (meta.todos || []).map(t =>
@@ -108,14 +153,12 @@ const HomePage = () => {
                 emotionScore: meta.emotionScore || undefined,
               });
 
-              // Show toast for auto-created todos
               if (todoItems.length > 0) {
                 setTodoToast(`已自动生成 ${todoItems.length} 条待办`);
                 setTimeout(() => setTodoToast(null), 3000);
               }
             }
 
-            // Auto-save finance hints with visible feedback
             if (meta.financeHints && meta.financeHints.length > 0) {
               meta.financeHints.forEach(hint => {
                 addFinanceEntry({
@@ -171,7 +214,7 @@ const HomePage = () => {
 
   return (
     <div className="flex flex-col h-full max-w-[600px] mx-auto relative">
-      {/* Top bar with History & Guide */}
+      {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-2">
         <span className="text-xs text-muted-foreground font-mono-jb">{format(new Date(), "M月d日")}</span>
         <div className="flex gap-2">
@@ -181,15 +224,19 @@ const HomePage = () => {
           <button onClick={() => navigate("/guide")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2">
             <BookOpen size={16} />
           </button>
+          <button onClick={signOut} className="text-muted-foreground hover:text-destructive transition-colors p-1.5 rounded-lg hover:bg-surface-2" title="退出登录">
+            <LogOut size={16} />
+          </button>
         </div>
       </div>
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-2">
         {displayMessages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-[300px]">
               <div className="text-3xl mb-4">🧭</div>
-              <p className="text-foreground text-sm leading-[1.8]">今天，你想说什么？</p>
+              <p className="text-foreground text-sm leading-[1.8]">{aiGreeting || getGreeting()}</p>
               <p className="text-muted-foreground text-xs mt-2 leading-[1.8]">随便聊，我在听。</p>
               {dailyQuestion && (
                 <div className="mt-6 bg-surface-2 border border-border rounded-xl px-4 py-3 text-left">
@@ -249,22 +296,40 @@ const HomePage = () => {
         </div>
       )}
 
-      {/* Finance toast */}
+      {/* Toasts */}
       {financeToast && (
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-los-green text-background text-xs px-4 py-1.5 rounded-full animate-pulse">
           已记录 ✓
         </div>
       )}
-
       {todoToast && (
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-gold text-background text-xs px-4 py-1.5 rounded-full animate-pulse">
           📝 {todoToast}
         </div>
       )}
 
+      {/* Energy picker */}
+      {showEnergyPicker && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-surface-2 border border-border rounded-xl px-3 py-2 flex gap-2 animate-in fade-in z-50">
+          {ENERGY_LEVELS.map(e => (
+            <button key={e.value} onClick={() => handleEnergyLog(e.value)} className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg hover:bg-surface-3 transition">
+              <span className="text-lg">{e.emoji}</span>
+              <span className="text-[9px] text-muted-foreground">{e.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Input */}
       <div className="px-4 py-3 pb-2">
         <div className="flex gap-2 items-end">
+          <button
+            onClick={() => setShowEnergyPicker(!showEnergyPicker)}
+            className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
+            title="记录精力"
+          >
+            <Zap size={18} />
+          </button>
           <button
             onClick={() => setShowFinance(!showFinance)}
             className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
@@ -300,8 +365,6 @@ const HomePage = () => {
               <X size={16} />
             </button>
           </div>
-
-          {/* Today summary */}
           <div className="flex gap-3 text-center mb-4">
             <div className="flex-1 bg-surface-2 rounded-lg py-2">
               <div className="text-[10px] text-muted-foreground">收入</div>
@@ -316,7 +379,6 @@ const HomePage = () => {
               <div className="text-sm text-gold font-mono-jb">¥{todayFinanceStats.net}</div>
             </div>
           </div>
-
           {!financeType ? (
             <div className="flex gap-3">
               <button onClick={() => setFinanceType("income")} className="flex-1 bg-los-green/20 text-los-green py-3 rounded-xl text-sm hover:bg-los-green/30 transition">+ 收入</button>
