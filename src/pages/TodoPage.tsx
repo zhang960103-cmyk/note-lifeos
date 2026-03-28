@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { format, startOfWeek, addDays, isToday } from "date-fns";
-import { Play, Pause, X, Check, Trash2, Pencil, MessageCircle } from "lucide-react";
-import type { TodoItem, HabitItem, Priority } from "@/types/lifeOs";
+import { Play, Pause, X, Check, Trash2, Pencil, MessageCircle, LayoutGrid, List, ArrowRight } from "lucide-react";
+import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
 import { useNavigate } from "react-router-dom";
 
 const PRIORITY_CONFIG: Record<Priority, { label: string; emoji: string; color: string }> = {
@@ -12,13 +12,22 @@ const PRIORITY_CONFIG: Record<Priority, { label: string; emoji: string; color: s
   low: { label: "可选", emoji: "⚪", color: "text-muted-foreground" },
 };
 
+type ViewMode = "list" | "board";
+type StatusColumn = "todo" | "doing" | "done";
+
+const COLUMN_CONFIG: Record<StatusColumn, { label: string; emoji: string; bg: string }> = {
+  todo: { label: "待办", emoji: "📋", bg: "border-gold/30" },
+  doing: { label: "进行中", emoji: "⚡", bg: "border-los-orange/30" },
+  done: { label: "已完成", emoji: "✅", bg: "border-los-green/30" },
+};
+
 const TodoPage = () => {
   const {
     allTodos, todayKey, toggleTodo, updateTodo, addTodoToDate, deleteTodo,
     habits, addHabit, checkInHabit, deleteHabit,
   } = useLifeOs();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"all" | "today" | "habits">("all");
+  const [tab, setTab] = useState<"all" | "today" | "board" | "habits">("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -68,6 +77,32 @@ const TodoPage = () => {
     return groups;
   }, [allTodos]);
 
+  // Kanban columns
+  const boardColumns = useMemo(() => {
+    const cols: Record<StatusColumn, TodoItem[]> = { todo: [], doing: [], done: [] };
+    allTodos.forEach(t => {
+      if (t.status === "done") cols.done.push(t);
+      else if (t.status === "doing") cols.doing.push(t);
+      else if (t.status !== "dropped") cols.todo.push(t);
+    });
+    // Sort by priority within each column
+    const priorityOrder: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+    Object.values(cols).forEach(col =>
+      col.sort((a, b) => (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2))
+    );
+    return cols;
+  }, [allTodos]);
+
+  // Stats
+  const stats = useMemo(() => {
+    const total = allTodos.filter(t => t.status !== "dropped").length;
+    const done = allTodos.filter(t => t.status === "done").length;
+    const doing = allTodos.filter(t => t.status === "doing").length;
+    const todo = total - done - doing;
+    const completionRate = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { total, done, doing, todo, completionRate };
+  }, [allTodos]);
+
   const todayDoneCount = useMemo(() =>
     allTodos.filter(t => t.status === "done" && t.completedAt?.startsWith(todayKey)).length,
     [allTodos, todayKey]
@@ -80,6 +115,14 @@ const TodoPage = () => {
       setCelebrateId(todo.id);
       setTimeout(() => setCelebrateId(null), 800);
     }
+  };
+
+  const moveToStatus = (todo: TodoItem, newStatus: TaskStatus) => {
+    const sourceDate = todo.sourceDate || todayKey;
+    updateTodo(sourceDate, todo.id, {
+      status: newStatus,
+      completedAt: newStatus === "done" ? new Date().toISOString() : undefined,
+    });
   };
 
   // Week days for habits
@@ -122,7 +165,7 @@ const TodoPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-full max-w-[600px] mx-auto">
+    <div className="flex flex-col h-full max-w-[700px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
         <span className="font-serif-sc text-lg text-foreground">待办</span>
@@ -134,30 +177,98 @@ const TodoPage = () => {
         </button>
       </div>
 
-      {/* AI hint banner */}
-      <div className="mx-4 mb-3 bg-surface-2 border border-border rounded-xl px-4 py-2.5">
-        <p className="text-[11px] text-muted-foreground leading-relaxed">
-          💡 所有待办由 AI 从对话中自动提取并评估优先级。回到「今天」告诉罗盘你要做的事，比如
-          <span className="text-gold">"明天下午3点开会，之前要准备PPT，还得回复老王消息"</span>
-          ，AI 会自动拆分、排序并生成清单。
-        </p>
+      {/* Stats bar */}
+      <div className="px-4 mb-3">
+        <div className="bg-surface-2 border border-border rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex gap-3 text-center">
+              <div>
+                <div className="text-lg font-mono-jb text-gold">{stats.completionRate}%</div>
+                <div className="text-[9px] text-muted-foreground">完成率</div>
+              </div>
+              <div className="w-px bg-border" />
+              <div>
+                <div className="text-sm font-mono-jb text-foreground">{stats.todo}</div>
+                <div className="text-[9px] text-muted-foreground">待办</div>
+              </div>
+              <div>
+                <div className="text-sm font-mono-jb text-los-orange">{stats.doing}</div>
+                <div className="text-[9px] text-muted-foreground">进行</div>
+              </div>
+              <div>
+                <div className="text-sm font-mono-jb text-los-green">{stats.done}</div>
+                <div className="text-[9px] text-muted-foreground">完成</div>
+              </div>
+            </div>
+          </div>
+          <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden flex">
+            <div className="h-full bg-los-green rounded-l-full transition-all" style={{ width: `${stats.total > 0 ? (stats.done / stats.total) * 100 : 0}%` }} />
+            <div className="h-full bg-los-orange transition-all" style={{ width: `${stats.total > 0 ? (stats.doing / stats.total) * 100 : 0}%` }} />
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 px-4 mb-3">
-        {(["all", "today", "habits"] as const).map(t => (
+        {([
+          { key: "all" as const, label: "列表", icon: <List size={10} /> },
+          { key: "board" as const, label: "看板", icon: <LayoutGrid size={10} /> },
+          { key: "today" as const, label: "今日" },
+          { key: "habits" as const, label: "习惯" },
+        ]).map(t => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`text-xs px-4 py-1.5 rounded-full transition ${tab === t ? "bg-gold text-background" : "bg-surface-2 text-muted-foreground"}`}
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`text-xs px-3 py-1.5 rounded-full transition flex items-center gap-1 ${tab === t.key ? "bg-gold text-background" : "bg-surface-2 text-muted-foreground"}`}
           >
-            {t === "all" ? "全部" : t === "today" ? "今日" : "习惯"}
+            {t.icon} {t.label}
           </button>
         ))}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-4">
-        {/* All tab */}
+        {/* Board (Kanban) view */}
+        {tab === "board" && (
+          <div className="space-y-4">
+            {(["todo", "doing", "done"] as StatusColumn[]).map(col => {
+              const items = boardColumns[col];
+              const cfg = COLUMN_CONFIG[col];
+              return (
+                <div key={col} className={`border-l-2 ${cfg.bg} pl-3`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs text-foreground font-serif-sc flex items-center gap-1.5">
+                      <span>{cfg.emoji}</span>
+                      <span>{cfg.label}</span>
+                      <span className="text-[10px] font-mono-jb text-muted-foreground ml-1">{items.length}</span>
+                    </div>
+                  </div>
+                  {items.length === 0 ? (
+                    <div className="text-[10px] text-muted-foreground/50 py-3">暂无任务</div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {items.map(todo => (
+                        <BoardCard
+                          key={todo.id}
+                          todo={todo}
+                          column={col}
+                          onMove={moveToStatus}
+                          onToggle={handleToggle}
+                          onStartPomodoro={() => { setPomodoroTask(todo.text); setPomodoroActive(true); setPomodoroRunning(true); setPomodoroTime(25 * 60); }}
+                          onEdit={() => setEditingId(editingId === todo.id ? null : todo.id)}
+                          editing={editingId === todo.id}
+                          onUpdate={(updates) => { updateTodo(todo.sourceDate || todayKey, todo.id, updates); setEditingId(null); }}
+                          onDelete={() => deleteTodo(todo.sourceDate || todayKey, todo.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* All (list) tab */}
         {tab === "all" && (
           <div className="space-y-4">
             {(["urgent", "high", "normal", "low"] as Priority[]).map(p => {
@@ -179,6 +290,7 @@ const TodoPage = () => {
                         onEdit={() => setEditingId(editingId === todo.id ? null : todo.id)}
                         onUpdate={(updates) => { updateTodo(todo.sourceDate || todayKey, todo.id, updates); setEditingId(null); }}
                         onDelete={() => deleteTodo(todo.sourceDate || todayKey, todo.id)}
+                        onMove={moveToStatus}
                       />
                     ))}
                   </div>
@@ -219,6 +331,7 @@ const TodoPage = () => {
                   onEdit={() => setEditingId(editingId === todo.id ? null : todo.id)}
                   onUpdate={(updates) => { updateTodo(todo.sourceDate || todayKey, todo.id, updates); setEditingId(null); }}
                   onDelete={() => deleteTodo(todo.sourceDate || todayKey, todo.id)}
+                  onMove={moveToStatus}
                 />
               ))}
               {todayTodos.length === 0 && (
@@ -299,15 +412,98 @@ const TodoPage = () => {
   );
 };
 
-// Enhanced TodoCard with inline editing
-function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomodoro, editing, onEdit, onUpdate, onDelete }: {
+// Board Card for Kanban view
+function BoardCard({ todo, column, onMove, onToggle, onStartPomodoro, editing, onEdit, onUpdate, onDelete }: {
+  todo: TodoItem; column: StatusColumn;
+  onMove: (todo: TodoItem, status: TaskStatus) => void;
+  onToggle: (t: TodoItem) => void;
+  onStartPomodoro: () => void;
+  editing: boolean; onEdit: () => void;
+  onUpdate: (updates: Partial<TodoItem>) => void;
+  onDelete: () => void;
+}) {
+  const [editText, setEditText] = useState(todo.text);
+  const [editPriority, setEditPriority] = useState(todo.priority);
+
+  const nextStatus: Record<StatusColumn, StatusColumn | null> = {
+    todo: "doing",
+    doing: "done",
+    done: null,
+  };
+  const prevStatus: Record<StatusColumn, StatusColumn | null> = {
+    todo: null,
+    doing: "todo",
+    done: "doing",
+  };
+
+  return (
+    <div className="bg-surface-2 border border-border rounded-lg p-2.5 group">
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="text-xs text-foreground leading-relaxed">{todo.text}</div>
+          <div className="flex gap-1 mt-1 flex-wrap">
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface-3 text-muted-foreground">
+              {PRIORITY_CONFIG[todo.priority]?.emoji} {PRIORITY_CONFIG[todo.priority]?.label}
+            </span>
+            {todo.dueDate && <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface-3 text-muted-foreground font-mono-jb">{todo.dueDate}</span>}
+            {todo.tags?.map(t => <span key={t} className="text-[9px] bg-gold-light text-gold px-1.5 py-0.5 rounded">{t}</span>)}
+          </div>
+          {todo.note && <p className="text-[9px] text-muted-foreground/70 mt-1 italic">{todo.note}</p>}
+        </div>
+        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {prevStatus[column] && (
+            <button onClick={() => onMove(todo, prevStatus[column]!)} className="text-muted-foreground hover:text-foreground p-0.5" title="移回上一步">
+              <ArrowRight size={10} className="rotate-180" />
+            </button>
+          )}
+          {nextStatus[column] && (
+            <button onClick={() => onMove(todo, nextStatus[column]!)} className="text-muted-foreground hover:text-gold p-0.5" title="移到下一步">
+              <ArrowRight size={10} />
+            </button>
+          )}
+          <button onClick={onEdit} className="text-muted-foreground hover:text-gold p-0.5">
+            <Pencil size={10} />
+          </button>
+          <button onClick={onStartPomodoro} className="text-muted-foreground hover:text-gold p-0.5">
+            <Play size={10} />
+          </button>
+        </div>
+      </div>
+
+      {/* Inline edit */}
+      {editing && (
+        <div className="mt-2 pt-2 border-t border-border space-y-2">
+          <input value={editText} onChange={e => setEditText(e.target.value)}
+            className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-gold-border" />
+          <div className="flex gap-1">
+            {(["urgent", "high", "normal", "low"] as Priority[]).map(p => (
+              <button key={p} onClick={() => setEditPriority(p)}
+                className={`text-[10px] px-2 py-0.5 rounded-full transition ${editPriority === p ? "bg-gold text-background" : "bg-surface-3 text-muted-foreground"}`}>
+                {PRIORITY_CONFIG[p].emoji}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => onUpdate({ text: editText, priority: editPriority })} className="flex-1 bg-gold text-background py-1 rounded-lg text-xs">保存</button>
+            <button onClick={onDelete} className="px-3 py-1 text-xs text-destructive bg-destructive/10 rounded-lg">删除</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// TodoCard component for list view
+function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomodoro, editing, onEdit, onUpdate, onDelete, onMove }: {
   todo: TodoItem; onToggle: (t: TodoItem) => void; expanded: boolean;
   onExpand: () => void; celebrating: boolean; onStartPomodoro: () => void;
   editing: boolean; onEdit: () => void;
   onUpdate: (updates: Partial<TodoItem>) => void;
   onDelete: () => void;
+  onMove: (todo: TodoItem, status: TaskStatus) => void;
 }) {
   const isDone = todo.status === "done";
+  const isDoing = todo.status === "doing";
   const [editText, setEditText] = useState(todo.text);
   const [editPriority, setEditPriority] = useState(todo.priority);
   const [editDueDate, setEditDueDate] = useState(todo.dueDate || "");
@@ -317,13 +513,15 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
     <div className={`bg-surface-2 border border-border rounded-xl overflow-hidden transition-all ${celebrating ? "ring-2 ring-gold animate-pulse" : ""}`}>
       <div className="flex items-center gap-2.5 px-3 py-2.5">
         <button onClick={() => onToggle(todo)} className="flex-shrink-0">
-          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition ${isDone ? "bg-los-green border-los-green" : "border-muted-foreground"}`}>
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition ${isDone ? "bg-los-green border-los-green" : isDoing ? "bg-los-orange border-los-orange" : "border-muted-foreground"}`}>
             {isDone && <Check size={10} className="text-background" />}
+            {isDoing && <Play size={8} className="text-background" />}
           </div>
         </button>
         <button onClick={onExpand} className="flex-1 text-left min-w-0">
           <div className={`text-xs ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>{todo.text}</div>
           <div className="flex gap-1 mt-0.5">
+            {isDoing && <span className="text-[8px] bg-los-orange/20 text-los-orange px-1.5 rounded">进行中</span>}
             {todo.dueDate && <span className="text-[8px] text-muted-foreground font-mono-jb">{todo.dueDate}</span>}
             {todo.tags?.map(t => <span key={t} className="text-[8px] bg-gold-light text-gold px-1 rounded">{t}</span>)}
             {todo.subTasks?.length > 0 && (
@@ -334,6 +532,16 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
           </div>
         </button>
         <div className="flex gap-1">
+          {!isDone && !isDoing && (
+            <button onClick={() => onMove(todo, "doing")} className="text-muted-foreground hover:text-los-orange transition p-1" title="开始做">
+              <Play size={12} />
+            </button>
+          )}
+          {isDoing && (
+            <button onClick={() => onMove(todo, "done")} className="text-muted-foreground hover:text-los-green transition p-1" title="完成">
+              <Check size={12} />
+            </button>
+          )}
           <button onClick={onEdit} className="text-muted-foreground hover:text-gold transition p-1">
             <Pencil size={12} />
           </button>
