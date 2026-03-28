@@ -11,6 +11,7 @@ import HistoryPage from "@/pages/HistoryPage";
 import ReviewPage from "@/pages/ReviewPage";
 import WheelPage from "@/pages/WheelPage";
 import WealthPage from "@/pages/WealthPage";
+import GuidePage from "@/pages/GuidePage";
 import AuthPage from "@/pages/AuthPage";
 import NotFound from "@/pages/NotFound";
 import Onboarding from "@/components/Onboarding";
