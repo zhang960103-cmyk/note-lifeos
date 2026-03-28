@@ -1,29 +1,81 @@
 import { useState, useMemo } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { useNavigate } from "react-router-dom";
-import { CheckSquare, Square, ChevronDown, ChevronUp, Trash2, FileText } from "lucide-react";
-import { format, parseISO, subDays, isAfter } from "date-fns";
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { CheckSquare, Square, ChevronDown, ChevronUp, Trash2, FileText, AlertTriangle } from "lucide-react";
+import { format, parseISO, subDays, eachDayOfInterval, startOfYear, getDay } from "date-fns";
 
 const HistoryPage = () => {
   const { entries, toggleTodo, deleteEntry, monthFinanceStats, financeEntries } = useLifeOs();
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const emotionData = useMemo(() => {
-    const cutoff = subDays(new Date(), 30);
-    return entries
-      .filter(e => isAfter(parseISO(e.date), cutoff))
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map(e => ({
-        date: format(parseISO(e.date), "M/d"),
-        score: e.emotionScore,
-        tags: e.emotionTags.slice(0, 2).join(" "),
-        id: e.id,
-      }));
+  // 365-day heatmap data
+  const heatmapData = useMemo(() => {
+    const today = new Date();
+    const yearAgo = subDays(today, 364);
+    const days = eachDayOfInterval({ start: yearAgo, end: today });
+    const entryMap = new Map(entries.map(e => [e.date, e]));
+
+    return days.map(d => {
+      const dateStr = format(d, "yyyy-MM-dd");
+      const entry = entryMap.get(dateStr);
+      return {
+        date: dateStr,
+        dayOfWeek: getDay(d), // 0=Sun
+        score: entry?.emotionScore ?? null,
+        hasEntry: !!entry,
+        tags: entry?.emotionTags?.slice(0, 2) ?? [],
+      };
+    });
   }, [entries]);
 
+  // Group heatmap by weeks
+  const weeks = useMemo(() => {
+    const result: typeof heatmapData[] = [];
+    let currentWeek: typeof heatmapData = [];
+    // Pad start
+    if (heatmapData.length > 0) {
+      const firstDow = heatmapData[0].dayOfWeek;
+      for (let i = 0; i < firstDow; i++) {
+        currentWeek.push({ date: "", dayOfWeek: i, score: null, hasEntry: false, tags: [] });
+      }
+    }
+    heatmapData.forEach(d => {
+      currentWeek.push(d);
+      if (d.dayOfWeek === 6) {
+        result.push(currentWeek);
+        currentWeek = [];
+      }
+    });
+    if (currentWeek.length > 0) result.push(currentWeek);
+    return result;
+  }, [heatmapData]);
+
+  const getHeatColor = (score: number | null, hasEntry: boolean) => {
+    if (!hasEntry || score === null) return "bg-surface-3";
+    if (score >= 8) return "bg-los-green";
+    if (score >= 6) return "bg-los-green/60";
+    if (score >= 4) return "bg-gold/60";
+    if (score >= 2) return "bg-los-orange/60";
+    return "bg-los-red/60";
+  };
+
+  const selectedEntry = selectedDate ? entries.find(e => e.date === selectedDate) : null;
+
   const recentFinance = useMemo(() => financeEntries.slice(0, 5), [financeEntries]);
+
+  const handleDelete = (id: string) => {
+    if (confirmDeleteId === id) {
+      deleteEntry(id);
+      setConfirmDeleteId(null);
+      setExpandedId(null);
+    } else {
+      setConfirmDeleteId(id);
+      setTimeout(() => setConfirmDeleteId(null), 3000);
+    }
+  };
 
   return (
     <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4">
@@ -40,29 +92,58 @@ const HistoryPage = () => {
         </button>
       </div>
 
-      {/* Emotion Curve */}
-      {emotionData.length > 1 && (
-        <div className="bg-surface-2 border border-border rounded-xl p-4 mb-4">
-          <h2 className="text-xs text-muted-foreground font-mono-jb mb-3">情绪曲线</h2>
-          <ResponsiveContainer width="100%" height={140}>
-            <LineChart data={emotionData}>
-              <XAxis dataKey="date" tick={{ fill: "hsl(30 12% 37%)", fontSize: 9 }} axisLine={false} tickLine={false} />
-              <YAxis domain={[1, 10]} tick={{ fill: "hsl(30 12% 37%)", fontSize: 9 }} axisLine={false} tickLine={false} width={20} />
-              <Tooltip
-                contentStyle={{ background: "hsl(30 25% 8%)", border: "1px solid hsl(30 28% 11%)", borderRadius: 8, fontSize: 11, color: "hsl(30 14% 78%)" }}
-                formatter={(value: number) => [`${value}/10`, "情绪"]}
-              />
-              <Line type="monotone" dataKey="score" stroke="hsl(30 14% 78%)" strokeWidth={1.5}
-                dot={{ fill: "hsl(30 14% 78%)", r: 2 }} activeDot={{ fill: "hsl(39 58% 53%)", r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
-          <div className="flex gap-2 mt-2 overflow-x-auto scrollbar-none">
-            {emotionData.map((d, i) => (
-              <div key={i} className="text-center min-w-[40px]">
-                <div className="text-[8px] text-muted-foreground/60">{d.tags}</div>
+      {/* 365-day Emotion Heatmap */}
+      <div className="bg-surface-2 border border-border rounded-xl p-4 mb-4">
+        <h2 className="text-xs text-muted-foreground font-mono-jb mb-3">情绪热力图 · 过去365天</h2>
+        <div className="overflow-x-auto scrollbar-none">
+          <div className="flex gap-[2px]" style={{ minWidth: `${weeks.length * 10}px` }}>
+            {weeks.map((week, wi) => (
+              <div key={wi} className="flex flex-col gap-[2px]">
+                {week.map((day, di) => (
+                  <button
+                    key={di}
+                    onClick={() => day.date && day.hasEntry && setSelectedDate(day.date === selectedDate ? null : day.date)}
+                    className={`w-[8px] h-[8px] rounded-[1px] transition-all ${getHeatColor(day.score, day.hasEntry)} ${
+                      day.date === selectedDate ? "ring-1 ring-gold scale-150" : ""
+                    } ${!day.date ? "opacity-0" : ""}`}
+                    title={day.date ? `${day.date} ${day.score ? `(${day.score}/10)` : "无记录"}` : ""}
+                  />
+                ))}
               </div>
             ))}
           </div>
+        </div>
+        {/* Legend */}
+        <div className="flex items-center gap-2 mt-2 text-[8px] text-muted-foreground">
+          <span>低</span>
+          <span className="w-2 h-2 bg-los-red/60 rounded-[1px]" />
+          <span className="w-2 h-2 bg-los-orange/60 rounded-[1px]" />
+          <span className="w-2 h-2 bg-gold/60 rounded-[1px]" />
+          <span className="w-2 h-2 bg-los-green/60 rounded-[1px]" />
+          <span className="w-2 h-2 bg-los-green rounded-[1px]" />
+          <span>高</span>
+          <span className="ml-2">□ 无记录</span>
+        </div>
+      </div>
+
+      {/* Selected day detail */}
+      {selectedEntry && (
+        <div className="bg-surface-2 border border-gold-border rounded-xl p-4 mb-4 animate-in fade-in">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-foreground font-serif-sc">{format(parseISO(selectedEntry.date), "M月d日")}</span>
+            <span className="text-xs text-gold font-mono-jb">{selectedEntry.emotionScore}/10</span>
+          </div>
+          {selectedEntry.emotionTags.length > 0 && (
+            <div className="flex gap-1 flex-wrap mb-2">
+              {selectedEntry.emotionTags.map(t => (
+                <span key={t} className="text-[9px] bg-surface-3 text-muted-foreground px-1.5 py-0.5 rounded">{t}</span>
+              ))}
+            </div>
+          )}
+          {selectedEntry.messages.filter(m => m.role === "user").slice(0, 2).map((m, i) => (
+            <p key={i} className="text-xs text-muted-foreground leading-[1.8] truncate">{m.content.slice(0, 80)}</p>
+          ))}
+          <button onClick={() => setSelectedDate(null)} className="text-[10px] text-gold mt-2">关闭 ×</button>
         </div>
       )}
 
@@ -164,8 +245,17 @@ const HistoryPage = () => {
                         ))}
                       </div>
                     )}
-                    <button onClick={() => deleteEntry(entry.id)} className="text-[10px] text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1 mt-2">
-                      <Trash2 size={11} /> 删除
+                    <button
+                      onClick={() => handleDelete(entry.id)}
+                      className={`text-[10px] transition-colors flex items-center gap-1 mt-2 ${
+                        confirmDeleteId === entry.id ? "text-destructive" : "text-muted-foreground hover:text-destructive"
+                      }`}
+                    >
+                      {confirmDeleteId === entry.id ? (
+                        <><AlertTriangle size={11} /> 确认删除？再点一次</>
+                      ) : (
+                        <><Trash2 size={11} /> 删除</>
+                      )}
                     </button>
                   </div>
                 )}
