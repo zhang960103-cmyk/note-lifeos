@@ -450,7 +450,23 @@ export function useFinance(userId: string | undefined) {
     return { income, expense, net: income - expense, entries: monthEntries, count: monthEntries.length };
   }, [entries]);
 
-  return { entries, addEntry, todayStats, monthStats };
+  const deleteEntry = useCallback(async (id: string) => {
+    setEntries(prev => prev.filter(e => e.id !== id));
+    await supabase.from("finance_entries").delete().eq("id", id);
+  }, []);
+
+  const updateEntry = useCallback(async (id: string, updates: Partial<Omit<FinanceEntry, "id" | "createdAt">>) => {
+    setEntries(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+    const dbUpdates: any = {};
+    if (updates.amount !== undefined) dbUpdates.amount = updates.amount;
+    if (updates.category !== undefined) dbUpdates.category = updates.category;
+    if (updates.note !== undefined) dbUpdates.note = updates.note;
+    if (updates.type !== undefined) dbUpdates.type = updates.type;
+    if (updates.date !== undefined) dbUpdates.date = updates.date;
+    await supabase.from("finance_entries").update(dbUpdates).eq("id", id);
+  }, []);
+
+  return { entries, addEntry, deleteEntry, updateEntry, todayStats, monthStats };
 }
 
 export function useHabits(userId: string | undefined) {
