@@ -33,7 +33,7 @@ const HomePage = () => {
   const { signOut } = useAuth();
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
-    addFinanceEntry, todayFinanceStats, wheelScores, entries,
+    addFinanceEntry, todayFinanceStats, wheelScores, entries, allTodos, toggleTodo,
   } = useLifeOs();
   const [dailyQuestion, setDailyQuestion] = useState<{ question: string; domain: string } | null>(null);
   const [input, setInput] = useState("");
