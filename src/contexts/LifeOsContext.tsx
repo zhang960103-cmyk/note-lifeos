@@ -40,7 +40,7 @@ export function LifeOsProvider({ children, userId }: { children: ReactNode; user
   } = useDayEntries(userId);
   const { scores: wheelScores, addScore: addWheelScore } = useWheelScores(userId);
   const { onboarded, completeOnboarding } = useOnboarding(userId);
-  const { entries: financeEntries, addEntry: addFinanceEntry, todayStats: todayFinanceStats, monthStats: monthFinanceStats } = useFinance(userId);
+  const { entries: financeEntries, addEntry: addFinanceEntry, deleteEntry: deleteFinanceEntry, updateEntry: updateFinanceEntry, todayStats: todayFinanceStats, monthStats: monthFinanceStats } = useFinance(userId);
   const { habits, addHabit, checkIn: checkInHabit, deleteHabit } = useHabits(userId);
 
   return (
