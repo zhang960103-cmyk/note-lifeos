@@ -14,8 +14,11 @@ const FINANCE_TIPS = [
 ];
 
 const WealthPage = () => {
-  const { financeEntries, monthFinanceStats } = useLifeOs();
+  const { financeEntries, monthFinanceStats, deleteFinanceEntry, updateFinanceEntry } = useLifeOs();
   const [period, setPeriod] = useState<"week" | "month" | "all">("month");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editNote, setEditNote] = useState("");
 
   // Filter entries by period
   const filtered = useMemo(() => {
