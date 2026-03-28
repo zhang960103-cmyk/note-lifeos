@@ -208,6 +208,12 @@ const HomePage = () => {
         </div>
       )}
 
+      {todoToast && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-gold text-background text-xs px-4 py-1.5 rounded-full animate-pulse">
+          📝 {todoToast}
+        </div>
+      )}
+
       {/* Input */}
       <div className="px-4 py-3 pb-2">
         <div className="flex gap-2 items-end">
