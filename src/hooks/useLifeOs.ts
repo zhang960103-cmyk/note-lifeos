@@ -15,7 +15,7 @@ function resolveDueDate(hint?: string): string | undefined {
 }
 
 export function createTodoFromExtract(
-  raw: { text: string; priority?: string; dueDate?: string; tags?: string[] },
+  raw: { text: string; priority?: string; dueDate?: string; dueTime?: string; tags?: string[]; subTasks?: Array<{text: string}>; note?: string },
   sourceDate: string
 ): TodoItem {
   const now = new Date().toISOString();
@@ -25,9 +25,11 @@ export function createTodoFromExtract(
     status: "todo",
     priority: (raw.priority as any) || "normal",
     dueDate: resolveDueDate(raw.dueDate),
+    dueTime: raw.dueTime,
     tags: raw.tags || [],
-    subTasks: [],
+    subTasks: (raw.subTasks || []).map(s => ({ id: crypto.randomUUID(), text: s.text, done: false })),
     recur: "none",
+    note: raw.note,
     sourceDate,
     createdAt: now,
     updatedAt: now,
@@ -317,6 +319,13 @@ export function useDayEntries(userId: string | undefined) {
     await supabase.from("day_entries").delete().eq("id", id);
   }, []);
 
+  const deleteTodo = useCallback(async (date: string, todoId: string) => {
+    setEntries(prev => prev.map(e =>
+      e.date === date ? { ...e, todos: e.todos.filter(t => t.id !== todoId) } : e
+    ));
+    await supabase.from("todos").delete().eq("id", todoId);
+  }, []);
+
   const allTodos = useMemo(() => {
     return entries.flatMap(e => e.todos.map(t => ({ ...t, sourceDate: t.sourceDate || e.date })));
   }, [entries]);
@@ -325,7 +334,7 @@ export function useDayEntries(userId: string | undefined) {
 
   return {
     entries, todayEntry, todayKey, addMessage, updateAssistantMessage,
-    updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, allTodos,
+    updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, allTodos,
   };
 }
 

@@ -22,6 +22,7 @@ const HomePage = () => {
   const [financeCategory, setFinanceCategory] = useState("其他");
   const [financeNote, setFinanceNote] = useState("");
   const [financeToast, setFinanceToast] = useState(false);
+  const [todoToast, setTodoToast] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -87,6 +88,12 @@ const HomePage = () => {
                 todos: todoItems.length > 0 ? todoItems : undefined,
                 emotionScore: meta.emotionScore || undefined,
               });
+
+              // Show toast for auto-created todos
+              if (todoItems.length > 0) {
+                setTodoToast(`已自动生成 ${todoItems.length} 条待办`);
+                setTimeout(() => setTodoToast(null), 3000);
+              }
             }
 
             // Auto-save finance hints
@@ -198,6 +205,12 @@ const HomePage = () => {
       {financeToast && (
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-los-green text-background text-xs px-4 py-1.5 rounded-full animate-pulse">
           已记录 ✓
+        </div>
+      )}
+
+      {todoToast && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-gold text-background text-xs px-4 py-1.5 rounded-full animate-pulse">
+          📝 {todoToast}
         </div>
       )}
 
