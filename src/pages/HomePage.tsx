@@ -36,7 +36,20 @@ const HomePage = () => {
     ? [...messages, { role: "assistant" as const, content: streamingContent, timestamp: new Date().toISOString() }]
     : messages;
 
+  // Fetch daily question when no messages today
   useEffect(() => {
+    if (messages.length === 0 && wheelScores.length > 0) {
+      const lastScores = wheelScores[0].scores;
+      fetch(CHAT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ mode: "daily-question", messages: [], scores: lastScores }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data?.question) setDailyQuestion(data); })
+        .catch(() => {});
+    }
+  }, [messages.length, wheelScores]);
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [displayMessages.length, streamingContent]);
 
