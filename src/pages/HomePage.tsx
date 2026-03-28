@@ -50,6 +50,8 @@ const HomePage = () => {
         .catch(() => {});
     }
   }, [messages.length, wheelScores]);
+
+  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [displayMessages.length, streamingContent]);
 
