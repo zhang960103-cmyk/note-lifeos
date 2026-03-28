@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import type { TodoItem } from "@/types/lifeOs";
 
 const CATEGORIES = ["教学", "内容", "餐饮", "交通", "购物", "其他"];
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
 
 const HomePage = () => {
   const navigate = useNavigate();
