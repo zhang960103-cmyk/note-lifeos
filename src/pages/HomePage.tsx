@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Loader2, DollarSign, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Send, Loader2, DollarSign, X, Clock, BookOpen } from "lucide-react";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { createTodoFromExtract } from "@/hooks/useLifeOs";
