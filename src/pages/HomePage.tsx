@@ -8,13 +8,15 @@ import { format } from "date-fns";
 import type { TodoItem } from "@/types/lifeOs";
 
 const CATEGORIES = ["教学", "内容", "餐饮", "交通", "购物", "其他"];
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
 
 const HomePage = () => {
   const navigate = useNavigate();
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
-    addFinanceEntry, todayFinanceStats,
+    addFinanceEntry, todayFinanceStats, wheelScores,
   } = useLifeOs();
+  const [dailyQuestion, setDailyQuestion] = useState<{ question: string; domain: string } | null>(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -33,6 +35,21 @@ const HomePage = () => {
   const displayMessages = isLoading && streamingContent
     ? [...messages, { role: "assistant" as const, content: streamingContent, timestamp: new Date().toISOString() }]
     : messages;
+
+  // Fetch daily question when no messages today
+  useEffect(() => {
+    if (messages.length === 0 && wheelScores.length > 0) {
+      const lastScores = wheelScores[0].scores;
+      fetch(CHAT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ mode: "daily-question", messages: [], scores: lastScores }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data?.question) setDailyQuestion(data); })
+        .catch(() => {});
+    }
+  }, [messages.length, wheelScores]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -170,10 +187,22 @@ const HomePage = () => {
       <div className="flex-1 overflow-y-auto px-4 py-2">
         {displayMessages.length === 0 && (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center max-w-[260px]">
+            <div className="text-center max-w-[300px]">
               <div className="text-3xl mb-4">🧭</div>
               <p className="text-foreground text-sm leading-[1.8]">今天，你想说什么？</p>
               <p className="text-muted-foreground text-xs mt-2 leading-[1.8]">随便聊，我在听。</p>
+              {dailyQuestion && (
+                <div className="mt-6 bg-surface-2 border border-border rounded-xl px-4 py-3 text-left">
+                  <p className="text-[10px] text-gold font-mono-jb mb-1">💭 今日一问 · {dailyQuestion.domain}</p>
+                  <p className="text-xs text-foreground leading-[1.8] mb-2">{dailyQuestion.question}</p>
+                  <button
+                    onClick={() => setInput(dailyQuestion.question)}
+                    className="text-[10px] text-gold hover:text-gold/80 transition-colors"
+                  >
+                    回应这个问题 →
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
