@@ -101,6 +101,21 @@ const GuidePage = () => {
         </div>
       </section>
 
+      {/* Life Wheel Entry */}
+      <section className="mb-6">
+        <button
+          onClick={() => navigate("/wheel")}
+          className="w-full bg-surface-2 border border-border rounded-xl px-4 py-4 flex items-center gap-3 hover:border-gold/40 transition-colors"
+        >
+          <Compass size={20} className="text-gold" />
+          <div className="text-left flex-1">
+            <span className="text-sm text-foreground font-serif-sc">生命之轮评估</span>
+            <p className="text-xs text-muted-foreground mt-0.5">7大领域打分，可视化你的生命平衡度</p>
+          </div>
+          <span className="text-muted-foreground text-xs">→</span>
+        </button>
+      </section>
+
       {/* Soul Patches */}
       <section className="mb-6">
         <h2 className="text-xs text-gold font-mono-jb mb-3">🧬 灵魂补丁（从工具升维为数字分身）</h2>
