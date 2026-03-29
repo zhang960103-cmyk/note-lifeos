@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type ChangeEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Send, Loader2, DollarSign, X, Clock, Settings, Zap, Brain, Mic } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
 import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { createTodoFromExtract } from "@/hooks/useLifeOs";
-import { format, subDays } from "date-fns";
+import { format, subDays, parseISO } from "date-fns";
 import type { TodoItem } from "@/types/lifeOs";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
@@ -16,8 +16,18 @@ const ENERGY_LEVELS = [
   { value: "low", emoji: "🔋", label: "低" },
 ];
 
+const QUICK_MOODS = [
+  { emoji: "😊", label: "开心", score: 8, tag: "开心" },
+  { emoji: "😌", label: "平静", score: 6, tag: "平静" },
+  { emoji: "😤", label: "烦躁", score: 3, tag: "烦躁" },
+  { emoji: "😔", label: "低落", score: 2, tag: "低落" },
+  { emoji: "😰", label: "焦虑", score: 3, tag: "焦虑" },
+  { emoji: "🤩", label: "兴奋", score: 9, tag: "兴奋" },
+];
+
 const HomePage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   // Auth no longer needed directly here - moved to settings
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
@@ -47,6 +57,15 @@ const HomePage = () => {
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevTagCountRef = useRef(0);
+
+  // Handle prefill from URL param (e.g. from InsightsPage)
+  useEffect(() => {
+    const prefill = searchParams.get("prefill");
+    if (prefill) {
+      setInput(prefill);
+      textareaRef.current?.focus();
+    }
+  }, [searchParams]);
 
   const messages = todayEntry?.messages || [];
   const messagesRef = useRef(messages);
@@ -129,7 +148,31 @@ const HomePage = () => {
       : "🌅 快到今天结束了。有什么想记录的吗？";
   }, [showSunset, todayEntry]);
 
-  // Feature 3: Focus todo
+  // Weekly letter ready check
+  const weeklyLetterReady = useMemo(() => {
+    const today = new Date();
+    const isMonday = today.getDay() === 1;
+    const lastWeekEntries = entries.filter(e => {
+      const d = parseISO(e.date);
+      return d >= subDays(today, 8) && d < subDays(today, 1);
+    });
+    const hasLastWeekData = lastWeekEntries.length >= 3;
+    const weekKey = format(today, "yyyy-ww");
+    const alreadyRead = localStorage.getItem(`letter_read_${weekKey}`);
+    return isMonday && hasLastWeekData && !alreadyRead;
+  }, [entries]);
+
+  const handleOpenLetter = () => {
+    const weekKey = format(new Date(), "yyyy-ww");
+    localStorage.setItem(`letter_read_${weekKey}`, "1");
+    navigate("/review?auto=weekly");
+  };
+
+  const handleQuickMood = (mood: typeof QUICK_MOODS[0]) => {
+    updateDayMeta(todayKey, { emotionTags: [mood.tag], emotionScore: mood.score });
+    sendMessage(`[快速情绪记录] ${mood.emoji} ${mood.label}`);
+  };
+
   const focusTodo = useMemo(() => {
     return allTodos.find(t => t.status === "doing");
   }, [allTodos]);
@@ -366,6 +409,17 @@ const HomePage = () => {
         {displayMessages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-[300px]">
+              {/* Weekly letter card */}
+              {weeklyLetterReady && (
+                <button
+                  onClick={handleOpenLetter}
+                  className="w-full bg-gold/10 border border-gold-border rounded-xl px-4 py-3 mb-4 text-left hover:bg-gold/20 transition"
+                >
+                  <p className="text-xs text-gold font-serif-sc mb-1">📨 罗盘的来信</p>
+                  <p className="text-[11px] text-foreground leading-[1.8]">本周有一封信在等你</p>
+                  <span className="text-[10px] text-gold mt-1 inline-block">打开信件 →</span>
+                </button>
+              )}
               {/* Feature 4: Sunset card */}
               {showSunset && (
                 <button
@@ -379,6 +433,19 @@ const HomePage = () => {
               <div className="text-3xl mb-4">{statusGreeting.emoji}</div>
               <p className="text-foreground text-sm leading-[1.8]">{statusGreeting.text}</p>
               <p className="text-muted-foreground text-xs mt-2 leading-[1.8]">随便聊，我在听。</p>
+              {/* Emoji mood quick-pick */}
+              <div className="flex justify-center gap-2 mt-4">
+                {QUICK_MOODS.map(mood => (
+                  <button
+                    key={mood.tag}
+                    onClick={() => handleQuickMood(mood)}
+                    className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center text-lg hover:scale-110 hover:bg-surface-3 transition-all"
+                    title={mood.label}
+                  >
+                    {mood.emoji}
+                  </button>
+                ))}
+              </div>
               {dailyQuestion && (
                 <div className="mt-6 bg-surface-2 border border-border rounded-xl px-4 py-3 text-left">
                   <p className="text-[10px] text-gold font-mono-jb mb-1">💭 今日一问 · {dailyQuestion.domain}</p>
