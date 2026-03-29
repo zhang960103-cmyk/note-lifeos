@@ -348,11 +348,8 @@ const HomePage = () => {
           <button onClick={() => navigate("/history")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2">
             <Clock size={16} />
           </button>
-          <button onClick={() => navigate("/guide")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2">
-            <BookOpen size={16} />
-          </button>
-          <button onClick={signOut} className="text-muted-foreground hover:text-destructive transition-colors p-1.5 rounded-lg hover:bg-surface-2" title="退出登录">
-            <LogOut size={16} />
+          <button onClick={() => navigate("/settings")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2" title="设置">
+            <Settings size={16} />
           </button>
         </div>
       </div>

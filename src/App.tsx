@@ -54,6 +54,7 @@ const AppInner = () => {
             <Route path="/wheel" element={<WheelPage />} />
             <Route path="/wealth" element={<WealthPage />} />
             <Route path="/guide" element={<GuidePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="/insights" element={<InsightsPage />} />
             <Route path="/goals" element={<GoalsPage />} />
             <Route path="/time-stats" element={<TimeStatsPage />} />
