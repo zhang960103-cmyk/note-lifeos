@@ -362,7 +362,7 @@ export function useDayEntries(userId: string | undefined) {
   const todayEntry = entries.find(e => e.date === todayKey) || null;
 
   return {
-    entries, todayEntry, todayKey, addMessage, updateAssistantMessage,
+    entries, todayEntry, todayKey, addMessage,
     updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, setFocusTodo, allTodos,
   };
 }
