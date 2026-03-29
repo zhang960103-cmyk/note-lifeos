@@ -38,8 +38,6 @@ const TodoPage = () => {
   const [trackingTodoId, setTrackingTodoId] = useState<string | null>(null);
   const [trackingStart, setTrackingStart] = useState<number | null>(null);
   const [trackingElapsed, setTrackingElapsed] = useState(0);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Pomodoro state
   const [pomodoroActive, setPomodoroActive] = useState(false);
