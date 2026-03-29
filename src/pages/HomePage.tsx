@@ -39,6 +39,8 @@ const HomePage = () => {
   const [brainDumpResult, setBrainDumpResult] = useState<{ todos: any[]; summary: string } | null>(null);
   const [showFocusPicker, setShowFocusPicker] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
+  const canUseVoice = typeof window !== "undefined"
+    && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
   const [showTagHint, setShowTagHint] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
