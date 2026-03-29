@@ -29,7 +29,15 @@ const TodoPage = () => {
     habits, addHabit, checkInHabit, deleteHabit,
   } = useLifeOs();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"all" | "today" | "board" | "habits">("all");
+  const [tab, setTab] = useState<TabKey>("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showTheme, setShowTheme] = useState(false);
+
+  // Time tracking
+  const [trackingTodoId, setTrackingTodoId] = useState<string | null>(null);
+  const [trackingStart, setTrackingStart] = useState<number | null>(null);
+  const [trackingElapsed, setTrackingElapsed] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
