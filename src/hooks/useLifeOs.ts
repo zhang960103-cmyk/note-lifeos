@@ -172,16 +172,20 @@ export function useDayEntries(userId: string | undefined) {
       const idx = prev.findIndex(e => e.date === date);
       if (idx < 0) return prev;
       const entry = prev[idx];
+      const norm = (s: string) => s.trim().toLowerCase().replace(/[，。！？,.!?\s]/g, '');
       let newTodos = entry.todos;
       if (meta.todos && meta.todos.length > 0) {
-        const existingTexts = entry.todos.map(t => t.text.trim().toLowerCase());
-        const deduped = meta.todos.filter(t => !existingTexts.includes(t.text.trim().toLowerCase()));
+        const existingNorms = entry.todos.map(t => norm(t.text));
+        const deduped = meta.todos.filter(t => {
+          const n = norm(t.text);
+          return !existingNorms.some(en => en === n || en.includes(n) || n.includes(en));
+        });
         newTodos = [...entry.todos, ...deduped];
       }
       const updated = {
         ...entry,
-        emotionTags: meta.emotionTags ? [...new Set([...entry.emotionTags, ...meta.emotionTags])] : entry.emotionTags,
-        topicTags: meta.topicTags ? [...new Set([...entry.topicTags, ...meta.topicTags])] : entry.topicTags,
+        emotionTags: meta.emotionTags ? [...new Set([...entry.emotionTags, ...meta.emotionTags])].slice(0, 8) : entry.emotionTags,
+        topicTags: meta.topicTags ? [...new Set([...entry.topicTags, ...meta.topicTags])].slice(0, 6) : entry.topicTags,
         todos: newTodos,
         emotionScore: meta.emotionScore ?? entry.emotionScore,
         updatedAt: new Date().toISOString(),
