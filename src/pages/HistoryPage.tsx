@@ -11,6 +11,7 @@ const HistoryPage = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [touchStart, setTouchStart] = useState(0);
 
   // 365-day heatmap data
   const heatmapData = useMemo(() => {
