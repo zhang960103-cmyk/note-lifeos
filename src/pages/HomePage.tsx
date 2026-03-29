@@ -27,6 +27,7 @@ const QUICK_MOODS = [
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   // Auth no longer needed directly here - moved to settings
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
