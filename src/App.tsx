@@ -41,25 +41,23 @@ const AppInner = () => {
 
   return (
     <>
-      <BrowserRouter>
-        <div className="h-[100dvh] flex flex-col">
-          <div className="flex-1 overflow-hidden pb-[52px]">
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/todos" element={<TodoPage />} />
-              <Route path="/history" element={<HistoryPage />} />
-              <Route path="/review" element={<ReviewPage />} />
-              <Route path="/wheel" element={<WheelPage />} />
-              <Route path="/wealth" element={<WealthPage />} />
-              <Route path="/guide" element={<GuidePage />} />
-              <Route path="/insights" element={<InsightsPage />} />
-              <Route path="/goals" element={<GoalsPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </div>
-          <TabBar />
+      <div className="h-[100dvh] flex flex-col">
+        <div className="flex-1 overflow-hidden pb-[52px]">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/todos" element={<TodoPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/review" element={<ReviewPage />} />
+            <Route path="/wheel" element={<WheelPage />} />
+            <Route path="/wealth" element={<WealthPage />} />
+            <Route path="/guide" element={<GuidePage />} />
+            <Route path="/insights" element={<InsightsPage />} />
+            <Route path="/goals" element={<GoalsPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
         </div>
-      </BrowserRouter>
+        <TabBar />
+      </div>
       <InstallBanner />
     </>
   );
@@ -88,13 +86,15 @@ const AuthGate = () => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AuthGate />
-    </TooltipProvider>
-  </QueryClientProvider>
+  <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AuthGate />
+      </TooltipProvider>
+    </QueryClientProvider>
+  </BrowserRouter>
 );
 
 export default App;

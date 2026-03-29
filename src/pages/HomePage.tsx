@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Send, Loader2, DollarSign, X, Clock, BookOpen, LogOut, Zap } from "lucide-react";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
@@ -53,9 +53,15 @@ const HomePage = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const messages = todayEntry?.messages || [];
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+
   const displayMessages = isLoading && streamingContent
     ? [...messages, { role: "assistant" as const, content: streamingContent, timestamp: new Date().toISOString() }]
     : messages;
+
+  // Fix 5: abort cleanup on unmount
+  useEffect(() => { return () => { abortRef.current?.abort(); }; }, []);
 
   // Fetch daily question when no messages today
   useEffect(() => {
@@ -93,12 +99,13 @@ const HomePage = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [displayMessages.length, streamingContent]);
 
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + "px";
-    }
-  }, [input]);
+  // Fix 7: textarea no-jitter height via onInput
+  const handleInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    const ta = e.currentTarget;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+    setInput(ta.value);
+  };
 
   const handleEnergyLog = (level: string) => {
     setEnergyLevel(level);
@@ -122,7 +129,7 @@ const HomePage = () => {
 
     let full = "";
     const allMsgs: ChatMsg[] = [
-      ...messages.map(m => ({ role: m.role, content: m.content })),
+      ...messagesRef.current.map(m => ({ role: m.role, content: m.content })),
       { role: "user" as const, content: text },
     ];
 
@@ -201,7 +208,7 @@ const HomePage = () => {
       setStreamingContent("");
       setIsLoading(false);
     }
-  }, [isLoading, messages, addMessage, updateDayMeta, todayKey, addFinanceEntry, allTodos, toggleTodo]);
+  }, [isLoading, addMessage, updateDayMeta, todayKey, addFinanceEntry, allTodos, toggleTodo]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -354,7 +361,7 @@ const HomePage = () => {
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={e => setInput(e.target.value)}
+            onChange={handleInput}
             onKeyDown={handleKeyDown}
             placeholder="说点什么..."
             rows={1}

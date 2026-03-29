@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "https://note-lifeos.lovable.app",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Credentials": "true",
 };
 
 const SYSTEM_PROMPT = `你是用户的私人生命导师，名字叫「罗盘」。你不是顾问，不是教练，不是分析师。你是一个真正了解他/她的老朋友，陪他/她想清楚自己的生活。
@@ -342,7 +343,7 @@ serve(async (req) => {
 
     // Extract mode
     if (mode === "extract") {
-      const userTexts = messages.filter((m: any) => m.role === "user").map((m: any) => m.content).join("\n");
+      const userTexts = messages.map((m: any) => `[${m.role === 'user' ? '用户' : '罗盘'}]: ${m.content}`).join("\n");
       const today = new Date().toISOString().split("T")[0];
       const todosContext = existingTodos?.length > 0
         ? existingTodos.map((t: any) => `[${t.id}] ${t.text} (${t.status}, ${t.priority})`).join("\n")
