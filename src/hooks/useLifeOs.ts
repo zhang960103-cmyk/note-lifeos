@@ -200,7 +200,7 @@ export function useDayEntries(userId: string | undefined) {
     });
 
     // Persist meta to DB
-    const entry = entries.find(e => e.date === date);
+    const entry = entriesRef.current.find(e => e.date === date);
     if (!entry) return;
 
     const newEmotionTags = meta.emotionTags
