@@ -404,6 +404,26 @@ serve(async (req) => {
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
+    // Voice correction mode
+    if (mode === "voice-correct") {
+      const rawText = messages[messages.length - 1]?.content || "";
+      const voiceCorrectPrompt = `你是一个语音识别纠错助手。用户通过语音输入了一段文字，可能存在以下问题：
+- 语音识别错误（同音字、谐音字）
+- 语法不通顺
+- 中英文混杂时的识别错误
+- 阿拉伯语识别错误
+- 标点符号缺失或错误
+- 口语化表达需要适当整理
+
+请修正这段文字，保持用户原意不变，只修正明显的识别错误和语法问题。
+如果原文已经很通顺，就原样返回。不要添加用户没说的内容。
+
+返回JSON：{"corrected":"修正后的文字","changes":[{"from":"原文片段","to":"修正后片段"}]}
+如果没有任何修改，changes返回空数组。只返回JSON。`;
+      const parsed = await aiCall("google/gemini-2.5-flash-lite", voiceCorrectPrompt, rawText);
+      return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+    }
+
     // Brain dump mode
     if (mode === "brain-dump") {
       const userText = messages[messages.length - 1]?.content || "";
