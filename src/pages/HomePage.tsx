@@ -18,7 +18,7 @@ const ENERGY_LEVELS = [
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  // Auth no longer needed directly here - moved to settings
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
     addFinanceEntry, todayFinanceStats, wheelScores, entries, allTodos, toggleTodo,
