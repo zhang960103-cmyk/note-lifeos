@@ -151,20 +151,7 @@ export function useDayEntries(userId: string | undefined) {
     });
   }, [userId, todayKey, ensureEntry]);
 
-  const updateDayMeta
-    setEntries(prev => {
-      const idx = prev.findIndex(e => e.date === todayKey);
-      if (idx < 0) return prev;
-      const entry = prev[idx];
-      const msgs = [...entry.messages];
-      if (msgs.length > 0 && msgs[msgs.length - 1].role === "assistant") {
-        msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content };
-      } else {
-        msgs.push({ role: "assistant", content, timestamp: new Date().toISOString() });
-      }
-      return prev.map((e, i) => i === idx ? { ...e, messages: msgs, updatedAt: new Date().toISOString() } : e);
-    });
-  }, [todayKey]);
+
 
   const updateDayMeta = useCallback(async (date: string, meta: {
     emotionTags?: string[];
