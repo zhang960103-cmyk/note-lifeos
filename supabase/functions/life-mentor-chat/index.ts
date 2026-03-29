@@ -404,6 +404,17 @@ serve(async (req) => {
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
+    // Brain dump mode
+    if (mode === "brain-dump") {
+      const userText = messages[messages.length - 1]?.content || "";
+      const brainDumpPrompt = `你是任务整理助手。把用户的乱序想法整理成待办任务列表。
+每个任务用动宾结构（如「发邮件给张老师」），估算完成时间（分钟），判断优先级。
+只返回 JSON：{"todos":[{"text":"...","priority":"high","estimatedMinutes":15,"tags":["工作"]}],"summary":"..."}
+如果用户只写了1-2件事，直接返回这1-2条，不要补充未提到的任务。只返回JSON。`;
+      const parsed = await aiCall("google/gemini-2.5-flash", brainDumpPrompt, userText);
+      return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+    }
+
     // Chat mode: streaming
     let systemContent = SYSTEM_PROMPT;
 

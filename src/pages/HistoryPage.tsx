@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
-import { useLifeOs } from "@/contexts/LifeOsContext";
 import { useNavigate } from "react-router-dom";
+import { useLifeOs } from "@/contexts/LifeOsContext";
 import { CheckSquare, Square, ChevronDown, ChevronUp, Trash2, FileText, AlertTriangle } from "lucide-react";
 import { format, parseISO, subDays, eachDayOfInterval, startOfYear, getDay } from "date-fns";
 
@@ -10,6 +10,7 @@ const HistoryPage = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [touchStart, setTouchStart] = useState(0);
 
   // 365-day heatmap data
   const heatmapData = useMemo(() => {
@@ -78,7 +79,10 @@ const HistoryPage = () => {
   };
 
   return (
-    <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4">
+    <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4"
+      onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
+      onTouchEnd={(e) => { const delta = e.changedTouches[0].clientX - touchStart; if (touchStart < 30 && delta > 70) navigate(-1); }}
+    >
       <div className="py-4 flex items-center justify-between">
         <div>
           <h1 className="font-serif-sc text-lg text-foreground">回顾</h1>
@@ -186,7 +190,10 @@ const HistoryPage = () => {
 
       {/* Day list */}
       {entries.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground text-xs">还没有记录</div>
+        <div className="text-center py-16">
+          <div className="text-3xl mb-3">📝</div>
+          <p className="text-sm text-muted-foreground leading-[1.8] text-center">开始记录的第一天，往往是改变的起点。</p>
+        </div>
       ) : (
         <div className="space-y-2">
           {entries.map(entry => {

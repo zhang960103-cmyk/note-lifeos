@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { ALL_DOMAINS } from "@/types/lifeOs";
 import { Mail, Loader2 } from "lucide-react";
@@ -6,10 +7,12 @@ import { subDays, isAfter, subMonths, format, parseISO } from "date-fns";
 import { streamChat, type ChatMsg } from "@/lib/streamChat";
 
 const ReviewPage = () => {
+  const navigate = useNavigate();
   const { entries, wheelScores, allTodos, monthFinanceStats } = useLifeOs();
   const [letter, setLetter] = useState<string | null>(null);
   const [letterType, setLetterType] = useState<"weekly" | "monthly" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [touchStart, setTouchStart] = useState(0);
 
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -115,12 +118,19 @@ ${recentContent}
   );
 
   return (
-    <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4">
+    <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4"
+      onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
+      onTouchEnd={(e) => { const delta = e.changedTouches[0].clientX - touchStart; if (touchStart < 30 && delta > 70) navigate(-1); }}
+    >
       <div className="py-4">
         <h1 className="font-serif-sc text-lg text-foreground">复盘</h1>
       </div>
 
-      {/* Weekly */}
+      {weekStats.count === 0 && monthStats.count === 0 && (
+        <div className="text-center py-12">
+          <p className="text-sm text-muted-foreground leading-[1.8]">当你有 3 天以上的记录，罗盘就能开始帮你回顾了。</p>
+        </div>
+      )}
       <div className="bg-surface-2 border border-border rounded-xl p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs text-foreground">本周</h2>

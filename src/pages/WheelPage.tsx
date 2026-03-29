@@ -31,6 +31,7 @@ const WheelPage = () => {
   const navigate = useNavigate();
   const insightRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [touchStart, setTouchStart] = useState(0);
 
   const [scores, setScores] = useState<Record<LifeDomain, number>>(
     () => Object.fromEntries(ALL_DOMAINS.map(d => [d, 5])) as Record<LifeDomain, number>
@@ -182,7 +183,10 @@ const WheelPage = () => {
   [wheelScores]);
 
   return (
-    <div className="pb-24 px-4 max-w-[600px] mx-auto overflow-y-auto h-full">
+    <div className="pb-24 px-4 max-w-[600px] mx-auto overflow-y-auto h-full"
+      onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
+      onTouchEnd={(e) => { const delta = e.changedTouches[0].clientX - touchStart; if (touchStart < 30 && delta > 70) navigate(-1); }}
+    >
       {/* Header */}
       <div className="flex items-center gap-3 py-4">
         <button onClick={() => navigate("/")} className="text-muted-foreground hover:text-foreground transition-colors">
