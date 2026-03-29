@@ -183,7 +183,10 @@ const WheelPage = () => {
   [wheelScores]);
 
   return (
-    <div className="pb-24 px-4 max-w-[600px] mx-auto overflow-y-auto h-full">
+    <div className="pb-24 px-4 max-w-[600px] mx-auto overflow-y-auto h-full"
+      onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
+      onTouchEnd={(e) => { const delta = e.changedTouches[0].clientX - touchStart; if (touchStart < 30 && delta > 70) navigate(-1); }}
+    >
       {/* Header */}
       <div className="flex items-center gap-3 py-4">
         <button onClick={() => navigate("/")} className="text-muted-foreground hover:text-foreground transition-colors">
