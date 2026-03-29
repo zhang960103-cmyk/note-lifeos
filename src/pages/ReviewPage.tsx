@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { ALL_DOMAINS } from "@/types/lifeOs";
 import { Mail, Loader2 } from "lucide-react";
@@ -8,11 +8,13 @@ import { streamChat, type ChatMsg } from "@/lib/streamChat";
 
 const ReviewPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { entries, wheelScores, allTodos, monthFinanceStats } = useLifeOs();
   const [letter, setLetter] = useState<string | null>(null);
   const [letterType, setLetterType] = useState<"weekly" | "monthly" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [touchStart, setTouchStart] = useState(0);
+  const [autoTriggered, setAutoTriggered] = useState(false);
 
   const today = format(new Date(), "yyyy-MM-dd");
 

@@ -399,6 +399,17 @@ const HomePage = () => {
         {displayMessages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-[300px]">
+              {/* Weekly letter card */}
+              {weeklyLetterReady && (
+                <button
+                  onClick={handleOpenLetter}
+                  className="w-full bg-gold/10 border border-gold-border rounded-xl px-4 py-3 mb-4 text-left hover:bg-gold/20 transition"
+                >
+                  <p className="text-xs text-gold font-serif-sc mb-1">📨 罗盘的来信</p>
+                  <p className="text-[11px] text-foreground leading-[1.8]">本周有一封信在等你</p>
+                  <span className="text-[10px] text-gold mt-1 inline-block">打开信件 →</span>
+                </button>
+              )}
               {/* Feature 4: Sunset card */}
               {showSunset && (
                 <button
@@ -412,6 +423,19 @@ const HomePage = () => {
               <div className="text-3xl mb-4">{statusGreeting.emoji}</div>
               <p className="text-foreground text-sm leading-[1.8]">{statusGreeting.text}</p>
               <p className="text-muted-foreground text-xs mt-2 leading-[1.8]">随便聊，我在听。</p>
+              {/* Emoji mood quick-pick */}
+              <div className="flex justify-center gap-2 mt-4">
+                {QUICK_MOODS.map(mood => (
+                  <button
+                    key={mood.tag}
+                    onClick={() => handleQuickMood(mood)}
+                    className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center text-lg hover:scale-110 hover:bg-surface-3 transition-all"
+                    title={mood.label}
+                  >
+                    {mood.emoji}
+                  </button>
+                ))}
+              </div>
               {dailyQuestion && (
                 <div className="mt-6 bg-surface-2 border border-border rounded-xl px-4 py-3 text-left">
                   <p className="text-[10px] text-gold font-mono-jb mb-1">💭 今日一问 · {dailyQuestion.domain}</p>
