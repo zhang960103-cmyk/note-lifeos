@@ -28,6 +28,17 @@ const ReviewPage = () => {
     return entries.filter(e => isAfter(parseISO(e.date), cutoff));
   }, [entries]);
 
+  // Auto-trigger weekly letter from URL param
+  useEffect(() => {
+    if (autoTriggered) return;
+    const auto = searchParams.get("auto");
+    if (auto === "weekly" && weekEntries.length >= 3 && !isGenerating && !letter) {
+      setAutoTriggered(true);
+      const timer = setTimeout(() => generateLetter("weekly"), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, weekEntries.length, autoTriggered, isGenerating, letter]);
+
   const buildSummary = (data: typeof entries) => {
     const count = data.length;
     const avgEmotion = count ? +(data.reduce((s, e) => s + e.emotionScore, 0) / count).toFixed(1) : 0;
