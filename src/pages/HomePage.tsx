@@ -6,7 +6,7 @@ import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
 import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { createTodoFromExtract } from "@/hooks/useLifeOs";
-import { format, subDays } from "date-fns";
+import { format, subDays, parseISO } from "date-fns";
 import type { TodoItem } from "@/types/lifeOs";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
