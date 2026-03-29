@@ -328,7 +328,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, mode, scores: inputScores, existingTodos } = await req.json();
+    const { messages, mode, scores: inputScores, existingTodos, memoryContext, patterns } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -514,6 +514,17 @@ serve(async (req) => {
 
     // Chat mode: streaming
     let systemContent = SYSTEM_PROMPT;
+
+    // Append cross-day memory context
+    if (memoryContext) {
+      systemContent += `\n\n【你对用户近两周的了解（跨日记忆）】\n${memoryContext}\n`;
+      systemContent += `当对话内容和过去记录有关联时，像真正认识这个人的朋友一样自然提及，`;
+      systemContent += `例如：「你上次提到XXX，后来怎么样了？」但不要每次都刻意提及记忆，只在真正相关时提。`;
+    }
+    if (patterns) {
+      systemContent += `\n\n【观察到的情绪模式】\n${patterns}\n`;
+      systemContent += `适时（不要每次）温和地指出这些模式。`;
+    }
 
     if (mode === "weekly-review") {
       systemContent += `\n\n【本次任务：周复盘信】

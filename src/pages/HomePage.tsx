@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Send, Loader2, DollarSign, X, Clock, Settings, Zap, Brain, Mic } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
+import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { createTodoFromExtract } from "@/hooks/useLifeOs";
 import { format, subDays } from "date-fns";
@@ -188,10 +189,15 @@ const HomePage = () => {
       { role: "user" as const, content: text },
     ];
 
+    const memoryContext = buildMemoryContext(entries, 14);
+    const patterns = getKeyPatterns(entries);
+
     try {
       await streamChat({
         messages: allMsgs,
         mode: "default",
+        memoryContext,
+        patterns,
         onDelta: (chunk) => {
           full += chunk;
           setStreamingContent(full);
