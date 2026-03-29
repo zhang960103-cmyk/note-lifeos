@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Send, Loader2, DollarSign, X, Clock, BookOpen, LogOut, Zap } from "lucide-react";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
