@@ -16,6 +16,15 @@ const ENERGY_LEVELS = [
   { value: "low", emoji: "🔋", label: "低" },
 ];
 
+const QUICK_MOODS = [
+  { emoji: "😊", label: "开心", score: 8, tag: "开心" },
+  { emoji: "😌", label: "平静", score: 6, tag: "平静" },
+  { emoji: "😤", label: "烦躁", score: 3, tag: "烦躁" },
+  { emoji: "😔", label: "低落", score: 2, tag: "低落" },
+  { emoji: "😰", label: "焦虑", score: 3, tag: "焦虑" },
+  { emoji: "🤩", label: "兴奋", score: 9, tag: "兴奋" },
+];
+
 const HomePage = () => {
   const navigate = useNavigate();
   // Auth no longer needed directly here - moved to settings
