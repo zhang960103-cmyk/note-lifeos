@@ -667,6 +667,17 @@ const HomePage = () => {
           </div>
         </div>
       )}
+
+      {/* Voice Input */}
+      {showVoice && (
+        <VoiceInput
+          onTranscript={(text) => {
+            setShowVoice(false);
+            sendMessage(text);
+          }}
+          onClose={() => setShowVoice(false)}
+        />
+      )}
     </div>
   );
 };
