@@ -99,12 +99,13 @@ const HomePage = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [displayMessages.length, streamingContent]);
 
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + "px";
-    }
-  }, [input]);
+  // Fix 7: textarea no-jitter height via onInput
+  const handleInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    const ta = e.currentTarget;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+    setInput(ta.value);
+  };
 
   const handleEnergyLog = (level: string) => {
     setEnergyLevel(level);
