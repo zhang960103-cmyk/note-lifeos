@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { DayEntry, WheelScore, ChatMessage, TodoItem, FinanceEntry, HabitItem } from "@/types/lifeOs";
-import { format, addDays, nextSunday } from "date-fns";
+import { format, addDays, nextSunday, subDays } from "date-fns";
 
 // Helper: convert dueDate hint from AI to actual ISO date
 function resolveDueDate(hint?: string): string | undefined {
