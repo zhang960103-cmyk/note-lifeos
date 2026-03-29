@@ -189,10 +189,15 @@ const HomePage = () => {
       { role: "user" as const, content: text },
     ];
 
+    const memoryContext = buildMemoryContext(entries, 14);
+    const patterns = getKeyPatterns(entries);
+
     try {
       await streamChat({
         messages: allMsgs,
         mode: "default",
+        memoryContext,
+        patterns,
         onDelta: (chunk) => {
           full += chunk;
           setStreamingContent(full);
