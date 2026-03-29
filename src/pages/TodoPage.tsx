@@ -254,10 +254,11 @@ const TodoPage = () => {
       {/* Tabs */}
       <div className="flex gap-1 px-4 mb-3">
         {([
-          { key: "all" as const, label: "列表", icon: <List size={10} /> },
-          { key: "board" as const, label: "看板", icon: <LayoutGrid size={10} /> },
-          { key: "today" as const, label: "今日" },
-          { key: "habits" as const, label: "习惯" },
+          { key: "all" as TabKey, label: "列表", icon: <List size={10} /> },
+          { key: "board" as TabKey, label: "看板", icon: <LayoutGrid size={10} /> },
+          { key: "matrix" as TabKey, label: "矩阵", icon: <Grid3X3 size={10} /> },
+          { key: "today" as TabKey, label: "今日" },
+          { key: "habits" as TabKey, label: "习惯" },
         ]).map(t => (
           <button
             key={t.key}
