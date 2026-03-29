@@ -53,9 +53,15 @@ const HomePage = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const messages = todayEntry?.messages || [];
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+
   const displayMessages = isLoading && streamingContent
     ? [...messages, { role: "assistant" as const, content: streamingContent, timestamp: new Date().toISOString() }]
     : messages;
+
+  // Fix 5: abort cleanup on unmount
+  useEffect(() => { return () => { abortRef.current?.abort(); }; }, []);
 
   // Fetch daily question when no messages today
   useEffect(() => {
