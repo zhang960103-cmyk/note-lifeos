@@ -151,7 +151,7 @@ export function useDayEntries(userId: string | undefined) {
     });
   }, [userId, todayKey, ensureEntry]);
 
-  const updateAssistantMessage = useCallback((content: string) => {
+  const updateDayMeta
     setEntries(prev => {
       const idx = prev.findIndex(e => e.date === todayKey);
       if (idx < 0) return prev;
