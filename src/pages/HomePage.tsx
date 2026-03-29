@@ -138,7 +138,31 @@ const HomePage = () => {
       : "🌅 快到今天结束了。有什么想记录的吗？";
   }, [showSunset, todayEntry]);
 
-  // Feature 3: Focus todo
+  // Weekly letter ready check
+  const weeklyLetterReady = useMemo(() => {
+    const today = new Date();
+    const isMonday = today.getDay() === 1;
+    const lastWeekEntries = entries.filter(e => {
+      const d = parseISO(e.date);
+      return d >= subDays(today, 8) && d < subDays(today, 1);
+    });
+    const hasLastWeekData = lastWeekEntries.length >= 3;
+    const weekKey = format(today, "yyyy-ww");
+    const alreadyRead = localStorage.getItem(`letter_read_${weekKey}`);
+    return isMonday && hasLastWeekData && !alreadyRead;
+  }, [entries]);
+
+  const handleOpenLetter = () => {
+    const weekKey = format(new Date(), "yyyy-ww");
+    localStorage.setItem(`letter_read_${weekKey}`, "1");
+    navigate("/review?auto=weekly");
+  };
+
+  const handleQuickMood = (mood: typeof QUICK_MOODS[0]) => {
+    updateDayMeta(todayKey, { emotionTags: [mood.tag], emotionScore: mood.score });
+    sendMessage(`[快速情绪记录] ${mood.emoji} ${mood.label}`);
+  };
+
   const focusTodo = useMemo(() => {
     return allTodos.find(t => t.status === "doing");
   }, [allTodos]);
