@@ -80,7 +80,10 @@ const HistoryPage = () => {
   };
 
   return (
-    <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4">
+    <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4"
+      onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
+      onTouchEnd={(e) => { const delta = e.changedTouches[0].clientX - touchStart; if (touchStart < 30 && delta > 70) navigate(-1); }}
+    >
       <div className="py-4 flex items-center justify-between">
         <div>
           <h1 className="font-serif-sc text-lg text-foreground">回顾</h1>
