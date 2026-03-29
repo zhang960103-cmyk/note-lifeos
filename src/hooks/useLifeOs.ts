@@ -351,8 +351,7 @@ export function useDayEntries(userId: string | undefined) {
       }),
     })));
 
-    // Reset all doing todos to todo, then set the target
-    await supabase.from("todos").update({ status: "todo", updated_at: new Date().toISOString() }).eq("user_id", userId).eq("status", "doing");
+    // Only update the target todo in DB; frontend setEntries already handles resetting others
     await supabase.from("todos").update({ status: "doing", updated_at: new Date().toISOString() }).eq("id", todoId);
   }, [userId]);
 
