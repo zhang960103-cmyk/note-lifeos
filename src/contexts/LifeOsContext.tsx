@@ -8,7 +8,6 @@ interface LifeOsContextType {
   todayKey: string;
   addMessage: (msg: ChatMessage) => void;
   updateDayMeta: (date: string, meta: { emotionTags?: string[]; topicTags?: string[]; todos?: TodoItem[]; emotionScore?: number }) => void;
-  updateDayMeta: (date: string, meta: { emotionTags?: string[]; topicTags?: string[]; todos?: TodoItem[]; emotionScore?: number }) => void;
   toggleTodo: (date: string, todoId: string) => void;
   updateTodo: (date: string, todoId: string, updates: Partial<TodoItem>) => void;
   addTodoToDate: (date: string, todo: TodoItem) => void;
