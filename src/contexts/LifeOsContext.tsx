@@ -37,7 +37,7 @@ const LifeOsContext = createContext<LifeOsContextType | null>(null);
 export function LifeOsProvider({ children, userId }: { children: ReactNode; userId: string }) {
   const {
     entries, todayEntry, todayKey, addMessage, updateAssistantMessage,
-    updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, allTodos,
+    updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, setFocusTodo, allTodos,
   } = useDayEntries(userId);
   const { scores: wheelScores, addScore: addWheelScore } = useWheelScores(userId);
   const { onboarded, completeOnboarding } = useOnboarding(userId);
