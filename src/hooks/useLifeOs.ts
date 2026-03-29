@@ -56,6 +56,8 @@ export function useOnboarding(userId: string | undefined) {
 
 export function useDayEntries(userId: string | undefined) {
   const [entries, setEntries] = useState<DayEntry[]>([]);
+  const entriesRef = useRef<DayEntry[]>([]);
+  useEffect(() => { entriesRef.current = entries; }, [entries]);
   const todayKey = format(new Date(), "yyyy-MM-dd");
 
   // Load entries from DB
