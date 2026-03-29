@@ -605,7 +605,9 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
         <button onClick={extractTimeline} className="text-[9px] text-muted-foreground/50 hover:text-primary">刷新</button>
       </div>
       {summary && <p className="text-[10px] text-muted-foreground mb-3">{summary}</p>}
-
+      {matchedCount > 0 && (
+        <p className="text-[10px] text-los-green mb-2">✅ 已自动匹配 {matchedCount} 条待办的用时</p>
+      )}
       {/* Horizontal stacked bar overview */}
       <div className="h-[6px] rounded-full bg-secondary mb-3 flex overflow-hidden">
         {timeBlocks.map((block, i) => (
