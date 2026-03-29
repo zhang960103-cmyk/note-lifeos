@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS wheel_scores_user_date ON wheel_scores(user_id, date);

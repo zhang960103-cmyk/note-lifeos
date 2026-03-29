@@ -37,4 +37,28 @@ export function useReminders() {
 
     return () => clearInterval(interval);
   }, [allTodos]);
+
+  // Check overdue todos when app becomes visible
+  useEffect(() => {
+    const checkOnFocus = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Notification.permission !== "granted") return;
+      const now = new Date();
+      const todayStr = format(now, "yyyy-MM-dd");
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      allTodos.forEach(todo => {
+        if (todo.status === "done") return;
+        if (!todo.dueDate || !todo.dueTime) return;
+        if (todo.dueDate !== todayStr) return;
+        const [h, m] = todo.dueTime.split(":").map(Number);
+        const todoMins = h * 60 + m;
+        if (nowMinutes >= todoMins && !notifiedRef.current.has(todo.id)) {
+          new Notification("🧭 罗盘提醒（逾期）", { body: todo.text });
+          notifiedRef.current.add(todo.id);
+        }
+      });
+    };
+    document.addEventListener("visibilitychange", checkOnFocus);
+    return () => document.removeEventListener("visibilitychange", checkOnFocus);
+  }, [allTodos]);
 }

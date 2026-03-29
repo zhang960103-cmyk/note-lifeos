@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { DayEntry, WheelScore, ChatMessage, TodoItem, FinanceEntry, HabitItem } from "@/types/lifeOs";
-import { format, addDays, nextSunday } from "date-fns";
+import { format, addDays, nextSunday, subDays } from "date-fns";
 
 // Helper: convert dueDate hint from AI to actual ISO date
 function resolveDueDate(hint?: string): string | undefined {
@@ -56,6 +56,8 @@ export function useOnboarding(userId: string | undefined) {
 
 export function useDayEntries(userId: string | undefined) {
   const [entries, setEntries] = useState<DayEntry[]>([]);
+  const entriesRef = useRef<DayEntry[]>([]);
+  useEffect(() => { entriesRef.current = entries; }, [entries]);
   const todayKey = format(new Date(), "yyyy-MM-dd");
 
   // Load entries from DB
@@ -73,8 +75,12 @@ export function useDayEntries(userId: string | undefined) {
       const entryIds = dayData.map(d => d.id);
 
       const [{ data: msgs }, { data: todos }] = await Promise.all([
-        supabase.from("chat_messages").select("*").in("entry_id", entryIds.length ? entryIds : ['']).order("timestamp", { ascending: true }),
-        supabase.from("todos").select("*").eq("user_id", userId).order("created_at", { ascending: true }),
+        entryIds.length
+          ? supabase.from("chat_messages").select("*").in("entry_id", entryIds).order("timestamp", { ascending: true })
+          : Promise.resolve({ data: [] as any[] }),
+        supabase.from("todos").select("*").eq("user_id", userId)
+          .gte("created_at", format(subDays(new Date(), 90), "yyyy-MM-dd"))
+          .order("created_at", { ascending: false }),
       ]);
 
       const mapped: DayEntry[] = dayData.map(d => ({
@@ -145,20 +151,7 @@ export function useDayEntries(userId: string | undefined) {
     });
   }, [userId, todayKey, ensureEntry]);
 
-  const updateAssistantMessage = useCallback((content: string) => {
-    setEntries(prev => {
-      const idx = prev.findIndex(e => e.date === todayKey);
-      if (idx < 0) return prev;
-      const entry = prev[idx];
-      const msgs = [...entry.messages];
-      if (msgs.length > 0 && msgs[msgs.length - 1].role === "assistant") {
-        msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content };
-      } else {
-        msgs.push({ role: "assistant", content, timestamp: new Date().toISOString() });
-      }
-      return prev.map((e, i) => i === idx ? { ...e, messages: msgs, updatedAt: new Date().toISOString() } : e);
-    });
-  }, [todayKey]);
+
 
   const updateDayMeta = useCallback(async (date: string, meta: {
     emotionTags?: string[];
@@ -194,7 +187,7 @@ export function useDayEntries(userId: string | undefined) {
     });
 
     // Persist meta to DB
-    const entry = entries.find(e => e.date === date);
+    const entry = entriesRef.current.find(e => e.date === date);
     if (!entry) return;
 
     const newEmotionTags = meta.emotionTags
@@ -345,8 +338,7 @@ export function useDayEntries(userId: string | undefined) {
       }),
     })));
 
-    // Reset all doing todos to todo, then set the target
-    await supabase.from("todos").update({ status: "todo", updated_at: new Date().toISOString() }).eq("user_id", userId).eq("status", "doing");
+    // Only update the target todo in DB; frontend setEntries already handles resetting others
     await supabase.from("todos").update({ status: "doing", updated_at: new Date().toISOString() }).eq("id", todoId);
   }, [userId]);
 
@@ -357,7 +349,7 @@ export function useDayEntries(userId: string | undefined) {
   const todayEntry = entries.find(e => e.date === todayKey) || null;
 
   return {
-    entries, todayEntry, todayKey, addMessage, updateAssistantMessage,
+    entries, todayEntry, todayKey, addMessage,
     updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, setFocusTodo, allTodos,
   };
 }
@@ -403,12 +395,15 @@ export function useWheelScores(userId: string | undefined) {
 
   const addScore = useCallback(async (score: WheelScore) => {
     if (!userId) return;
-    await supabase.from("wheel_scores").insert({
-      user_id: userId,
-      date: score.date,
-      scores: score.scores as any,
-    });
-    setScores(prev => [score, ...prev]);
+    const dateKey = score.date.split("T")[0];
+    await supabase.from("wheel_scores").upsert(
+      { user_id: userId, date: dateKey, scores: score.scores as any },
+      { onConflict: "user_id,date" }
+    );
+    setScores(prev => [
+      { date: dateKey, scores: score.scores },
+      ...prev.filter(s => s.date.split("T")[0] !== dateKey),
+    ]);
   }, [userId]);
 
   return { scores, addScore };

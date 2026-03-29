@@ -7,7 +7,6 @@ interface LifeOsContextType {
   todayEntry: DayEntry | null;
   todayKey: string;
   addMessage: (msg: ChatMessage) => void;
-  updateAssistantMessage: (content: string) => void;
   updateDayMeta: (date: string, meta: { emotionTags?: string[]; topicTags?: string[]; todos?: TodoItem[]; emotionScore?: number }) => void;
   toggleTodo: (date: string, todoId: string) => void;
   updateTodo: (date: string, todoId: string, updates: Partial<TodoItem>) => void;
@@ -36,7 +35,7 @@ const LifeOsContext = createContext<LifeOsContextType | null>(null);
 
 export function LifeOsProvider({ children, userId }: { children: ReactNode; userId: string }) {
   const {
-    entries, todayEntry, todayKey, addMessage, updateAssistantMessage,
+    entries, todayEntry, todayKey, addMessage,
     updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, setFocusTodo, allTodos,
   } = useDayEntries(userId);
   const { scores: wheelScores, addScore: addWheelScore } = useWheelScores(userId);
@@ -46,7 +45,7 @@ export function LifeOsProvider({ children, userId }: { children: ReactNode; user
 
   return (
     <LifeOsContext.Provider value={{
-      entries, todayEntry, todayKey, addMessage, updateAssistantMessage,
+      entries, todayEntry, todayKey, addMessage,
       updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, setFocusTodo, allTodos,
       wheelScores, addWheelScore, onboarded, completeOnboarding,
       financeEntries, addFinanceEntry, deleteFinanceEntry, updateFinanceEntry, todayFinanceStats, monthFinanceStats,

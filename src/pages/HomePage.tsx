@@ -39,6 +39,8 @@ const HomePage = () => {
   const [brainDumpResult, setBrainDumpResult] = useState<{ todos: any[]; summary: string } | null>(null);
   const [showFocusPicker, setShowFocusPicker] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
+  const canUseVoice = typeof window !== "undefined"
+    && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
   const [showTagHint, setShowTagHint] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -501,13 +503,15 @@ const HomePage = () => {
           >
             <Brain size={18} />
           </button>
-          <button
-            onClick={() => setShowVoice(true)}
-            className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
-            title="语音输入"
-          >
-            <Mic size={18} />
-          </button>
+          {canUseVoice && (
+            <button
+              onClick={() => setShowVoice(true)}
+              className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
+              title="语音输入"
+            >
+              <Mic size={18} />
+            </button>
+          )}
           <textarea
             ref={textareaRef}
             value={input}
