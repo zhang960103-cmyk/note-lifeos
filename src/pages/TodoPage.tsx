@@ -388,6 +388,39 @@ const TodoPage = () => {
           </div>
         )}
 
+        {/* Eisenhower Matrix */}
+        {tab === "matrix" && (
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { key: "urgentImportant", label: "🔴 紧急重要", desc: "立即做", bg: "border-los-red/30" },
+              { key: "notUrgentImportant", label: "🟠 重要不紧急", desc: "计划做", bg: "border-los-orange/30" },
+              { key: "urgentNotImportant", label: "🔵 紧急不重要", desc: "委托做", bg: "border-los-blue/30" },
+              { key: "notUrgentNotImportant", label: "⚪ 不紧急不重要", desc: "考虑删", bg: "border-muted-foreground/20" },
+            ] as const).map(q => {
+              const items = eisenhowerMatrix[q.key];
+              return (
+                <div key={q.key} className={`border-l-2 ${q.bg} bg-surface-2 rounded-xl p-2.5 min-h-[120px]`}>
+                  <div className="text-[10px] text-foreground font-serif-sc mb-0.5">{q.label}</div>
+                  <div className="text-[8px] text-muted-foreground/60 mb-2">{q.desc}</div>
+                  <div className="space-y-1">
+                    {items.length === 0 ? (
+                      <p className="text-[9px] text-muted-foreground/40">空</p>
+                    ) : items.slice(0, 5).map(t => (
+                      <div key={t.id} className="flex items-center gap-1.5">
+                        <button onClick={() => handleToggle(t)} className="flex-shrink-0">
+                          <div className={`w-3.5 h-3.5 rounded-full border ${t.status === "doing" ? "bg-los-orange border-los-orange" : "border-muted-foreground"}`} />
+                        </button>
+                        <span className="text-[10px] text-foreground truncate">{t.text}</span>
+                      </div>
+                    ))}
+                    {items.length > 5 && <p className="text-[8px] text-muted-foreground/50">+{items.length - 5} 更多</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Habits tab */}
         {tab === "habits" && (
           <div className="space-y-3">
