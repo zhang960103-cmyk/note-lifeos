@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Send, Loader2, DollarSign, X, Clock, BookOpen, LogOut, Zap, Brain, Mic } from "lucide-react";
+import { Send, Loader2, DollarSign, X, Clock, Settings, Zap, Brain, Mic } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { createTodoFromExtract } from "@/hooks/useLifeOs";
-import { useAuth } from "@/hooks/useAuth";
 import { format, subDays } from "date-fns";
 import type { TodoItem } from "@/types/lifeOs";
 
@@ -18,7 +17,7 @@ const ENERGY_LEVELS = [
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  // Auth no longer needed directly here - moved to settings
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
     addFinanceEntry, todayFinanceStats, wheelScores, entries, allTodos, toggleTodo,
@@ -348,11 +347,8 @@ const HomePage = () => {
           <button onClick={() => navigate("/history")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2">
             <Clock size={16} />
           </button>
-          <button onClick={() => navigate("/guide")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2">
-            <BookOpen size={16} />
-          </button>
-          <button onClick={signOut} className="text-muted-foreground hover:text-destructive transition-colors p-1.5 rounded-lg hover:bg-surface-2" title="退出登录">
-            <LogOut size={16} />
+          <button onClick={() => navigate("/settings")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2" title="设置">
+            <Settings size={16} />
           </button>
         </div>
       </div>

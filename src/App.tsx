@@ -13,6 +13,7 @@ import ReviewPage from "@/pages/ReviewPage";
 import WheelPage from "@/pages/WheelPage";
 import WealthPage from "@/pages/WealthPage";
 import GuidePage from "@/pages/GuidePage";
+import SettingsPage from "@/pages/SettingsPage";
 import InsightsPage from "@/pages/InsightsPage";
 import GoalsPage from "@/pages/GoalsPage";
 import TimeStatsPage from "@/pages/TimeStatsPage";
@@ -53,6 +54,7 @@ const AppInner = () => {
             <Route path="/wheel" element={<WheelPage />} />
             <Route path="/wealth" element={<WealthPage />} />
             <Route path="/guide" element={<GuidePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="/insights" element={<InsightsPage />} />
             <Route path="/goals" element={<GoalsPage />} />
             <Route path="/time-stats" element={<TimeStatsPage />} />

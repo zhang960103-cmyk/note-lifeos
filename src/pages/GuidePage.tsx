@@ -1,24 +1,39 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Compass, Target, BookOpen, TrendingUp, Zap, Clock, DollarSign } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+
+const APP_VERSION = "1.4.0";
+const LAST_UPDATED = "2026-03-29";
+
+const changelog = [
+  { version: "1.4.0", date: "2026-03-29", items: ["统一待办视图，合并看板与列表", "时间线提取自动更新待办用时", "新增设置页面，整合主题/账号/退出", "使用指南自动跟随版本更新"] },
+  { version: "1.3.0", date: "2026-03-28", items: ["时间统计仪表盘升级（热力图、效率评分）", "AI时间分析与日记时间线提取", "参考 Toggl/RescueTime 重设计可视化"] },
+  { version: "1.2.0", date: "2026-03-27", items: ["语音输入支持中英阿三语", "AI语音自动纠错", "换肤系统（深浅模式+6种主题色）", "待办看板+矩阵+习惯打卡+番茄钟"] },
+  { version: "1.1.0", date: "2026-03-26", items: ["Go Deeper 追问按钮", "脑清空 Brain Dump", "聚焦任务模式", "日落复盘卡片", "自然语言记账"] },
+  { version: "1.0.0", date: "2026-03-25", items: ["核心对话日记系统", "AI自动提取待办/情绪/话题", "财富板块自动记账", "生命罗盘7维度评估", "周/月复盘报告生成"] },
+];
 
 const quickStart = [
   { emoji: "💬", title: "直接说话就行", desc: "打开应用，在底部输入框写下任何想法。不用分类、不用格式化，AI自动整理一切。" },
   { emoji: "🤖", title: "AI导师自动回应", desc: "发送后AI导师会回复你——不是冷冰冰的分析，而是像朋友一样陪你想清楚。" },
   { emoji: "✅", title: "待办自动生成", desc: "对话中提到的任务，AI自动拆分优先级并加入待办清单，无需手动创建。" },
-  { emoji: "💰", title: "聊天即记账", desc: "说'花了200买书'或'收入5000'，系统自动识别并记录到财富面板。" },
+  { emoji: "💰", title: "聊天即记账", desc: "说'我花了200买书'或'收入5000'，系统自动识别并记录到财富面板。只有明确说'我花了/我付了'才会记录为你的支出。" },
   { emoji: "⚖️", title: "生命之轮自动评估", desc: "AI根据你近30天的对话内容，自动为7大生命维度打分，你只需微调确认。" },
   { emoji: "⚡", title: "精力随手记", desc: "输入框旁的⚡按钮，快速记录当前精力状态（高/中/低），积累后发现规律。" },
+  { emoji: "🎤", title: "语音输入", desc: "支持中英阿三语语音识别，AI自动纠错语法和用词错误，也可手动修改。" },
+  { emoji: "🧠", title: "脑清空模式", desc: "点击🧠按钮，把脑子里所有想法倒出来，AI自动整理成结构化待办清单。" },
 ];
 
 const features = [
-  { icon: "🧭", title: "今天（首页）", desc: "核心对话界面。每日一问引导深度思考，所有日记和导师对话在这里完成。", path: "/" },
-  { icon: "✅", title: "待办清单", desc: "AI从对话中自动提取任务，按紧急/重要四象限排列。支持看板视图拖拽管理。", path: "/todos" },
-  { icon: "⚖️", title: "生命罗盘", desc: "7大维度雷达图+AI洞察卡片+认知清单+本月行动计划。点击底部Tab直达。", path: "/wheel" },
-  { icon: "💰", title: "财富面板", desc: "收支自动记录、分类统计、财商提升建议。对话中提到金额自动入账。", path: "/wealth" },
+  { icon: "🧭", title: "今天（首页）", desc: "核心对话界面。每日一问引导深度思考，AI导师对话+自动提取待办/情绪/财务。", path: "/" },
+  { icon: "✅", title: "待办清单", desc: "智能任务管理：统一视图按状态分组、四象限矩阵、习惯打卡、番茄钟计时。", path: "/todos" },
+  { icon: "⚖️", title: "生命罗盘", desc: "7大维度雷达图+AI洞察卡片+认知清单+本月行动计划。", path: "/wheel" },
+  { icon: "💰", title: "财富面板", desc: "收支自动记录、分类统计、可编辑删除。对话中明确提到'我花了'自动入账。", path: "/wealth" },
+  { icon: "📊", title: "时间统计", desc: "效率评分环、活跃热力图、分类堆叠图、情绪波动、日记时间线提取、AI深度分析。", path: "/time-stats" },
   { icon: "🕐", title: "历史记录", desc: "365天情绪热力图，点击任意一天查看当天对话摘要和情绪标签。", path: "/history" },
   { icon: "💡", title: "破局手册", desc: "从所有AI回复中提取的行动建议精华库，可收藏、可搜索。", path: "/insights" },
   { icon: "🎯", title: "目标系统", desc: "季度OKR管理，AI自动将待办关联到关键结果，追踪完成进度。", path: "/goals" },
-  { icon: "📊", title: "复盘报告", desc: "周报/月报一键生成，AI以'老朋友写信'的方式总结你的成长轨迹。", path: "/review" },
+  { icon: "📈", title: "复盘报告", desc: "周报/月报一键生成，AI以'老朋友写信'的方式总结你的成长轨迹。", path: "/review" },
+  { icon: "⚙️", title: "设置", desc: "深浅模式切换、6种主题色、账号管理、退出登录。", path: "/settings" },
 ];
 
 const algorithms = [
@@ -57,10 +72,11 @@ const GuidePage = () => {
     <div className="pb-24 px-4 max-w-[600px] mx-auto overflow-y-auto h-full">
       {/* Header */}
       <div className="flex items-center gap-3 py-4">
-        <button onClick={() => navigate("/")} className="text-muted-foreground hover:text-foreground transition-colors">
+        <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft size={20} />
         </button>
         <h1 className="font-serif-sc text-lg text-foreground">使用指南</h1>
+        <span className="ml-auto text-[9px] text-muted-foreground font-mono-jb">v{APP_VERSION} · {LAST_UPDATED}</span>
       </div>
 
       {/* Philosophy */}
@@ -181,12 +197,35 @@ const GuidePage = () => {
           </div>
           <div className="border-t border-border pt-3">
             <p className="text-xs text-gold font-mono-jb mb-1">🌙 晚间（10分钟）</p>
-            <p className="text-xs text-muted-foreground leading-[1.8]">回顾今天 → AI自动生成日记摘要 → 查看待办完成情况</p>
+            <p className="text-xs text-muted-foreground leading-[1.8]">回顾今天 → AI自动生成日记摘要 → 查看待办完成情况 → 提取时间线</p>
           </div>
           <div className="border-t border-border pt-3">
             <p className="text-xs text-gold font-mono-jb mb-1">📊 每周日</p>
-            <p className="text-xs text-muted-foreground leading-[1.8]">查看生命罗盘 → 生成周复盘信 → 调整下周焦点</p>
+            <p className="text-xs text-muted-foreground leading-[1.8]">查看生命罗盘 → 生成周复盘信 → 查看时间统计AI分析 → 调整下周焦点</p>
           </div>
+        </div>
+      </section>
+
+      {/* Changelog */}
+      <section className="mb-6">
+        <h2 className="text-xs text-gold font-mono-jb mb-3">📋 版本更新记录</h2>
+        <div className="space-y-2">
+          {changelog.map(v => (
+            <div key={v.version} className="bg-surface-2 border border-border rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-xs text-gold font-mono-jb">v{v.version}</span>
+                <span className="text-[9px] text-muted-foreground font-mono-jb">{v.date}</span>
+              </div>
+              <ul className="space-y-0.5">
+                {v.items.map((item, i) => (
+                  <li key={i} className="text-[10px] text-muted-foreground leading-[1.6] flex gap-1.5">
+                    <span className="text-gold/50">·</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       </section>
     </div>
