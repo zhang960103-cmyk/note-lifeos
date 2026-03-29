@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { format, subDays, startOfWeek, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isToday, parseISO, differenceInMinutes } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
-import { ArrowLeft, Clock, TrendingUp } from "lucide-react";
+import { ArrowLeft, Clock, TrendingUp, Sparkles, Loader2 } from "lucide-react";
 
 const CATEGORY_COLORS: Record<string, string> = {
   "工作": "hsl(39 58% 53%)",
