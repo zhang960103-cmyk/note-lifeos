@@ -47,7 +47,7 @@ export function LifeOsProvider({ children, userId }: { children: ReactNode; user
   return (
     <LifeOsContext.Provider value={{
       entries, todayEntry, todayKey, addMessage, updateAssistantMessage,
-      updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, allTodos,
+      updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, setFocusTodo, allTodos,
       wheelScores, addWheelScore, onboarded, completeOnboarding,
       financeEntries, addFinanceEntry, deleteFinanceEntry, updateFinanceEntry, todayFinanceStats, monthFinanceStats,
       habits, addHabit, checkInHabit, deleteHabit,

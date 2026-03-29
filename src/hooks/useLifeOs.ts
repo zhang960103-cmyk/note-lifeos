@@ -334,6 +334,22 @@ export function useDayEntries(userId: string | undefined) {
     await supabase.from("todos").delete().eq("id", todoId);
   }, []);
 
+  const setFocusTodo = useCallback(async (date: string, todoId: string) => {
+    // Set target to 'doing', reset any other 'doing' back to 'todo'
+    setEntries(prev => prev.map(e => ({
+      ...e,
+      todos: e.todos.map(t => {
+        if (t.id === todoId) return { ...t, status: "doing" as const, updatedAt: new Date().toISOString() };
+        if (t.status === "doing") return { ...t, status: "todo" as const, updatedAt: new Date().toISOString() };
+        return t;
+      }),
+    })));
+
+    // Reset all doing todos to todo, then set the target
+    await supabase.from("todos").update({ status: "todo", updated_at: new Date().toISOString() }).eq("user_id", userId).eq("status", "doing");
+    await supabase.from("todos").update({ status: "doing", updated_at: new Date().toISOString() }).eq("id", todoId);
+  }, [userId]);
+
   const allTodos = useMemo(() => {
     return entries.flatMap(e => e.todos.map(t => ({ ...t, sourceDate: t.sourceDate || e.date })));
   }, [entries]);
@@ -342,7 +358,7 @@ export function useDayEntries(userId: string | undefined) {
 
   return {
     entries, todayEntry, todayKey, addMessage, updateAssistantMessage,
-    updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, allTodos,
+    updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, setFocusTodo, allTodos,
   };
 }
 
