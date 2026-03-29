@@ -158,9 +158,13 @@ priority智能评估规则（按优先级矩阵）：
 - 「月底前」→ 本月最后一天
 - 「下午3点」→ dueTime=15:00
 
-financeHints提取规则：
-- 提取对话中提到的收支信息
-- 如果没有提到金额，返回空数组 []
+financeHints提取规则（极其重要！）：
+- 只提取用户明确表示自己支付/收到的金额
+- 如果用户只是抱怨某个价格贵/便宜，但没有明确说"我花了/我付了/我买了"，不要提取为支出
+- 例如："两个人吃了84块太贵了"≠用户花了84，可能是AA或对方请客，除非用户明确说"我请的"或"我花的"
+- 例如："小宝转给我500"→ income；"我给房东转了2000"→ expense
+- 工资/课时费等固定收入，如果用户没提到具体金额，不要猜测金额，返回空数组
+- 如果金额不明确或支付主体不明确，宁可不提取，返回空数组 []
 
 只返回JSON，不要有其他文字。`;
 
@@ -455,6 +459,45 @@ serve(async (req) => {
 - 如果数据量太少，坦诚说明并给出通用建议
 只返回JSON。`;
       const parsed = await aiCall("google/gemini-2.5-flash", timeAnalysisPrompt, userText);
+      return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+    }
+
+    // Time-block extraction from diary
+    if (mode === "time-extract") {
+      const userText = messages.map((m: any) => `[${m.role === 'user' ? '用户' : '罗盘'}]: ${m.content}`).join("\n");
+      const today = new Date().toISOString().split("T")[0];
+      const timeExtractPrompt = `你是时间记录助手。从用户的日记/对话中，提取他们今天做了什么事、每件事大概花了多少时间。
+
+当前日期：${today}
+
+提取规则：
+- 用户可能说"9点到12点在上课"→ 提取为一个时间块
+- 用户可能说"花了2个小时做XXX"→ 提取为一个时间块
+- 用户可能说"路上一个半小时"→ 提取为通勤时间块
+- 推断合理的开始和结束时间
+- 如果用户没提到具体时间但提到了活动，根据上下文推断时长
+- 按时间顺序排列
+
+分类参考：工作、学习、生活、运动、社交、娱乐、休息、通勤、其他
+
+返回JSON：
+{
+  "timeBlocks": [
+    {
+      "activity": "活动名称（简短）",
+      "category": "分类",
+      "startTime": "HH:mm",
+      "endTime": "HH:mm",
+      "durationMinutes": 180,
+      "note": "备注（可选）"
+    }
+  ],
+  "totalTrackedMinutes": 720,
+  "gaps": ["未记录的时间段描述"],
+  "summary": "一句话总结今天的时间使用"
+}
+只返回JSON。`;
+      const parsed = await aiCall("google/gemini-2.5-flash", timeExtractPrompt, userText);
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
