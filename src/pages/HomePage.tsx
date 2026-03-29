@@ -39,6 +39,7 @@ const HomePage = () => {
   const [brainDumpLoading, setBrainDumpLoading] = useState(false);
   const [brainDumpResult, setBrainDumpResult] = useState<{ todos: any[]; summary: string } | null>(null);
   const [showFocusPicker, setShowFocusPicker] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
   const [showTagHint, setShowTagHint] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
