@@ -14,6 +14,7 @@ interface LifeOsContextType {
   addTodoToDate: (date: string, todo: TodoItem) => void;
   deleteTodo: (date: string, todoId: string) => void;
   deleteEntry: (id: string) => void;
+  setFocusTodo: (date: string, todoId: string) => void;
   allTodos: TodoItem[];
   wheelScores: WheelScore[];
   addWheelScore: (score: WheelScore) => void;
