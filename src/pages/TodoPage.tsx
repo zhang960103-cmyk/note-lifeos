@@ -73,6 +73,36 @@ const TodoPage = () => {
     return () => { if (pomodoroRef.current) clearInterval(pomodoroRef.current); };
   }, [pomodoroRunning, pomodoroTime]);
 
+  // Time tracking timer
+  useEffect(() => {
+    if (!trackingTodoId || !trackingStart) return;
+    const iv = setInterval(() => setTrackingElapsed(Math.floor((Date.now() - trackingStart) / 1000)), 1000);
+    return () => clearInterval(iv);
+  }, [trackingTodoId, trackingStart]);
+
+  const startTracking = (todoId: string) => {
+    setTrackingTodoId(todoId);
+    setTrackingStart(Date.now());
+    setTrackingElapsed(0);
+  };
+  const stopTracking = () => {
+    setTrackingTodoId(null);
+    setTrackingStart(null);
+    setTrackingElapsed(0);
+  };
+  const formatTracking = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
+
+  // Eisenhower matrix
+  const eisenhowerMatrix = useMemo(() => {
+    const active = allTodos.filter(t => t.status !== "done" && t.status !== "dropped");
+    return {
+      urgentImportant: active.filter(t => t.priority === "urgent"),
+      notUrgentImportant: active.filter(t => t.priority === "high"),
+      urgentNotImportant: active.filter(t => t.priority === "normal"),
+      notUrgentNotImportant: active.filter(t => t.priority === "low"),
+    };
+  }, [allTodos]);
+
   const todayTodos = useMemo(() =>
     allTodos.filter(t => t.status !== "done" && t.status !== "dropped" && (!t.dueDate || t.dueDate === todayKey)),
     [allTodos, todayKey]
