@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Send, Loader2, DollarSign, X, Clock, BookOpen, LogOut, Zap, Brain } from "lucide-react";
+import { Send, Loader2, DollarSign, X, Clock, BookOpen, LogOut, Zap, Brain, Mic } from "lucide-react";
+import VoiceInput from "@/components/VoiceInput";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { createTodoFromExtract } from "@/hooks/useLifeOs";
@@ -38,6 +39,7 @@ const HomePage = () => {
   const [brainDumpLoading, setBrainDumpLoading] = useState(false);
   const [brainDumpResult, setBrainDumpResult] = useState<{ todos: any[]; summary: string } | null>(null);
   const [showFocusPicker, setShowFocusPicker] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
   const [showTagHint, setShowTagHint] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -503,6 +505,13 @@ const HomePage = () => {
           >
             <Brain size={18} />
           </button>
+          <button
+            onClick={() => setShowVoice(true)}
+            className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
+            title="语音输入"
+          >
+            <Mic size={18} />
+          </button>
           <textarea
             ref={textareaRef}
             value={input}
@@ -657,6 +666,17 @@ const HomePage = () => {
             )}
           </div>
         </div>
+      )}
+
+      {/* Voice Input */}
+      {showVoice && (
+        <VoiceInput
+          onTranscript={(text) => {
+            setShowVoice(false);
+            sendMessage(text);
+          }}
+          onClose={() => setShowVoice(false)}
+        />
       )}
     </div>
   );
