@@ -1,14 +1,13 @@
-import { useState, useRef, useEffect, useCallback, type ChangeEvent } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Send, Loader2, DollarSign, X, Clock, BookOpen, LogOut, Zap } from "lucide-react";
+import { Send, Loader2, DollarSign, X, Clock, BookOpen, LogOut, Zap, Brain } from "lucide-react";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { createTodoFromExtract } from "@/hooks/useLifeOs";
 import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import type { TodoItem } from "@/types/lifeOs";
 
-const CATEGORIES = ["教学", "内容", "餐饮", "交通", "购物", "其他"];
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
 const ENERGY_LEVELS = [
   { value: "high", emoji: "🔥", label: "高" },
@@ -16,41 +15,34 @@ const ENERGY_LEVELS = [
   { value: "low", emoji: "🔋", label: "低" },
 ];
 
-// Greeting based on time
-const getGreeting = () => {
-  const h = new Date().getHours();
-  if (h < 6) return "夜深了，还在思考什么？";
-  if (h < 9) return "早安，新的一天开始了";
-  if (h < 12) return "上午好，今天有什么计划？";
-  if (h < 14) return "中午好，休息一下";
-  if (h < 18) return "下午好，精力如何？";
-  if (h < 21) return "晚上好，今天过得怎么样？";
-  return "夜深了，今天有什么收获？";
-};
-
 const HomePage = () => {
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
     addFinanceEntry, todayFinanceStats, wheelScores, entries, allTodos, toggleTodo,
+    habits, setFocusTodo, addTodoToDate,
   } = useLifeOs();
   const [dailyQuestion, setDailyQuestion] = useState<{ question: string; domain: string } | null>(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [showFinance, setShowFinance] = useState(false);
-  const [financeType, setFinanceType] = useState<"income" | "expense" | null>(null);
-  const [financeAmount, setFinanceAmount] = useState("");
-  const [financeCategory, setFinanceCategory] = useState("其他");
-  const [financeNote, setFinanceNote] = useState("");
+  const [financeNLInput, setFinanceNLInput] = useState("");
+  const [financeNLLoading, setFinanceNLLoading] = useState(false);
   const [financeToast, setFinanceToast] = useState(false);
   const [todoToast, setTodoToast] = useState<string | null>(null);
   const [showEnergyPicker, setShowEnergyPicker] = useState(false);
-  const [energyLevel, setEnergyLevel] = useState<string | null>(null);
+  const [showBrainDump, setShowBrainDump] = useState(false);
+  const [brainDumpText, setBrainDumpText] = useState("");
+  const [brainDumpLoading, setBrainDumpLoading] = useState(false);
+  const [brainDumpResult, setBrainDumpResult] = useState<{ todos: any[]; summary: string } | null>(null);
+  const [showFocusPicker, setShowFocusPicker] = useState(false);
+  const [showTagHint, setShowTagHint] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const prevTagCountRef = useRef(0);
 
   const messages = todayEntry?.messages || [];
   const messagesRef = useRef(messages);
@@ -62,6 +54,85 @@ const HomePage = () => {
 
   // Fix 5: abort cleanup on unmount
   useEffect(() => { return () => { abortRef.current?.abort(); }; }, []);
+
+  // UX 3: Tag hint
+  useEffect(() => {
+    const currentCount = (todayEntry?.emotionTags.length || 0) + (todayEntry?.topicTags.length || 0);
+    if (prevTagCountRef.current === 0 && currentCount > 0) {
+      setShowTagHint(true);
+      setTimeout(() => setShowTagHint(false), 3000);
+    }
+    prevTagCountRef.current = currentCount;
+  }, [todayEntry?.emotionTags.length, todayEntry?.topicTags.length]);
+
+  // UX 1: Status-aware greeting
+  const statusGreeting = useMemo(() => {
+    const h = new Date().getHours();
+    const yesterday = format(subDays(new Date(), 1), "yyyy-MM-dd");
+    const yesterdayEntry = entries.find(e => e.date === yesterday);
+
+    // Priority 1: Yesterday low emotion
+    if (yesterdayEntry && yesterdayEntry.emotionScore <= 4) {
+      return { emoji: "🌧️", text: "昨天有点难熬，今天怎么样？" };
+    }
+
+    // Priority 2: Habit streak 3+ days
+    if (habits && habits.length > 0) {
+      for (const habit of habits) {
+        if (habit.checkIns && habit.checkIns.length >= 3) {
+          const sorted = [...habit.checkIns].sort().reverse();
+          let streak = 1;
+          for (let i = 1; i < sorted.length; i++) {
+            const prev = new Date(sorted[i - 1]);
+            const curr = new Date(sorted[i]);
+            const diff = (prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24);
+            if (diff <= 1.5) streak++;
+            else break;
+          }
+          if (streak >= 3) {
+            return { emoji: "⚡", text: `我注意到你已经坚持了 ${streak} 天了` };
+          }
+        }
+      }
+    }
+
+    // Priority 3: Monday
+    if (new Date().getDay() === 1) {
+      return { emoji: "🚀", text: "新的一周。有什么想带着走的吗？" };
+    }
+
+    // Priority 4: Default with time awareness
+    if (h < 6) return { emoji: "🧭", text: "夜深了，还在思考什么？" };
+    if (h < 9) return { emoji: "🧭", text: "早安，新的一天开始了" };
+    if (h < 12) return { emoji: "🧭", text: "上午好，今天有什么计划？" };
+    if (h < 14) return { emoji: "🧭", text: "中午好，休息一下" };
+    if (h < 18) return { emoji: "🧭", text: "下午好，精力如何？" };
+    if (h < 21) return { emoji: "🧭", text: "晚上好，今天过得怎么样？" };
+    return { emoji: "🧭", text: "夜深了，今天有什么收获？" };
+  }, [entries, habits]);
+
+  // Feature 4: Sunset ritual
+  const isSunsetHour = useMemo(() => {
+    const h = new Date().getHours();
+    return h >= 20 && h <= 22;
+  }, []);
+  const showSunset = isSunsetHour && (!todayEntry || todayEntry.messages.length === 0);
+  const sunsetText = useMemo(() => {
+    if (!showSunset) return "";
+    const completedCount = todayEntry?.todos.filter(t => t.status === "done").length || 0;
+    return completedCount > 0
+      ? `🌅 今天完成了 ${completedCount} 件事。写下今天的感受？`
+      : "🌅 快到今天结束了。有什么想记录的吗？";
+  }, [showSunset, todayEntry]);
+
+  // Feature 3: Focus todo
+  const focusTodo = useMemo(() => {
+    return allTodos.find(t => t.status === "doing");
+  }, [allTodos]);
+
+  const todayUndoneTodos = useMemo(() => {
+    return allTodos.filter(t => t.status === "todo" || t.status === "doing");
+  }, [allTodos]);
 
   // Fetch daily question when no messages today
   useEffect(() => {
@@ -78,28 +149,10 @@ const HomePage = () => {
     }
   }, [messages.length, wheelScores]);
 
-  // AI greeting based on last emotion
-  const [aiGreeting, setAiGreeting] = useState<string | null>(null);
-  useEffect(() => {
-    if (messages.length > 0) return;
-    const lastEntry = entries.find(e => e.date !== todayKey && e.emotionScore > 0);
-    if (!lastEntry) return;
-    const timeGreeting = getGreeting();
-    const score = lastEntry.emotionScore;
-    if (score <= 3) {
-      setAiGreeting(`${timeGreeting}。上次你的状态不太好，今天感觉怎么样？`);
-    } else if (score >= 8) {
-      setAiGreeting(`${timeGreeting}。上次状态很不错，保持住这个势头！`);
-    } else {
-      setAiGreeting(timeGreeting);
-    }
-  }, [messages.length, entries, todayKey]);
-
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [displayMessages.length, streamingContent]);
 
-  // Fix 7: textarea no-jitter height via onInput
   const handleInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
     ta.style.height = 'auto';
@@ -108,7 +161,6 @@ const HomePage = () => {
   };
 
   const handleEnergyLog = (level: string) => {
-    setEnergyLevel(level);
     setShowEnergyPicker(false);
     const emoji = ENERGY_LEVELS.find(e => e.value === level)?.emoji || "⚡";
     const text = `[精力记录] ${emoji} 当前精力：${level === "high" ? "高" : level === "medium" ? "中" : "低"}`;
@@ -151,7 +203,6 @@ const HomePage = () => {
             .filter(t => t.status !== "dropped")
             .map(t => ({ id: t.id, text: t.text, status: t.status, priority: t.priority }));
           extractMeta(msgsForExtract, existingTodosForAI).then(meta => {
-            // Mark completed todos from AI recognition
             if (meta.completedTodoIds?.length > 0) {
               meta.completedTodoIds.forEach(todoId => {
                 const todo = allTodos.find(t => t.id === todoId);
@@ -217,21 +268,73 @@ const HomePage = () => {
     }
   };
 
-  const handleFinanceSave = () => {
-    if (!financeType || !financeAmount) return;
-    addFinanceEntry({
-      date: todayKey,
-      type: financeType,
-      amount: parseFloat(financeAmount),
-      category: financeCategory,
-      note: financeNote,
-    });
-    setFinanceType(null);
-    setFinanceAmount("");
-    setFinanceNote("");
-    setShowFinance(false);
-    setFinanceToast(true);
-    setTimeout(() => setFinanceToast(false), 2000);
+  // Feature 5: Natural language finance input
+  const handleFinanceNL = async () => {
+    if (!financeNLInput.trim() || financeNLLoading) return;
+    setFinanceNLLoading(true);
+    try {
+      const meta = await extractMeta([{ role: "user", content: financeNLInput }]);
+      if (meta.financeHints && meta.financeHints.length > 0) {
+        meta.financeHints.forEach(hint => {
+          addFinanceEntry({
+            date: todayKey,
+            type: hint.type,
+            amount: hint.amount,
+            category: hint.category,
+            note: hint.note,
+          });
+        });
+        const total = meta.financeHints.reduce((s, h) => s + h.amount, 0);
+        setTodoToast(`💰 已记录 ¥${total}`);
+        setTimeout(() => setTodoToast(null), 3000);
+        setFinanceNLInput("");
+        setShowFinance(false);
+      } else {
+        setTodoToast("未识别到金额，请重新描述");
+        setTimeout(() => setTodoToast(null), 3000);
+      }
+    } catch {
+      setTodoToast("解析失败，请重试");
+      setTimeout(() => setTodoToast(null), 3000);
+    }
+    setFinanceNLLoading(false);
+  };
+
+  // Feature 2: Brain dump
+  const handleBrainDump = async () => {
+    if (!brainDumpText.trim() || brainDumpLoading) return;
+    setBrainDumpLoading(true);
+    try {
+      const resp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ mode: "brain-dump", messages: [{ role: "user", content: brainDumpText }] }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setBrainDumpResult(data);
+      }
+    } catch {}
+    setBrainDumpLoading(false);
+  };
+
+  const confirmBrainDump = () => {
+    if (!brainDumpResult) return;
+    const todoItems: TodoItem[] = brainDumpResult.todos.map(t => createTodoFromExtract(t, todayKey));
+    if (todoItems.length > 0) {
+      updateDayMeta(todayKey, { todos: todoItems });
+      setTodoToast(`已添加 ${todoItems.length} 条待办`);
+      setTimeout(() => setTodoToast(null), 3000);
+    }
+    setBrainDumpText("");
+    setBrainDumpResult(null);
+    setShowBrainDump(false);
+  };
+
+  // Feature 1: Go deeper
+  const handleGoDeeper = (msgContent: string) => {
+    const lastSentence = msgContent.split(/[。？！.?!\n]/).filter(Boolean).pop() || msgContent.slice(-30);
+    sendMessage(`请针对你刚才说的「${lastSentence}」，再往深处挖一层。`);
   };
 
   return (
@@ -257,8 +360,18 @@ const HomePage = () => {
         {displayMessages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-[300px]">
-              <div className="text-3xl mb-4">🧭</div>
-              <p className="text-foreground text-sm leading-[1.8]">{aiGreeting || getGreeting()}</p>
+              {/* Feature 4: Sunset card */}
+              {showSunset && (
+                <button
+                  onClick={() => textareaRef.current?.focus()}
+                  className="bg-surface-2 rounded-xl px-4 py-3 mb-3 w-full text-left hover:bg-surface-3 transition"
+                >
+                  <p className="text-xs text-foreground leading-[1.8]">{sunsetText}</p>
+                </button>
+              )}
+              {/* UX 1: Status-aware greeting */}
+              <div className="text-3xl mb-4">{statusGreeting.emoji}</div>
+              <p className="text-foreground text-sm leading-[1.8]">{statusGreeting.text}</p>
               <p className="text-muted-foreground text-xs mt-2 leading-[1.8]">随便聊，我在听。</p>
               {dailyQuestion && (
                 <div className="mt-6 bg-surface-2 border border-border rounded-xl px-4 py-3 text-left">
@@ -279,14 +392,25 @@ const HomePage = () => {
         <div className="space-y-4">
           {displayMessages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[82%] rounded-2xl px-4 py-3 ${
-                  msg.role === "user"
-                    ? "bg-gold text-background rounded-br-sm text-sm leading-[1.8]"
-                    : "text-muted-foreground rounded-bl-sm text-[13px] leading-[1.8]"
-                }`}
-              >
-                {msg.content}
+              <div className={msg.role === "assistant" ? "max-w-[82%]" : ""}>
+                <div
+                  className={`max-w-full rounded-2xl px-4 py-3 ${
+                    msg.role === "user"
+                      ? `bg-gold text-background rounded-br-sm text-sm leading-[1.8]${i === displayMessages.length - 1 ? " animate-msg-in" : ""}`
+                      : "text-muted-foreground rounded-bl-sm text-[13px] leading-[1.8]"
+                  }`}
+                >
+                  {msg.content}
+                </div>
+                {/* Feature 1: Go Deeper button */}
+                {msg.role === "assistant" && !isLoading && (
+                  <button
+                    onClick={() => handleGoDeeper(msg.content)}
+                    className="text-[10px] text-muted-foreground/40 hover:text-gold cursor-pointer px-1 mt-0.5 transition-colors"
+                  >
+                    ↓ 深探
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -306,26 +430,29 @@ const HomePage = () => {
         <div ref={chatEndRef} />
       </div>
 
-      {/* Tags strip */}
+      {/* Tags strip + UX 3: Tag hint */}
       {todayEntry && (todayEntry.emotionTags.length > 0 || todayEntry.topicTags.length > 0) && (
-        <div className="px-4 py-1.5 flex gap-1.5 overflow-x-auto scrollbar-none">
+        <div className="px-4 py-1.5 flex gap-1.5 overflow-x-auto scrollbar-none items-center">
           {todayEntry.emotionTags.map(t => (
             <span key={t} className="text-[9px] bg-surface-2 text-muted-foreground px-2 py-0.5 rounded-full whitespace-nowrap">{t}</span>
           ))}
           {todayEntry.topicTags.map(t => (
             <span key={t} className="text-[9px] bg-gold-light text-gold px-2 py-0.5 rounded-full whitespace-nowrap">{t}</span>
           ))}
+          <span className={`text-[9px] text-muted-foreground/50 whitespace-nowrap transition-opacity duration-500 ${showTagHint ? "opacity-100" : "opacity-0"}`}>
+            AI 自动提取
+          </span>
         </div>
       )}
 
       {/* Toasts */}
       {financeToast && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-los-green text-background text-xs px-4 py-1.5 rounded-full animate-pulse">
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-los-green text-background text-xs px-4 py-1.5 rounded-full animate-pulse z-50">
           已记录 ✓
         </div>
       )}
       {todoToast && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-gold text-background text-xs px-4 py-1.5 rounded-full animate-pulse">
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-gold text-background text-xs px-4 py-1.5 rounded-full animate-pulse z-50">
           📝 {todoToast}
         </div>
       )}
@@ -342,6 +469,17 @@ const HomePage = () => {
         </div>
       )}
 
+      {/* Feature 3: Focus bar */}
+      <div className="px-4 h-6 flex items-center">
+        <button onClick={() => setShowFocusPicker(true)} className="w-full text-left truncate">
+          {focusTodo ? (
+            <span className="text-[11px] text-gold">⚡ 现在：{focusTodo.text.slice(0, 20)}{focusTodo.text.length > 20 ? "..." : ""}</span>
+          ) : (
+            <span className="text-[11px] text-muted-foreground/50">· 无聚焦任务</span>
+          )}
+        </button>
+      </div>
+
       {/* Input */}
       <div className="px-4 py-3 pb-2">
         <div className="flex gap-2 items-end">
@@ -357,6 +495,13 @@ const HomePage = () => {
             className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
           >
             <DollarSign size={18} />
+          </button>
+          <button
+            onClick={() => setShowBrainDump(true)}
+            className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
+            title="脑清空"
+          >
+            <Brain size={18} />
           </button>
           <textarea
             ref={textareaRef}
@@ -378,12 +523,12 @@ const HomePage = () => {
         </div>
       </div>
 
-      {/* Finance Sheet */}
+      {/* Feature 5: Finance Sheet - NL input */}
       {showFinance && (
         <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl p-5 z-50 animate-in slide-in-from-bottom">
           <div className="flex justify-between items-center mb-4">
             <span className="text-xs text-foreground font-serif-sc">记账</span>
-            <button onClick={() => { setShowFinance(false); setFinanceType(null); }} className="text-muted-foreground">
+            <button onClick={() => setShowFinance(false)} className="text-muted-foreground">
               <X size={16} />
             </button>
           </div>
@@ -401,47 +546,116 @@ const HomePage = () => {
               <div className="text-sm text-gold font-mono-jb">¥{todayFinanceStats.net}</div>
             </div>
           </div>
-          {!financeType ? (
-            <div className="flex gap-3">
-              <button onClick={() => setFinanceType("income")} className="flex-1 bg-los-green/20 text-los-green py-3 rounded-xl text-sm hover:bg-los-green/30 transition">+ 收入</button>
-              <button onClick={() => setFinanceType("expense")} className="flex-1 bg-los-orange/20 text-los-orange py-3 rounded-xl text-sm hover:bg-los-orange/30 transition">- 支出</button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <input
-                type="number"
-                value={financeAmount}
-                onChange={e => setFinanceAmount(e.target.value)}
-                placeholder="金额"
-                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-foreground text-lg font-mono-jb focus:outline-none focus:border-gold-border"
-                autoFocus
+          <div className="space-y-3">
+            <input
+              value={financeNLInput}
+              onChange={e => setFinanceNLInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") handleFinanceNL(); }}
+              placeholder="随便说，如：今天收了600学费，买书花了89..."
+              className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-gold-border"
+              autoFocus
+            />
+            <button
+              onClick={handleFinanceNL}
+              disabled={!financeNLInput.trim() || financeNLLoading}
+              className="w-full bg-gold text-background py-2.5 rounded-xl text-sm disabled:opacity-30 hover:bg-gold/90 transition flex items-center justify-center gap-2"
+            >
+              {financeNLLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+              AI 智能记账
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Feature 2: Brain Dump Sheet */}
+      {showBrainDump && (
+        <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl z-50 animate-in slide-in-from-bottom flex flex-col" style={{ height: "70vh" }}>
+          <div className="flex justify-between items-center p-4 pb-2">
+            <span className="text-xs text-foreground font-serif-sc">🧠 脑清空</span>
+            <button onClick={() => { setShowBrainDump(false); setBrainDumpResult(null); }} className="text-muted-foreground">
+              <X size={16} />
+            </button>
+          </div>
+
+          {!brainDumpResult ? (
+            <>
+              <textarea
+                value={brainDumpText}
+                onChange={e => setBrainDumpText(e.target.value)}
+                placeholder="把脑子里所有想法随便倒出来，不用整理，不用分类..."
+                className="flex-1 mx-4 bg-surface-2 border border-border rounded-xl px-4 py-3 text-sm text-foreground resize-none focus:outline-none focus:border-gold-border leading-[1.8]"
               />
-              <div className="flex gap-1.5 flex-wrap">
-                {CATEGORIES.map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setFinanceCategory(c)}
-                    className={`text-xs px-3 py-1 rounded-full transition ${financeCategory === c ? "bg-gold text-background" : "bg-surface-2 text-muted-foreground"}`}
-                  >
-                    {c}
-                  </button>
+              <div className="p-4 pt-2">
+                <button
+                  onClick={handleBrainDump}
+                  disabled={!brainDumpText.trim() || brainDumpLoading}
+                  className="w-full bg-gold text-background py-3 rounded-xl text-sm disabled:opacity-30 hover:bg-gold/90 transition flex items-center justify-center gap-2"
+                >
+                  {brainDumpLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+                  🧹 整理成计划
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 overflow-y-auto px-4">
+              {brainDumpResult.summary && (
+                <p className="text-xs text-muted-foreground mb-3 leading-[1.8]">{brainDumpResult.summary}</p>
+              )}
+              <div className="space-y-2 mb-4">
+                {brainDumpResult.todos.map((t, i) => (
+                  <div key={i} className="bg-surface-2 rounded-xl px-3 py-2 flex items-start gap-2">
+                    <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded ${
+                      t.priority === "high" || t.priority === "urgent" ? "bg-los-red/20 text-los-red" : "bg-surface-3 text-muted-foreground"
+                    }`}>{t.priority === "urgent" ? "紧急" : t.priority === "high" ? "重要" : "普通"}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-foreground">{t.text}</p>
+                      {t.estimatedMinutes && <p className="text-[10px] text-muted-foreground">≈ {t.estimatedMinutes}分钟</p>}
+                    </div>
+                  </div>
                 ))}
               </div>
-              <input
-                value={financeNote}
-                onChange={e => setFinanceNote(e.target.value)}
-                placeholder="备注（可选）"
-                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2 text-sm text-foreground focus:outline-none focus:border-gold-border"
-              />
-              <button
-                onClick={handleFinanceSave}
-                disabled={!financeAmount}
-                className="w-full bg-gold text-background py-2.5 rounded-xl text-sm disabled:opacity-30 hover:bg-gold/90 transition"
-              >
-                确认
-              </button>
+              <div className="pb-4">
+                <button
+                  onClick={confirmBrainDump}
+                  className="w-full bg-gold text-background py-3 rounded-xl text-sm hover:bg-gold/90 transition"
+                >
+                  ✅ 确认添加 {brainDumpResult.todos.length} 条待办
+                </button>
+              </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Feature 3: Focus picker sheet */}
+      {showFocusPicker && (
+        <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl p-5 z-50 animate-in slide-in-from-bottom max-h-[50vh] flex flex-col">
+          <div className="flex justify-between items-center mb-3">
+            <span className="text-xs text-foreground font-serif-sc">选择聚焦任务</span>
+            <button onClick={() => setShowFocusPicker(false)} className="text-muted-foreground">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-1">
+            {todayUndoneTodos.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">暂无待办任务</p>
+            ) : (
+              todayUndoneTodos.map(todo => (
+                <button
+                  key={todo.id}
+                  onClick={() => {
+                    setFocusTodo(todo.sourceDate || todayKey, todo.id);
+                    setShowFocusPicker(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-xs transition ${
+                    todo.status === "doing" ? "bg-gold/20 text-gold" : "bg-surface-2 text-foreground hover:bg-surface-3"
+                  }`}
+                >
+                  {todo.status === "doing" ? "⚡ " : ""}{todo.text}
+                </button>
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>
