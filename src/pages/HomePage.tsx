@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Send, Loader2, DollarSign, X, Clock, BookOpen, LogOut, Zap, Brain, Mic } from "lucide-react";
+import { Send, Loader2, DollarSign, X, Clock, Settings, Zap, Brain, Mic } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
 import { useLifeOs } from "@/contexts/LifeOsContext";
