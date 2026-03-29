@@ -515,6 +515,17 @@ serve(async (req) => {
     // Chat mode: streaming
     let systemContent = SYSTEM_PROMPT;
 
+    // Append cross-day memory context
+    if (memoryContext) {
+      systemContent += `\n\n【你对用户近两周的了解（跨日记忆）】\n${memoryContext}\n`;
+      systemContent += `当对话内容和过去记录有关联时，像真正认识这个人的朋友一样自然提及，`;
+      systemContent += `例如：「你上次提到XXX，后来怎么样了？」但不要每次都刻意提及记忆，只在真正相关时提。`;
+    }
+    if (patterns) {
+      systemContent += `\n\n【观察到的情绪模式】\n${patterns}\n`;
+      systemContent += `适时（不要每次）温和地指出这些模式。`;
+    }
+
     if (mode === "weekly-review") {
       systemContent += `\n\n【本次任务：周复盘信】
 请以"一封来自罗盘的周信"形式回复。不要用格式标记，像写信一样自然地写。包含本周观察、一个你注意到的模式、一个温和的提醒。控制在200字内。如果有值得深入学习的话题，在末尾附上1个资源推荐。`;

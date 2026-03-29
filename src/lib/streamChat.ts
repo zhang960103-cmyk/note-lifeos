@@ -6,12 +6,16 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-
 export async function streamChat({
   messages,
   mode = "default",
+  memoryContext,
+  patterns,
   onDelta,
   onDone,
   signal,
 }: {
   messages: ChatMsg[];
   mode?: ChatMode;
+  memoryContext?: string;
+  patterns?: string;
   onDelta: (text: string) => void;
   onDone: () => void;
   signal?: AbortSignal;
@@ -22,7 +26,7 @@ export async function streamChat({
       "Content-Type": "application/json",
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ messages, mode }),
+    body: JSON.stringify({ messages, mode, memoryContext, patterns }),
     signal,
   });
 
