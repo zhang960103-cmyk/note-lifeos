@@ -633,7 +633,15 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
             )}
           </div>
         </button>
-        <div className="flex gap-1">
+        <div className="flex gap-1 items-center">
+          {isTracking && trackingTime && (
+            <span className="text-[9px] font-mono-jb text-gold mr-1">{trackingTime}</span>
+          )}
+          {!isDone && onStartTracking && !isTracking && (
+            <button onClick={onStartTracking} className="text-muted-foreground hover:text-gold transition p-1" title="计时">
+              <Clock size={12} />
+            </button>
+          )}
           {!isDone && !isDoing && (
             <button onClick={() => onMove(todo, "doing")} className="text-muted-foreground hover:text-los-orange transition p-1" title="开始做">
               <Play size={12} />
@@ -647,7 +655,7 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
           <button onClick={onEdit} className="text-muted-foreground hover:text-gold transition p-1">
             <Pencil size={12} />
           </button>
-          <button onClick={onStartPomodoro} className="text-muted-foreground hover:text-gold transition p-1">
+          <button onClick={onStartPomodoro} className="text-muted-foreground hover:text-gold transition p-1" title="番茄钟">
             <Play size={12} />
           </button>
         </div>
