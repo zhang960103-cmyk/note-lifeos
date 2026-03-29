@@ -424,6 +424,40 @@ serve(async (req) => {
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
+    // Time analysis mode
+    if (mode === "time-analysis") {
+      const userText = messages[messages.length - 1]?.content || "";
+      const timeAnalysisPrompt = `你是一个时间管理专家和生活导师。根据用户的时间分布数据，给出个性化的深度分析和建议。
+
+分析维度：
+1. 时间分配是否均衡？哪些类别占比过高或过低？
+2. 完成率如何？有什么改进空间？
+3. 情绪与时间分配的关联性（如果有情绪数据）
+4. 基于数据的具体可执行建议
+
+返回JSON：
+{
+  "summary": "一段2-3句话的整体评价，像朋友聊天一样自然",
+  "insights": [
+    {"icon": "⚡", "title": "洞察标题", "detail": "具体分析，1-2句话"},
+    {"icon": "🎯", "title": "洞察标题", "detail": "具体分析，1-2句话"}
+  ],
+  "suggestions": [
+    {"action": "具体可执行的建议，动词开头", "reason": "为什么这样做，1句话"}
+  ],
+  "encouragement": "一句鼓励的话"
+}
+
+规则：
+- insights 给 2-4 条
+- suggestions 给 2-3 条
+- 语气温和、直接，不要鸡汤
+- 如果数据量太少，坦诚说明并给出通用建议
+只返回JSON。`;
+      const parsed = await aiCall("google/gemini-2.5-flash", timeAnalysisPrompt, userText);
+      return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+    }
+
     // Brain dump mode
     if (mode === "brain-dump") {
       const userText = messages[messages.length - 1]?.content || "";
