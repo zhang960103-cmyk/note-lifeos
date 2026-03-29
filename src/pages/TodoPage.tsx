@@ -330,6 +330,9 @@ const TodoPage = () => {
                         onExpand={() => setExpandedId(expandedId === todo.id ? null : todo.id)}
                         celebrating={celebrateId === todo.id}
                         onStartPomodoro={() => { setPomodoroTask(todo.text); setPomodoroActive(true); setPomodoroRunning(true); setPomodoroTime(25 * 60); }}
+                        onStartTracking={() => startTracking(todo.id)}
+                        isTracking={trackingTodoId === todo.id}
+                        trackingTime={trackingTodoId === todo.id ? formatTracking(trackingElapsed) : undefined}
                         editing={editingId === todo.id}
                         onEdit={() => setEditingId(editingId === todo.id ? null : todo.id)}
                         onUpdate={(updates) => { updateTodo(todo.sourceDate || todayKey, todo.id, updates); setEditingId(null); }}
