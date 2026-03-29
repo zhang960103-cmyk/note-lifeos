@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LifeOsProvider } from "@/contexts/LifeOsContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/useAuth";
 import HomePage from "@/pages/HomePage";
 import TodoPage from "@/pages/TodoPage";
@@ -14,6 +15,7 @@ import WealthPage from "@/pages/WealthPage";
 import GuidePage from "@/pages/GuidePage";
 import InsightsPage from "@/pages/InsightsPage";
 import GoalsPage from "@/pages/GoalsPage";
+import TimeStatsPage from "@/pages/TimeStatsPage";
 import AuthPage from "@/pages/AuthPage";
 import NotFound from "@/pages/NotFound";
 import Onboarding from "@/components/Onboarding";
@@ -53,6 +55,7 @@ const AppInner = () => {
             <Route path="/guide" element={<GuidePage />} />
             <Route path="/insights" element={<InsightsPage />} />
             <Route path="/goals" element={<GoalsPage />} />
+            <Route path="/time-stats" element={<TimeStatsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
@@ -88,11 +91,13 @@ const AuthGate = () => {
 const App = () => (
   <BrowserRouter>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <AuthGate />
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AuthGate />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   </BrowserRouter>
 );
