@@ -595,9 +595,10 @@ function BoardCard({ todo, column, onMove, onToggle, onStartPomodoro, editing, o
 }
 
 // TodoCard component for list view
-function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomodoro, editing, onEdit, onUpdate, onDelete, onMove }: {
+function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomodoro, onStartTracking, isTracking, trackingTime, editing, onEdit, onUpdate, onDelete, onMove }: {
   todo: TodoItem; onToggle: (t: TodoItem) => void; expanded: boolean;
   onExpand: () => void; celebrating: boolean; onStartPomodoro: () => void;
+  onStartTracking?: () => void; isTracking?: boolean; trackingTime?: string;
   editing: boolean; onEdit: () => void;
   onUpdate: (updates: Partial<TodoItem>) => void;
   onDelete: () => void;
