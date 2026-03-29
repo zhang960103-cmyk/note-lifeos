@@ -126,7 +126,11 @@ ${recentContent}
         <h1 className="font-serif-sc text-lg text-foreground">复盘</h1>
       </div>
 
-      {/* Weekly */}
+      {weekStats.count === 0 && monthStats.count === 0 && (
+        <div className="text-center py-12">
+          <p className="text-sm text-muted-foreground leading-[1.8]">当你有 3 天以上的记录，罗盘就能开始帮你回顾了。</p>
+        </div>
+      )}
       <div className="bg-surface-2 border border-border rounded-xl p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs text-foreground">本周</h2>
