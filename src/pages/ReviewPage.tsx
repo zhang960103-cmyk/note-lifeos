@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { ALL_DOMAINS } from "@/types/lifeOs";
 import { Mail, Loader2 } from "lucide-react";
