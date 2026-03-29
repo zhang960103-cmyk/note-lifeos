@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
-import { useNavigate } from "react-router-dom";
 import { CheckSquare, Square, ChevronDown, ChevronUp, Trash2, FileText, AlertTriangle } from "lucide-react";
 import { format, parseISO, subDays, eachDayOfInterval, startOfYear, getDay } from "date-fns";
 
