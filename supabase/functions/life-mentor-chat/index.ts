@@ -462,6 +462,45 @@ serve(async (req) => {
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
+    // Time-block extraction from diary
+    if (mode === "time-extract") {
+      const userText = messages.map((m: any) => `[${m.role === 'user' ? '用户' : '罗盘'}]: ${m.content}`).join("\n");
+      const today = new Date().toISOString().split("T")[0];
+      const timeExtractPrompt = `你是时间记录助手。从用户的日记/对话中，提取他们今天做了什么事、每件事大概花了多少时间。
+
+当前日期：${today}
+
+提取规则：
+- 用户可能说"9点到12点在上课"→ 提取为一个时间块
+- 用户可能说"花了2个小时做XXX"→ 提取为一个时间块
+- 用户可能说"路上一个半小时"→ 提取为通勤时间块
+- 推断合理的开始和结束时间
+- 如果用户没提到具体时间但提到了活动，根据上下文推断时长
+- 按时间顺序排列
+
+分类参考：工作、学习、生活、运动、社交、娱乐、休息、通勤、其他
+
+返回JSON：
+{
+  "timeBlocks": [
+    {
+      "activity": "活动名称（简短）",
+      "category": "分类",
+      "startTime": "HH:mm",
+      "endTime": "HH:mm",
+      "durationMinutes": 180,
+      "note": "备注（可选）"
+    }
+  ],
+  "totalTrackedMinutes": 720,
+  "gaps": ["未记录的时间段描述"],
+  "summary": "一句话总结今天的时间使用"
+}
+只返回JSON。`;
+      const parsed = await aiCall("google/gemini-2.5-flash", timeExtractPrompt, userText);
+      return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+    }
+
     // Brain dump mode
     if (mode === "brain-dump") {
       const userText = messages[messages.length - 1]?.content || "";
