@@ -198,10 +198,10 @@ export function useDayEntries(userId: string | undefined) {
     if (!entry) return;
 
     const newEmotionTags = meta.emotionTags
-      ? [...new Set([...entry.emotionTags, ...meta.emotionTags])]
+      ? [...new Set([...entry.emotionTags, ...meta.emotionTags])].slice(0, 8)
       : entry.emotionTags;
     const newTopicTags = meta.topicTags
-      ? [...new Set([...entry.topicTags, ...meta.topicTags])]
+      ? [...new Set([...entry.topicTags, ...meta.topicTags])].slice(0, 6)
       : entry.topicTags;
 
     await supabase.from("day_entries").update({
