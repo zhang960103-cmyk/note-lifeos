@@ -495,13 +495,40 @@ export default function TimeStatsPage() {
 
 /* ─── Diary Timeline Component ─── */
 function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
+  const { allTodos, updateTodo, todayKey } = useLifeOs();
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [loading, setLoading] = useState(false);
   const [extracted, setExtracted] = useState(false);
   const [summary, setSummary] = useState("");
+  const [matchedCount, setMatchedCount] = useState(0);
 
   const todayEntry = entries.find(e => e.date === today);
   const hasMessages = todayEntry && todayEntry.messages.length > 0;
+
+  // Auto-match time blocks to todos and update their notes
+  const matchBlocksToTodos = (blocks: TimeBlock[]) => {
+    let matched = 0;
+    blocks.forEach(block => {
+      // Find matching todo by fuzzy text match
+      const matchingTodo = allTodos.find(t => {
+        const text = t.text.toLowerCase();
+        const activity = block.activity.toLowerCase();
+        return activity.includes(text) || text.includes(activity) ||
+          activity.split(/\s+/).some(w => w.length > 2 && text.includes(w));
+      });
+      if (matchingTodo) {
+        const timeNote = `⏱ ${block.startTime}-${block.endTime} (${block.durationMinutes}分钟)`;
+        const existingNote = matchingTodo.note || "";
+        if (!existingNote.includes("⏱")) {
+          updateTodo(matchingTodo.sourceDate || todayKey, matchingTodo.id, {
+            note: existingNote ? `${existingNote}\n${timeNote}` : timeNote,
+          });
+          matched++;
+        }
+      }
+    });
+    setMatchedCount(matched);
+  };
 
   const extractTimeline = async () => {
     if (!todayEntry) return;
@@ -520,9 +547,14 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
       });
       if (!resp.ok) throw new Error("提取失败");
       const data = await resp.json();
-      setTimeBlocks(data.timeBlocks || []);
+      const blocks = data.timeBlocks || [];
+      setTimeBlocks(blocks);
       setSummary(data.summary || "");
       setExtracted(true);
+      // Auto-match to todos
+      if (blocks.length > 0) {
+        matchBlocksToTodos(blocks);
+      }
     } catch {
       setTimeBlocks([]);
     } finally {
