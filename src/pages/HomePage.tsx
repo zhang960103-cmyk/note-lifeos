@@ -58,6 +58,15 @@ const HomePage = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevTagCountRef = useRef(0);
 
+  // Handle prefill from URL param (e.g. from InsightsPage)
+  useEffect(() => {
+    const prefill = searchParams.get("prefill");
+    if (prefill) {
+      setInput(prefill);
+      textareaRef.current?.focus();
+    }
+  }, [searchParams]);
+
   const messages = todayEntry?.messages || [];
   const messagesRef = useRef(messages);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
