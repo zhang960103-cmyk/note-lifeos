@@ -129,7 +129,7 @@ const HomePage = () => {
 
     let full = "";
     const allMsgs: ChatMsg[] = [
-      ...messages.map(m => ({ role: m.role, content: m.content })),
+      ...messagesRef.current.map(m => ({ role: m.role, content: m.content })),
       { role: "user" as const, content: text },
     ];
 
