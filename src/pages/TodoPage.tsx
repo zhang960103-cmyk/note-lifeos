@@ -14,6 +14,7 @@ const PRIORITY_CONFIG: Record<Priority, { label: string; emoji: string; color: s
 };
 
 type ViewMode = "list" | "board";
+type TabKey = "all" | "today" | "board" | "matrix" | "habits";
 type StatusColumn = "todo" | "doing" | "done";
 
 const COLUMN_CONFIG: Record<StatusColumn, { label: string; emoji: string; bg: string }> = {
