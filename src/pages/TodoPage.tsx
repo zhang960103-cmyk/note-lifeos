@@ -207,12 +207,17 @@ const TodoPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
         <span className="font-serif-sc text-lg text-foreground">待办</span>
-        <button
-          onClick={() => navigate("/")}
-          className="text-xs text-gold bg-gold/10 px-3 py-1 rounded-full flex items-center gap-1"
-        >
-          <MessageCircle size={12} /> 对话生成任务
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => navigate("/time-stats")} className="text-muted-foreground hover:text-gold transition p-1.5" title="时间统计">
+            <BarChart3 size={16} />
+          </button>
+          <button onClick={() => setShowTheme(true)} className="text-muted-foreground hover:text-gold transition p-1.5" title="换肤">
+            <Palette size={16} />
+          </button>
+          <button onClick={() => navigate("/")} className="text-xs text-gold bg-gold/10 px-3 py-1 rounded-full flex items-center gap-1">
+            <MessageCircle size={12} /> 对话生成
+          </button>
+        </div>
       </div>
 
       {/* Stats bar */}
