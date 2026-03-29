@@ -213,8 +213,12 @@ export function useDayEntries(userId: string | undefined) {
 
     // Insert new todos
     if (meta.todos && meta.todos.length > 0) {
-      const existingTexts = entry.todos.map(t => t.text.trim().toLowerCase());
-      const deduped = meta.todos.filter(t => !existingTexts.includes(t.text.trim().toLowerCase()));
+      const normDb = (s: string) => s.trim().toLowerCase().replace(/[，。！？,.!?\s]/g, '');
+      const existingNorms = entry.todos.map(t => normDb(t.text));
+      const deduped = meta.todos.filter(t => {
+        const n = normDb(t.text);
+        return !existingNorms.some(en => en === n || en.includes(n) || n.includes(en));
+      });
       if (deduped.length > 0) {
         await supabase.from("todos").insert(deduped.map(t => ({
           id: t.id,

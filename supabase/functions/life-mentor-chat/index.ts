@@ -343,7 +343,7 @@ serve(async (req) => {
 
     // Extract mode
     if (mode === "extract") {
-      const userTexts = messages.filter((m: any) => m.role === "user").map((m: any) => m.content).join("\n");
+      const userTexts = messages.map((m: any) => `[${m.role === 'user' ? '用户' : '罗盘'}]: ${m.content}`).join("\n");
       const today = new Date().toISOString().split("T")[0];
       const todosContext = existingTodos?.length > 0
         ? existingTodos.map((t: any) => `[${t.id}] ${t.text} (${t.status}, ${t.priority})`).join("\n")
