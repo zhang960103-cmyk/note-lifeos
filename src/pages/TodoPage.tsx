@@ -485,6 +485,27 @@ const TodoPage = () => {
           </button>
         </div>
       )}
+
+      {/* Time tracking floating bar */}
+      {trackingTodoId && (
+        <div className="px-4 py-2 bg-gold/10 border-t border-gold-border flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock size={14} className="text-gold animate-pulse" />
+            <span className="text-[11px] text-foreground truncate max-w-[180px]">
+              {allTodos.find(t => t.id === trackingTodoId)?.text || "计时中"}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-mono-jb text-gold">{formatTracking(trackingElapsed)}</span>
+            <button onClick={stopTracking} className="text-[10px] bg-surface-2 text-muted-foreground px-2 py-1 rounded-lg hover:text-foreground">
+              停止
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Theme Settings Sheet */}
+      {showTheme && <ThemeSettings onClose={() => setShowTheme(false)} />}
     </div>
   );
 };
