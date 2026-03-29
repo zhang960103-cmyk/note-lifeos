@@ -31,6 +31,7 @@ const WheelPage = () => {
   const navigate = useNavigate();
   const insightRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [touchStart, setTouchStart] = useState(0);
 
   const [scores, setScores] = useState<Record<LifeDomain, number>>(
     () => Object.fromEntries(ALL_DOMAINS.map(d => [d, 5])) as Record<LifeDomain, number>
