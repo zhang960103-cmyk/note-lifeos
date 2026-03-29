@@ -5,7 +5,7 @@ import VoiceInput from "@/components/VoiceInput";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { createTodoFromExtract } from "@/hooks/useLifeOs";
-import { useAuth } from "@/hooks/useAuth";
+import { format, subDays } from "date-fns";
 import { format, subDays } from "date-fns";
 import type { TodoItem } from "@/types/lifeOs";
 
