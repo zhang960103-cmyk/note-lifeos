@@ -13,6 +13,7 @@ import ReviewPage from "@/pages/ReviewPage";
 import WheelPage from "@/pages/WheelPage";
 import WealthPage from "@/pages/WealthPage";
 import GuidePage from "@/pages/GuidePage";
+import SettingsPage from "@/pages/SettingsPage";
 import InsightsPage from "@/pages/InsightsPage";
 import GoalsPage from "@/pages/GoalsPage";
 import TimeStatsPage from "@/pages/TimeStatsPage";
