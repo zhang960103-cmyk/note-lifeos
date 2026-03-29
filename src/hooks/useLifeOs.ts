@@ -408,12 +408,15 @@ export function useWheelScores(userId: string | undefined) {
 
   const addScore = useCallback(async (score: WheelScore) => {
     if (!userId) return;
-    await supabase.from("wheel_scores").insert({
-      user_id: userId,
-      date: score.date,
-      scores: score.scores as any,
-    });
-    setScores(prev => [score, ...prev]);
+    const dateKey = score.date.split("T")[0];
+    await supabase.from("wheel_scores").upsert(
+      { user_id: userId, date: dateKey, scores: score.scores as any },
+      { onConflict: "user_id,date" }
+    );
+    setScores(prev => [
+      { date: dateKey, scores: score.scores },
+      ...prev.filter(s => s.date.split("T")[0] !== dateKey),
+    ]);
   }, [userId]);
 
   return { scores, addScore };

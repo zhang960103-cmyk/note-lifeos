@@ -50,10 +50,11 @@ const WheelPage = () => {
 
   // Auto-infer on mount
   useEffect(() => {
-    const recentEntries = entries.slice(0, 30);
-    const msgCount = recentEntries.reduce((acc, e) => acc + e.messages.filter(m => m.role === "user").length, 0);
-    if (msgCount >= 3) handleInfer();
-  }, []); // eslint-disable-line
+    if (entries.length === 0) return;
+    const msgCount = entries.slice(0, 30)
+      .reduce((acc, e) => acc + e.messages.filter(m => m.role === "user").length, 0);
+    if (msgCount >= 3 && !isInferring) handleInfer();
+  }, [entries.length]); // eslint-disable-line
 
   const handleInfer = async () => {
     setIsInferring(true);

@@ -503,7 +503,7 @@ const HomePage = () => {
           >
             <Brain size={18} />
           </button>
-          <button
+          {canUseVoice && <button
             onClick={() => setShowVoice(true)}
             className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
             title="语音输入"
