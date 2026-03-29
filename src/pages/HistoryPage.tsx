@@ -191,7 +191,10 @@ const HistoryPage = () => {
 
       {/* Day list */}
       {entries.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground text-xs">还没有记录</div>
+        <div className="text-center py-16">
+          <div className="text-3xl mb-3">📝</div>
+          <p className="text-sm text-muted-foreground leading-[1.8] text-center">开始记录的第一天，往往是改变的起点。</p>
+        </div>
       ) : (
         <div className="space-y-2">
           {entries.map(entry => {
