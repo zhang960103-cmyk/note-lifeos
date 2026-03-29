@@ -306,7 +306,152 @@ export default function TimeStatsPage() {
             )}
           </div>
         )}
+
+        {/* AI Analysis Section */}
+        <AiAnalysis
+          categoryData={categoryData}
+          stats={stats}
+          emotionTrend={emotionTrend}
+          dailyData={dailyData}
+          range={range}
+        />
       </div>
+    </div>
+  );
+}
+
+/* ─── AI Analysis Component ─── */
+function AiAnalysis({
+  categoryData,
+  stats,
+  emotionTrend,
+  dailyData,
+  range,
+}: {
+  categoryData: { name: string; value: number }[];
+  stats: { total: number; done: number; topCategory: string; avgEmotion: string; activeDays: number };
+  emotionTrend: { date: string; score: number; msgCount: number }[];
+  dailyData: { date: string; done: number; total: number }[];
+  range: string;
+}) {
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const buildContext = () => {
+    const rangeName = range === "today" ? "今天" : range === "week" ? "本周" : "本月";
+    const catBreakdown = categoryData.map(d => `${d.name}: ${d.value}项`).join("、");
+    const completionRate = stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
+    const emotionInfo = emotionTrend.filter(e => e.score > 0);
+    const avgEmotion = emotionInfo.length > 0
+      ? (emotionInfo.reduce((s, e) => s + e.score, 0) / emotionInfo.length).toFixed(1)
+      : "无数据";
+    const dailySummary = dailyData.filter(d => d.total > 0).map(d => `${d.date}: 完成${d.done}/${d.total}`).join("；");
+
+    return `时间范围：${rangeName}
+任务总数：${stats.total}，已完成：${stats.done}，完成率：${completionRate}%
+分类分布：${catBreakdown || "暂无数据"}
+情绪均值：${avgEmotion}
+活跃天数：${stats.activeDays}
+每日明细：${dailySummary || "暂无"}`;
+  };
+
+  const runAnalysis = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: buildContext() }],
+          mode: "time-analysis",
+        }),
+      });
+      if (!resp.ok) throw new Error("分析失败");
+      const data = await resp.json();
+      setAnalysis(data);
+    } catch {
+      setError("AI 分析暂时不可用，请稍后再试");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!analysis && !loading) {
+    return (
+      <button
+        onClick={runAnalysis}
+        className="w-full bg-surface-2 border border-border rounded-xl p-4 flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-gold hover:border-gold/30 transition"
+      >
+        <Sparkles size={14} />
+        <span className="font-serif-sc">AI 深度分析我的时间</span>
+      </button>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-surface-2 border border-border rounded-xl p-6 flex items-center justify-center gap-2">
+        <Loader2 size={14} className="animate-spin text-gold" />
+        <span className="text-xs text-muted-foreground">罗盘正在分析你的时间分布…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-surface-2 border border-border rounded-xl p-4">
+        <p className="text-xs text-destructive text-center">{error}</p>
+        <button onClick={runAnalysis} className="text-[10px] text-gold mt-2 mx-auto block">重试</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-surface-2 border border-gold/20 rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Sparkles size={14} className="text-gold" />
+        <span className="text-xs font-serif-sc text-foreground">罗盘分析</span>
+        <button onClick={runAnalysis} className="ml-auto text-[9px] text-muted-foreground/50 hover:text-gold">刷新</button>
+      </div>
+
+      {analysis.summary && (
+        <p className="text-xs text-foreground/90 leading-relaxed">{analysis.summary}</p>
+      )}
+
+      {analysis.insights?.length > 0 && (
+        <div className="space-y-2">
+          {analysis.insights.map((ins: any, i: number) => (
+            <div key={i} className="flex gap-2">
+              <span className="text-sm flex-shrink-0">{ins.icon}</span>
+              <div>
+                <span className="text-[11px] text-foreground font-medium">{ins.title}</span>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">{ins.detail}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {analysis.suggestions?.length > 0 && (
+        <div className="border-t border-border pt-2 space-y-1.5">
+          <span className="text-[10px] text-muted-foreground">💡 建议</span>
+          {analysis.suggestions.map((s: any, i: number) => (
+            <div key={i} className="pl-4">
+              <p className="text-[11px] text-foreground">{s.action}</p>
+              <p className="text-[9px] text-muted-foreground/60">{s.reason}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {analysis.encouragement && (
+        <p className="text-[10px] text-gold/80 text-center pt-1">✨ {analysis.encouragement}</p>
+      )}
     </div>
   );
 }
