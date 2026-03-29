@@ -75,8 +75,12 @@ export function useDayEntries(userId: string | undefined) {
       const entryIds = dayData.map(d => d.id);
 
       const [{ data: msgs }, { data: todos }] = await Promise.all([
-        supabase.from("chat_messages").select("*").in("entry_id", entryIds.length ? entryIds : ['']).order("timestamp", { ascending: true }),
-        supabase.from("todos").select("*").eq("user_id", userId).order("created_at", { ascending: true }),
+        entryIds.length
+          ? supabase.from("chat_messages").select("*").in("entry_id", entryIds).order("timestamp", { ascending: true })
+          : Promise.resolve({ data: [] as any[] }),
+        supabase.from("todos").select("*").eq("user_id", userId)
+          .gte("created_at", format(subDays(new Date(), 90), "yyyy-MM-dd"))
+          .order("created_at", { ascending: false }),
       ]);
 
       const mapped: DayEntry[] = dayData.map(d => ({
