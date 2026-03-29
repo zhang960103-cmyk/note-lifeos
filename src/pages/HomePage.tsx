@@ -208,7 +208,7 @@ const HomePage = () => {
       setStreamingContent("");
       setIsLoading(false);
     }
-  }, [isLoading, messages, addMessage, updateDayMeta, todayKey, addFinanceEntry, allTodos, toggleTodo]);
+  }, [isLoading, addMessage, updateDayMeta, todayKey, addFinanceEntry, allTodos, toggleTodo]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
