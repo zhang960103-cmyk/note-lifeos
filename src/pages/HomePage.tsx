@@ -361,7 +361,7 @@ const HomePage = () => {
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={e => setInput(e.target.value)}
+            onChange={handleInput}
             onKeyDown={handleKeyDown}
             placeholder="说点什么..."
             rows={1}
