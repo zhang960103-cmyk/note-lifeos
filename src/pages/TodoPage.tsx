@@ -4,8 +4,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { format, startOfWeek, addDays, isToday, subDays } from "date-fns";
 import {
   Play, Pause, X, Check, Trash2, Pencil, Clock, ChevronDown,
-  ChevronRight, Wand2, Loader2, Plus, BarChart3, Timer, Flame,
-  LayoutGrid, List, Zap, Calendar
+  ChevronRight, Wand2, Loader2, Plus, Timer, Flame,
+  LayoutGrid, List, Zap, Calendar, CalendarClock
 } from "lucide-react";
 import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
 import { useNavigate } from "react-router-dom";
