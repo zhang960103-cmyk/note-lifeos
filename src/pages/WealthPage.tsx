@@ -308,6 +308,34 @@ const WealthPage = () => {
         )}
       </div>
 
+      {/* Energy × Income Correlation */}
+      {energyIncomeCorrelation && energyIncomeCorrelation.length > 0 && (
+        <div className="bg-surface-2 border border-border rounded-xl p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap size={14} className="text-gold" />
+            <span className="text-xs text-muted-foreground font-mono-jb">精力 × 收入关联</span>
+          </div>
+          <div className="space-y-2">
+            {energyIncomeCorrelation.map(d => (
+              <div key={d.level} className="flex items-center gap-3">
+                <span className="text-sm w-6">{d.level === '高' ? '🔥' : d.level === '中' ? '⚡' : '🔋'}</span>
+                <span className="text-[10px] text-muted-foreground w-12">{d.level}精力</span>
+                <div className="flex-1 h-4 bg-surface-3 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gold rounded-full transition-all"
+                    style={{ width: `${Math.min((d.avgIncome / Math.max(...energyIncomeCorrelation.map(x => x.avgIncome), 1)) * 100, 100)}%` }}
+                  />
+                </div>
+                <span className="text-xs font-mono-jb text-foreground w-16 text-right">¥{d.avgIncome}/天</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[9px] text-muted-foreground mt-2">
+            基于{energyIncomeCorrelation.reduce((s, d) => s + d.days, 0)}天数据 · 高精力日通常产出更高价值
+          </p>
+        </div>
+      )}
+
       {/* Financial literacy tip */}
       <div className="bg-surface-2 border border-gold-border rounded-xl p-4 mb-4">
         <div className="flex items-center gap-2 mb-2">
