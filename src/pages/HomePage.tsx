@@ -583,7 +583,7 @@ const HomePage = () => {
           {ENERGY_LEVELS.map(e => (
             <button key={e.value} onClick={() => handleEnergyLog(e.value)} className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg hover:bg-surface-3 transition">
               <span className="text-lg">{e.emoji}</span>
-              <span className="text-[9px] text-muted-foreground">{e.label}</span>
+              <span className="text-[9px] text-muted-foreground">{t(e.labelKey)}</span>
             </button>
           ))}
         </div>
