@@ -311,6 +311,11 @@ const HomePage = () => {
               setTimeout(() => { setFinanceToast(false); setTodoToast(null); }, 3000);
             }
 
+            // Auto-link KR progress from goalHints
+            if (meta.goalHints && meta.goalHints.length > 0 && user) {
+              updateKRProgressFromGoalHints(meta.goalHints, user.id);
+            }
+
             // Auto-extract time blocks from diary and create time-tagged todos
             autoExtractTimeBlocks(msgsForExtract);
           }).catch(() => {
