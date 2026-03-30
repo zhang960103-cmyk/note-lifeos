@@ -144,8 +144,8 @@ const SECTIONS = [
           AI 只会在你明确说出「我花了」「我买了」「收到」等第一人称支付动词时才会自动记账。
         </p>
         <div className="bg-muted rounded-lg p-3 space-y-1.5">
-          <div className="text-xs"><span className="text-green-500">✓</span> "我花了200买书" → 自动记录支出</div>
-          <div className="text-xs"><span className="text-green-500">✓</span> "收到学生转账500" → 自动记录收入</div>
+          <div className="text-xs"><span className="text-los-green">✓</span> "我花了200买书" → 自动记录支出</div>
+          <div className="text-xs"><span className="text-los-green">✓</span> "收到学生转账500" → 自动记录收入</div>
           <div className="text-xs"><span className="text-destructive">✗</span> "这顿饭好贵啊200多" → 不会记录</div>
           <div className="text-xs"><span className="text-destructive">✗</span> "打算花3000买相机" → 不会记录</div>
         </div>
