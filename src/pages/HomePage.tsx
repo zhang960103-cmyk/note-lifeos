@@ -122,18 +122,17 @@ const HomePage = () => {
 
     // Priority 3: Monday
     if (new Date().getDay() === 1) {
-      return { emoji: "🚀", text: "新的一周。有什么想带着走的吗？" };
+      return { emoji: "🚀", text: t("home.greeting.monday") };
     }
 
-    // Priority 4: Default with time awareness
-    if (h < 6) return { emoji: "🧭", text: "夜深了，还在思考什么？" };
-    if (h < 9) return { emoji: "🧭", text: "早安，新的一天开始了" };
-    if (h < 12) return { emoji: "🧭", text: "上午好，今天有什么计划？" };
-    if (h < 14) return { emoji: "🧭", text: "中午好，休息一下" };
-    if (h < 18) return { emoji: "🧭", text: "下午好，精力如何？" };
-    if (h < 21) return { emoji: "🧭", text: "晚上好，今天过得怎么样？" };
-    return { emoji: "🧭", text: "夜深了，今天有什么收获？" };
-  }, [entries, habits]);
+    if (h < 6) return { emoji: "🧭", text: t("home.greeting.night_late") };
+    if (h < 9) return { emoji: "🧭", text: t("home.greeting.morning_early") };
+    if (h < 12) return { emoji: "🧭", text: t("home.greeting.morning") };
+    if (h < 14) return { emoji: "🧭", text: t("home.greeting.noon") };
+    if (h < 18) return { emoji: "🧭", text: t("home.greeting.afternoon") };
+    if (h < 21) return { emoji: "🧭", text: t("home.greeting.evening") };
+    return { emoji: "🧭", text: t("home.greeting.night") };
+  }, [entries, habits, t]);
 
   // Feature 4: Sunset ritual
   const isSunsetHour = useMemo(() => {
