@@ -485,6 +485,23 @@ const HomePage = () => {
               <div className="text-3xl mb-4">{statusGreeting.emoji}</div>
               <p className="text-foreground text-sm leading-[1.8]">{statusGreeting.text}</p>
               <p className="text-muted-foreground text-xs mt-2 leading-[1.8]">{t("home.input.placeholder")}</p>
+              {/* T08: Starter prompts */}
+              <div className="grid grid-cols-2 gap-2 mt-4 text-left">
+                {[
+                  { emoji: "📝", text: "记录今天发生了什么", msg: "帮我回顾一下今天，我来说说发生了什么" },
+                  { emoji: "🎯", text: "规划我的一天", msg: "帮我规划一下今天要做的事情" },
+                  { emoji: "💭", text: "聊聊最近的想法", msg: "我最近有些想法想整理一下" },
+                  { emoji: "📊", text: "复盘这周表现", msg: "帮我复盘一下这周的表现" },
+                ].map(sp => (
+                  <button
+                    key={sp.msg}
+                    onClick={() => sendMessage(sp.msg)}
+                    className="bg-surface-2 border border-border rounded-xl px-3 py-2.5 hover:bg-surface-3 transition text-xs text-foreground leading-relaxed"
+                  >
+                    <span className="text-sm">{sp.emoji}</span> {sp.text}
+                  </button>
+                ))}
+              </div>
               {/* Emoji mood quick-pick */}
               <div className="flex justify-center gap-2 mt-4">
                 {QUICK_MOODS.map(mood => (
