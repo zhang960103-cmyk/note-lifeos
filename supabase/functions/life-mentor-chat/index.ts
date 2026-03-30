@@ -28,10 +28,10 @@ const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 // Default model mapping by usage tag
 const DEFAULT_MODELS: Record<string, string> = {
-  chat: "google/gemini-3-flash-preview",
+  chat: "google/gemini-2.5-pro",
   cheap: "google/gemini-2.5-flash-lite",
   extract: "google/gemini-2.5-flash",
-  private: "google/gemini-3-flash-preview",
+  private: "google/gemini-2.5-pro",
 };
 
 function resolveModel(usageTag: string): string {
