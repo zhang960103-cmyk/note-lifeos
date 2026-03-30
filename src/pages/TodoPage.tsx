@@ -492,7 +492,7 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
     setDecomposing(false);
   }, [todo.text, todo.subTasks, onUpdate]);
 
-  const prio = PRIORITY_CONFIG[todo.priority];
+  const prio = PRIORITY_KEYS[todo.priority];
 
   return (
     <div className={`bg-card border border-border rounded-xl transition-all ${celebrating ? "ring-2 ring-primary animate-pulse" : ""}`}>
