@@ -426,6 +426,17 @@ const HomePage = () => {
                   <span className="text-[10px] text-gold mt-1 inline-block">打开信件 →</span>
                 </button>
               )}
+              {/* Energy debt warning */}
+              {consecutiveLowDays >= 3 && (
+                <button
+                  onClick={() => sendMessage("我已经连续低能量好几天了，帮我分析一下可能的原因？")}
+                  className="w-full bg-los-red/10 border border-los-red/30 rounded-xl px-4 py-3 mb-3 text-left hover:bg-los-red/20 transition"
+                >
+                  <p className="text-xs text-los-red font-serif-sc mb-1">⚠️ 能量预警</p>
+                  <p className="text-[11px] text-foreground leading-[1.8]">你已经连续{consecutiveLowDays}天低能量了</p>
+                  <span className="text-[10px] text-los-red mt-1 inline-block">聊聊怎么回事 →</span>
+                </button>
+              )}
               {/* Feature 4: Sunset card */}
               {showSunset && (
                 <button
