@@ -98,6 +98,37 @@ const WealthPage = () => {
     return Math.round((passive.reduce((s, e) => s + e.amount, 0) / totalIncome) * 100);
   }, [filtered, stats.income]);
 
+  // Energy × Income correlation
+  const energyIncomeCorrelation = useMemo(() => {
+    if (energyLogs.length === 0 || financeEntries.length === 0) return null;
+    const byLevel: Record<string, { income: number; days: Set<string> }> = {
+      '高': { income: 0, days: new Set() },
+      '中': { income: 0, days: new Set() },
+      '低': { income: 0, days: new Set() },
+    };
+    
+    energyLogs.forEach(log => {
+      const date = format(new Date(log.timestamp), 'yyyy-MM-dd');
+      if (byLevel[log.level]) byLevel[log.level].days.add(date);
+    });
+
+    financeEntries.filter(e => e.type === 'income').forEach(entry => {
+      for (const [level, data] of Object.entries(byLevel)) {
+        if (data.days.has(entry.date)) {
+          byLevel[level].income += entry.amount;
+        }
+      }
+    });
+
+    return Object.entries(byLevel)
+      .filter(([, d]) => d.days.size > 0)
+      .map(([level, d]) => ({
+        level,
+        avgIncome: Math.round(d.income / d.days.size),
+        days: d.days.size,
+      }));
+  }, [energyLogs, financeEntries]);
+
   return (
     <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4">
       <div className="py-4">
