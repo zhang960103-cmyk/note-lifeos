@@ -520,11 +520,22 @@ serve(async (req) => {
     // Chat mode: streaming
     let systemContent = SYSTEM_PROMPT;
 
-    // Append cross-day memory context
+    // Append cross-day memory context (includes energy summary)
     if (memoryContext) {
       systemContent += `\n\n【你对用户近两周的了解（跨日记忆）】\n${memoryContext}\n`;
       systemContent += `当对话内容和过去记录有关联时，像真正认识这个人的朋友一样自然提及，`;
       systemContent += `例如：「你上次提到XXX，后来怎么样了？」但不要每次都刻意提及记忆，只在真正相关时提。`;
+      
+      // Energy-aware task recommendations
+      if (memoryContext.includes('精力记录')) {
+        systemContent += `\n\n【精力感知任务推荐】
+当用户记录精力状态时，根据精力水平推荐适合的任务类型：
+- 高精力 → 建议深度工作（写课程、做产品、系统设计、复杂学习）
+- 中精力 → 建议创意型任务（写脚本、发帖、内容创作、规划）
+- 低精力 → 建议轻量任务（回消息、整理资料、简单行政事务）
+- 如果用户连续多天低精力，主动询问是否需要调整今天的待办优先级，把重任务往后挪。
+- 如果用户记录低精力，温和建议："要不要把今天的重任务往后挪，先处理轻量的？"`;
+      }
     }
     if (patterns) {
       systemContent += `\n\n【观察到的情绪模式】\n${patterns}\n`;
