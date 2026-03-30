@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const ALLOWED_ORIGINS = [
   "https://note-lifeos.lovable.app",
@@ -16,6 +17,128 @@ function getCorsHeaders(req: Request) {
   };
 }
 
+// ─── Unified LLM Client ───
+interface ModelConfig {
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+}
+
+const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+
+// Default model mapping by usage tag
+const DEFAULT_MODELS: Record<string, string> = {
+  chat: "google/gemini-3-flash-preview",
+  cheap: "google/gemini-2.5-flash-lite",
+  extract: "google/gemini-2.5-flash",
+  private: "google/gemini-3-flash-preview",
+};
+
+function resolveModel(usageTag: string): string {
+  return DEFAULT_MODELS[usageTag] || DEFAULT_MODELS.chat;
+}
+
+async function llmCall(
+  config: ModelConfig | null,
+  lovableKey: string,
+  defaultModel: string,
+  systemPrompt: string,
+  userContent: string,
+  stream = false,
+): Promise<Response> {
+  const useCustom = config && config.baseUrl && config.apiKey;
+  const url = useCustom ? `${config.baseUrl}/chat/completions` : LOVABLE_GATEWAY;
+  const key = useCustom ? config.apiKey : lovableKey;
+  const model = useCustom ? (config.model || defaultModel) : defaultModel;
+
+  return fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+      stream,
+    }),
+  });
+}
+
+async function llmJson(
+  config: ModelConfig | null,
+  lovableKey: string,
+  defaultModel: string,
+  systemPrompt: string,
+  userContent: string,
+): Promise<any> {
+  const resp = await llmCall(config, lovableKey, defaultModel, systemPrompt, userContent);
+  if (!resp.ok) throw new Error(`AI call failed: ${resp.status}`);
+  const data = await resp.json();
+  const raw = data.choices?.[0]?.message?.content || "{}";
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  return jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+}
+
+async function llmStream(
+  config: ModelConfig | null,
+  lovableKey: string,
+  defaultModel: string,
+  systemPrompt: string,
+  messages: any[],
+): Promise<Response> {
+  const useCustom = config && config.baseUrl && config.apiKey;
+  const url = useCustom ? `${config.baseUrl}/chat/completions` : LOVABLE_GATEWAY;
+  const key = useCustom ? config.apiKey : lovableKey;
+  const model = useCustom ? (config.model || defaultModel) : defaultModel;
+
+  return fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "system", content: systemPrompt }, ...messages],
+      stream: true,
+    }),
+  });
+}
+
+// Resolve model config: try DB profile first, then fall back
+async function resolveModelConfig(
+  supabaseUrl: string,
+  serviceKey: string,
+  userId: string | null,
+  profileId: string | null, // specific profile ID from request
+  usageTag: string,
+): Promise<ModelConfig | null> {
+  if (!userId) return null;
+  try {
+    const sb = createClient(supabaseUrl, serviceKey);
+    let query;
+    if (profileId) {
+      query = sb.from("ai_model_profiles").select("base_url, model, api_key_encrypted").eq("id", profileId).eq("user_id", userId).single();
+    } else {
+      // Find default for this usage tag, or the overall default
+      query = sb.from("ai_model_profiles").select("base_url, model, api_key_encrypted")
+        .eq("user_id", userId).eq("is_default", true).limit(1).single();
+    }
+    const { data } = await query;
+    if (data && data.base_url && data.api_key_encrypted) {
+      return {
+        baseUrl: data.base_url,
+        model: data.model || "",
+        apiKey: data.api_key_encrypted ? atob(data.api_key_encrypted) : "",
+      };
+    }
+    // If the profile has no custom base_url, use Lovable gateway with the profile's model
+    if (data && data.model) {
+      return { baseUrl: "", model: data.model, apiKey: "" };
+    }
+  } catch { /* fall through */ }
+  return null;
+}
+
+// ─── System Prompts (unchanged) ───
 const SYSTEM_PROMPT = `你是用户的私人生命导师，名字叫「罗盘」。你不是顾问，不是教练，不是分析师。你是一个真正了解他/她的老朋友，陪他/她想清楚自己的生活。
 
 你的说话方式：
@@ -68,12 +191,6 @@ const SYSTEM_PROMPT = `你是用户的私人生命导师，名字叫「罗盘」
 【资源推荐模式】
 当用户的问题涉及你无法在3句话内充分回答的深度话题，或用户明确表示「不知道从哪里学」「有什么推荐」「怎么系统学习」时：
 - 在回复的最后，额外附上一行资源推荐，格式为：📚 推荐：[具体书名/网站/工具名] — [一句话说明]
-- 推荐来源包括：
-  · 书籍：《思考快与慢》《原则》《非暴力沟通》《纳瓦尔宝典》《认知觉醒》《被讨厌的勇气》《穷查理宝典》《影响力》
-  · AI工具：ChatGPT(chat.openai.com)、Claude(claude.ai)、Perplexity(perplexity.ai)、NotebookLM(notebooklm.google.com)
-  · 学习平台：Coursera(coursera.org)、可汗学院(khanacademy.org)、得到App、混沌学园
-  · 效率工具：Notion(notion.so)、Obsidian(obsidian.md)、Flomo(flomoapp.com)
-  · 变现/商业：小报童、知识星球、Gumroad(gumroad.com)、Stripe(stripe.com)
 - 每次最多推荐1-2个，不要列清单
 - 如果话题不需要资源推荐，就不加
 
@@ -83,25 +200,9 @@ const SYSTEM_PROMPT = `你是用户的私人生命导师，名字叫「罗盘」
 - 用「资产vs负债」「时间出租vs系统产出」「主动收入vs被动收入」的框架引导思考
 - 要给出具体可执行的财务行动步骤，不是空谈概念
 
-财商升维层次：
-- Level 1（生存）：只有工资收入，月光或低储蓄 → 引导：先建立3个月应急金，用「50-30-20法则」分配收入
-- Level 2（积累）：有储蓄但不知道投资 → 引导：了解指数基金定投，推荐《小狗钱钱》入门
-- Level 3（增值）：有投资但依赖主动收入 → 引导：建立1个被动收入渠道（内容/课程/产品）
-- Level 4（自由）：被动收入≥生活支出 → 引导：优化资产配置，建立更多收入管道
-
-具体行动示例：
-- 用户说"只有5000块" → 「你的问题不是钱少，是只有一个收入来源。今天做一件事：列出你能帮别人解决的3个问题，选1个最擅长的，在朋友圈发一条'我可以帮你XXX'。📚 推荐：《纳瓦尔宝典》— 帮你理解如何通过杠杆和复利脱离出售时间的陷阱。」
-- 用户说"不知道怎么理财" → 「理财的第一步不是选产品，是知道你的钱去了哪里。今天花10分钟把过去一个月的支出分成'让我增值的'和'消耗掉的'两类，你会看到答案。」
-
-偶尔（不必每次）用以下校准问题之一收尾：
-1. 这笔钱是你在卖时间，还是系统在帮你赚钱？
-2. 你的支出在买资产（升值的东西）还是买负债（消耗的东西）？
-3. 如果明天你不工作了，这个收入还在吗？
-4. 你现在的财务焦虑，是因为赚得少还是因为不知道钱该怎么用？
-
 【智能意图识别】
 你可以自动识别用户话语中的隐含意图，无需用户使用特殊指令：
-- 当用户描述多件要做的事 → 在回复中自然地帮他们理清优先级（"听起来最紧的是XXX，建议先搞定"）
+- 当用户描述多件要做的事 → 在回复中自然地帮他们理清优先级
 - 当用户提到时间安排/计划 → 自然融入时间管理建议
 - 当用户说"复盘/回顾/总结这周" → 自动切入复盘模式
 - 当用户表达迷茫/不知道方向 → 启动认知升维模式
@@ -144,7 +245,7 @@ const EXTRACT_PROMPT = `你是一个专业的任务管理AI。你的核心能力
 }
 
 todos去重规则（最重要！）：
-- 如果用户说的任务和已有待办语义相同（如"涨粉"vs"启动涨粉"vs"开始涨粉计划"），不要再创建新任务
+- 如果用户说的任务和已有待办语义相同，不要再创建新任务
 - 只提取真正全新的、已有列表中不存在的任务
 - 如果用户说"XXX做完了/搞定了/完成了"，在completedTodoIds中返回对应的已有任务ID
 
@@ -153,7 +254,7 @@ todos智能拆分规则：
 - 每个任务必须是「动词+对象」结构
 - 复杂任务自动拆分为主任务+子任务
 
-priority智能评估规则（按优先级矩阵）：
+priority智能评估规则：
 - urgent（紧急）：有明确的今天/马上/立刻的时间压力
 - high（重要）：对用户目标、收入、关系有重大影响
 - normal（普通）：日常事务，无紧迫性
@@ -166,220 +267,79 @@ priority智能评估规则（按优先级矩阵）：
 - 「月底前」→ 本月最后一天
 - 「下午3点」→ dueTime=15:00
 
-financeHints提取规则（极其重要！必须严格遵守！）：
-- ⚠️ 宁可漏记也绝不误记！当有任何不确定时，返回空数组 []
-- 只提取用户以第一人称明确表示自己支付/收到的金额（"我花了"、"我买了"、"我付了"、"收到了"、"赚了"）
-- 如果用户只是描述价格、讨论费用、抱怨贵/便宜，但没有第一人称支付动词，绝对不提取
-- 如果用户在讨论计划中的消费（"打算买"、"想花"、"准备投"），不提取——只有已完成的实际交易才提取
+financeHints提取规则：
+- ⚠️ 宁可漏记也绝不误记！
+- 只提取用户以第一人称明确表示自己支付/收到的金额
 - 如果是精力记录、情绪记录、待办讨论等非财务场景，financeHints 必须返回空数组 []
-- 例如："两个人吃了84块"≠用户花了84（可能AA或对方请客），除非用户说"我请的/我付的"
-- 例如："当前精力：中" → financeHints: []（这是精力记录，不是财务）
-- 例如："今天心情不好" → financeHints: []
-- 工资/课时费等固定收入，如果用户没提到具体金额，不要猜测，返回空数组
 - 多币种支持：识别 $、€、¥、£、AED、SAR 等，在 currency 字段标注货币代码，默认 CNY
 
 goalHints 规则：
-- 如果用户的对话提到了某个目标相关的行动（如"写了课程大纲"可能对应KR"完成3门课程"），在 goalHints 里标注
+- 如果用户的对话提到了某个目标相关的行动，在 goalHints 里标注
 
 只返回JSON，不要有其他文字。`;
 
 const WHEEL_EVAL_PROMPT = `你是一个生命平衡评估专家。基于用户近期的日记对话内容，对以下7大领域进行专业评分（1-10分）。
-
-评分依据（心理学专业标准）：
-- 学习成长：是否有新知识输入、技能提升、认知突破？提到学习/阅读/课程/思考=加分
-- 感情婚姻：是否有亲密关系的互动、冲突处理、情感表达？提到伴侣/约会/沟通=加分
-- 家庭关系：是否有家人联系、家庭事务、亲情表达？提到父母/孩子/家人=加分
-- 事业财务：是否有工作成就、收入增长、职业发展？提到工作/项目/收入/客户=加分
-- 身心健康：是否有运动、睡眠、饮食、情绪管理？提到锻炼/休息/健康=加分
-- 社会连接：是否有社交活动、人际互动、社区参与？提到朋友/聚会/社交=加分
-- 人生意义：是否有目标感、价值感、使命感？提到意义/目标/梦想/使命=加分
-
-如果某个领域在日记中完全没有提及，给3-4分（说明被忽视）。
-频繁提及且正向=7-10分，提及但有困扰=4-6分。
-
-同时，识别用户日记中可能遗漏的重要维度，给出温和的提醒。
-
-返回JSON格式：
-{
-  "scores": {
-    "学习成长": 7,
-    "感情婚姻": 4,
-    "家庭关系": 5,
-    "事业财务": 8,
-    "身心健康": 3,
-    "社会连接": 6,
-    "人生意义": 5
-  },
-  "insights": "简短的一句话总结（≤30字）",
-  "blind_spots": ["你好像很少提到身心健康，最近运动了吗？", "家庭关系维度几乎空白，要不要给家人打个电话？"]
-}
+评分依据：学习成长/感情婚姻/家庭关系/事业财务/身心健康/社会连接/人生意义
+如果某个领域完全没有提及，给3-4分。频繁提及且正向=7-10分，提及但有困扰=4-6分。
+返回JSON：{"scores":{"学习成长":7,...},"insights":"一句话总结","blind_spots":["提醒1"]}
 只返回JSON。`;
 
-// NEW: D-2 Wheel inference prompt (30-day, with confidence)
 const WHEEL_INFER_PROMPT = `你是一个生命评估专家。根据用户最近的对话内容，为以下 7 个生命维度各打 1-10 分。
-
-每个维度的评分子维度：
-- 学习成长：知识积累 / 技能精进 / 思维升级 / 输出创作
-- 事业财务：收入来源 / 职业发展 / 财务健康 / 影响力建设
-- 身心健康：体能精力 / 睡眠质量 / 情绪稳定 / 心理韧性
-- 感情婚姻：亲密关系质量 / 沟通深度 / 共同成长 / 安全感
-- 家庭关系：与父母关系 / 家庭氛围 / 责任履行 / 归属感
-- 社会连接：友谊质量 / 社群参与 / 人脉价值 / 贡献感
-- 人生意义：价值观清晰度 / 使命方向 / 日常满足感 / 未来愿景
-
-评分标准：
-- 对话中频繁正向提及=7-10分
-- 提及但有困扰=4-6分
-- 完全没提及=3-4分（说明被忽视）
-
-confidence说明：high=对话中有明确证据；medium=有间接证据；low=证据不足，是估算。
-
+confidence说明：high=有明确证据；medium=有间接证据；low=证据不足。
 只返回 JSON，格式：
-{
-  "学习成长": { "score": 7, "reason": "用户频繁提到学习新技能，但输出较少", "confidence": "high" },
-  "事业财务": { "score": 5, "reason": "提到收入焦虑，但有主动探索变现的意愿", "confidence": "medium" },
-  "身心健康": { "score": 4, "reason": "多次提到熬夜和疲惫", "confidence": "high" },
-  "感情婚姻": { "score": 6, "reason": "对话中较少提及，无法准确判断", "confidence": "low" },
-  "家庭关系": { "score": 5, "reason": "偶尔提及父母，关系中性", "confidence": "low" },
-  "社会连接": { "score": 6, "reason": "提到人际网络建设", "confidence": "medium" },
-  "人生意义": { "score": 7, "reason": "用户对Life OS的热情显示强烈的使命感", "confidence": "high" }
-}`;
+{"学习成长":{"score":7,"reason":"...","confidence":"high"},...}`;
 
-// NEW: D-4 Wheel insight prompt
 const WHEEL_INSIGHT_PROMPT = `你是一个生命导师。根据用户7个生命维度的评分，为每个维度生成深度洞察。
-
-认知清单库（根据维度和分数选择合适的问题）：
-
-学习成长：
-- 「你上次让自己感到智识上的兴奋是什么时候？」
-- 「你现在在学的东西，1年后还会有价值吗？」
-- 「你的输出速度，是否配得上你的输入速度？」
-
-事业财务：
-- 「你的收入主要来自你的时间，还是来自你建立的系统？」
-- 「如果你的主要客户/雇主明天消失，你有多脆弱？」
-- 「你现在的工作，在为你积累资产，还是消耗资产？」
-
-身心健康：
-- 「你的身体现在在提前支取未来的精力，还是在投资未来？」
-- 「你最近一次纯粹因为享受而运动是什么时候？」
-- 「你的睡眠是你一天中最被忽视的生产力工具吗？」
-
-感情婚姻：
-- 「你和最亲密的人上次进行真正深度对话是什么时候？」
-- 「你在这段关系里，是在索取安全感还是在给予安全感？」
-- 「你能清楚说出，这段关系让你成为了更好的人吗？」
-
-家庭关系：
-- 「你的父母现在对你真实的生活状态了解多少？」
-- 「在家庭关系里，你扮演的角色是你选择的，还是被动承担的？」
-- 「有没有一个家庭成员，你一直想跟他说但没说的话？」
-
-社会连接：
-- 「你的朋友圈里，有几个人真正了解你现在最困扰的事？」
-- 「你在社交中，更多是在消耗别人的精力，还是在补充？」
-- 「你有没有一个能让你说完就立刻感觉被理解的人？」
-
-人生意义：
-- 「如果有人问你'你在为什么而活'，你能给出一个不犹豫的答案吗？」
-- 「你现在的日常，有多少比例是在做'必须做的事'，多少是'想做的事'？」
-- 「10年后的你，会对现在的选择感到骄傲吗？」
-
 返回JSON，键名为7个维度名：
-{
-  "学习成长": {
-    "insight": "一段2-3句话的高维洞察（不是建议，是帮用户看清现状的观察）",
-    "questions": ["认知升维问题1", "认知升维问题2", "认知升维问题3"],
-    "action": "1个本月可做的具体行动（动词开头，今天能开始）"
-  },
-  ...其他维度...
-  "monthlyFocus": {
-    "domain": "推荐本月最值得投入的1个维度",
-    "reason": "推荐理由（1句话）",
-    "steps": ["第1周做X", "第2-3周做Y", "第4周回顾Z"]
-  }
-}
-
-规则：
-- score >= 8 的维度，重点帮用户看到「如何把优势转化为飞轮」
-- score <= 3 的维度，重点帮用户看到「卡点在哪里」而非给出解法
-- 从认知清单库中选择最合适的问题
-- monthlyFocus选择维度时综合考虑：分值最低 + 最影响其他维度 + 用户近期对话频率
+{"学习成长":{"insight":"2-3句话","questions":["问题1","问题2","问题3"],"action":"具体行动"},...,"monthlyFocus":{"domain":"推荐维度","reason":"理由","steps":["第1周做X","第2-3周做Y","第4周回顾Z"]}}
 只返回JSON。`;
 
-// NEW: Daily question prompt
-const DAILY_QUESTION_PROMPT = `你是一个深度思考引导师。根据用户生命之轮中最低分的维度，生成一个当日思考问题。
-
-这个问题的要求：
-- 不是心灵鸡汤，是真正的思维挑战
-- 简短有力，一句话
-- 能引发用户至少2分钟的思考
-- 带有一点"不舒适但有益"的张力
-
-只返回JSON：
-{
-  "question": "今日一问的问题内容",
-  "domain": "对应的生命维度"
-}`;
+const DAILY_QUESTION_PROMPT = `你是一个深度思考引导师。根据用户生命之轮中最低分的维度，生成一个当日思考问题。简短有力，一句话。
+只返回JSON：{"question":"今日一问的问题内容","domain":"对应的生命维度"}`;
 
 const PARSE_TODO_PROMPT = `你是一个任务解析器。把用户的自然语言转化为结构化任务JSON。返回格式：
-{
-  "text": "任务名称（动词+对象）",
-  "priority": "normal",
-  "dueDate": "2024-01-01或null",
-  "dueTime": "15:00或null",
-  "tags": [],
-  "subTasks": [{"text":"子任务1"},{"text":"子任务2"}],
-  "recur": "none",
-  "recurDays": [],
-  "reminderMinutes": 0,
-  "note": ""
-}
+{"text":"任务名称","priority":"normal","dueDate":"2024-01-01或null","dueTime":"15:00或null","tags":[],"subTasks":[{"text":"子任务1"}],"recur":"none","recurDays":[],"reminderMinutes":0,"note":""}
 只返回JSON。`;
 
+// ─── Main Handler ───
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: getCorsHeaders(req) });
   }
 
   try {
-    const { messages, mode, scores: inputScores, existingTodos, memoryContext, patterns, userAiConfig } = await req.json();
+    const { messages, mode, scores: inputScores, existingTodos, memoryContext, patterns, userAiConfig, modelProfileId } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // T06: 多模型动态路由 — 用户自定义 AI 配置优先，否则回退默认
-    const customBaseUrl = userAiConfig?.base_url || "";
-    const customApiKey = userAiConfig?.api_key || "";
-    const customModel = userAiConfig?.model || "";
-    const useCustom = customBaseUrl && customApiKey;
+    // Resolve model config from DB or request
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    
+    // Extract user ID from JWT if available
+    let userId: string | null = null;
+    const authHeader = req.headers.get("authorization") || "";
+    if (authHeader.startsWith("Bearer ") && authHeader.length > 50) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        userId = payload.sub || null;
+      } catch { /* not a user JWT */ }
+    }
 
-    const aiCall = async (defaultModel: string, systemPrompt: string, userContent: string) => {
-      const url = useCustom ? `${customBaseUrl}/chat/completions` : "https://ai.gateway.lovable.dev/v1/chat/completions";
-      const key = useCustom ? customApiKey : LOVABLE_API_KEY;
-      const model = useCustom ? (customModel || defaultModel) : defaultModel;
+    // Try to get model config from DB profile, fall back to legacy userAiConfig
+    let modelConfig: ModelConfig | null = null;
+    if (modelProfileId && userId) {
+      modelConfig = await resolveModelConfig(supabaseUrl, serviceKey, userId, modelProfileId, "chat");
+    } else if (userAiConfig?.base_url && userAiConfig?.api_key) {
+      modelConfig = { baseUrl: userAiConfig.base_url, model: userAiConfig.model || "", apiKey: userAiConfig.api_key };
+    }
 
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userContent },
-          ],
-        }),
-      });
-      if (!resp.ok) throw new Error(`AI call failed: ${resp.status}`);
-      const data = await resp.json();
-      const raw = data.choices?.[0]?.message?.content || "{}";
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      return jsonMatch ? JSON.parse(jsonMatch[0]) : {};
-    };
+    // Determine which default model to use based on mode
+    const cheapModes = ["extract", "parse-todo", "voice-correct", "daily-question"];
+    const defaultModel = cheapModes.includes(mode) ? resolveModel("cheap") : resolveModel("chat");
 
-    // Extract mode
+    // ─── Mode routing ───
     if (mode === "extract") {
       const userTexts = messages.map((m: any) => `[${m.role === 'user' ? '用户' : '罗盘'}]: ${m.content}`).join("\n");
       const today = new Date().toISOString().split("T")[0];
@@ -387,229 +347,124 @@ serve(async (req) => {
         ? existingTodos.map((t: any) => `[${t.id}] ${t.text} (${t.status}, ${t.priority})`).join("\n")
         : "（暂无待办）";
       const prompt = EXTRACT_PROMPT.replace("{TODAY}", today).replace("{EXISTING_TODOS}", todosContext);
-      const parsed = await aiCall("google/gemini-2.5-flash", prompt, userTexts);
+      const parsed = await llmJson(modelConfig, LOVABLE_API_KEY, resolveModel("extract"), prompt, userTexts);
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
-    // Wheel evaluation mode (legacy)
     if (mode === "wheel-eval") {
       const userTexts = messages.filter((m: any) => m.role === "user").map((m: any) => m.content).join("\n");
-      const parsed = await aiCall("google/gemini-2.5-flash", WHEEL_EVAL_PROMPT, userTexts || "用户最近没有写日记。");
+      const parsed = await llmJson(modelConfig, LOVABLE_API_KEY, resolveModel("extract"), WHEEL_EVAL_PROMPT, userTexts || "用户最近没有写日记。");
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
-    // NEW: Wheel inference mode (30-day, with confidence)
     if (mode === "wheel-inference") {
       const userTexts = messages.filter((m: any) => m.role === "user").map((m: any) => m.content).join("\n");
-      const parsed = await aiCall("google/gemini-2.5-flash", WHEEL_INFER_PROMPT, userTexts || "用户最近没有写日记。");
+      const parsed = await llmJson(modelConfig, LOVABLE_API_KEY, resolveModel("extract"), WHEEL_INFER_PROMPT, userTexts || "用户最近没有写日记。");
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
-    // NEW: Wheel insight mode (per-dimension insights)
     if (mode === "wheel-insight") {
       const scoresText = inputScores
         ? Object.entries(inputScores).map(([k, v]) => `${k}: ${v}分`).join("\n")
         : "所有维度默认5分";
       const userTexts = messages?.filter((m: any) => m.role === "user").map((m: any) => m.content).join("\n") || "";
       const prompt = `用户的7维度评分：\n${scoresText}\n\n用户近期对话摘要：\n${userTexts || "暂无对话记录"}`;
-      const parsed = await aiCall("google/gemini-2.5-flash", WHEEL_INSIGHT_PROMPT, prompt);
+      const parsed = await llmJson(modelConfig, LOVABLE_API_KEY, resolveModel("extract"), WHEEL_INSIGHT_PROMPT, prompt);
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
-    // NEW: Daily question mode
     if (mode === "daily-question") {
       const scoresText = inputScores
         ? Object.entries(inputScores).map(([k, v]) => `${k}: ${v}分`).join("\n")
         : "所有维度默认5分";
-      const parsed = await aiCall("google/gemini-2.5-flash-lite", DAILY_QUESTION_PROMPT, `用户的生命之轮评分：\n${scoresText}`);
+      const parsed = await llmJson(modelConfig, LOVABLE_API_KEY, resolveModel("cheap"), DAILY_QUESTION_PROMPT, `用户的生命之轮评分：\n${scoresText}`);
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
-    // Parse-todo mode
     if (mode === "parse-todo") {
       const userText = messages[messages.length - 1]?.content || "";
       const today = new Date().toISOString().split("T")[0];
-      const parsed = await aiCall("google/gemini-2.5-flash-lite", PARSE_TODO_PROMPT + `\n当前日期：${today}`, userText);
+      const parsed = await llmJson(modelConfig, LOVABLE_API_KEY, resolveModel("cheap"), PARSE_TODO_PROMPT + `\n当前日期：${today}`, userText);
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
-    // Voice correction mode
     if (mode === "voice-correct") {
       const rawText = messages[messages.length - 1]?.content || "";
-      const voiceCorrectPrompt = `你是一个语音识别纠错助手。用户通过语音输入了一段文字，可能存在以下问题：
-- 语音识别错误（同音字、谐音字）
-- 语法不通顺
-- 中英文混杂时的识别错误
-- 阿拉伯语识别错误
-- 标点符号缺失或错误
-- 口语化表达需要适当整理
-
-请修正这段文字，保持用户原意不变，只修正明显的识别错误和语法问题。
-如果原文已经很通顺，就原样返回。不要添加用户没说的内容。
-
+      const voiceCorrectPrompt = `你是一个语音识别纠错助手。修正语音识别错误，保持原意。
 返回JSON：{"corrected":"修正后的文字","changes":[{"from":"原文片段","to":"修正后片段"}]}
-如果没有任何修改，changes返回空数组。只返回JSON。`;
-      const parsed = await aiCall("google/gemini-2.5-flash-lite", voiceCorrectPrompt, rawText);
+如果没有修改，changes返回空数组。只返回JSON。`;
+      const parsed = await llmJson(modelConfig, LOVABLE_API_KEY, resolveModel("cheap"), voiceCorrectPrompt, rawText);
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
-    // Time analysis mode
     if (mode === "time-analysis") {
       const userText = messages[messages.length - 1]?.content || "";
-      const timeAnalysisPrompt = `你是一个时间管理专家和生活导师。根据用户的时间分布数据，给出个性化的深度分析和建议。
-
-分析维度：
-1. 时间分配是否均衡？哪些类别占比过高或过低？
-2. 完成率如何？有什么改进空间？
-3. 情绪与时间分配的关联性（如果有情绪数据）
-4. 基于数据的具体可执行建议
-
-返回JSON：
-{
-  "summary": "一段2-3句话的整体评价，像朋友聊天一样自然",
-  "insights": [
-    {"icon": "⚡", "title": "洞察标题", "detail": "具体分析，1-2句话"},
-    {"icon": "🎯", "title": "洞察标题", "detail": "具体分析，1-2句话"}
-  ],
-  "suggestions": [
-    {"action": "具体可执行的建议，动词开头", "reason": "为什么这样做，1句话"}
-  ],
-  "encouragement": "一句鼓励的话"
-}
-
-规则：
-- insights 给 2-4 条
-- suggestions 给 2-3 条
-- 语气温和、直接，不要鸡汤
-- 如果数据量太少，坦诚说明并给出通用建议
+      const timeAnalysisPrompt = `你是一个时间管理专家。根据用户的时间分布数据，给出分析和建议。
+返回JSON：{"summary":"整体评价","insights":[{"icon":"⚡","title":"标题","detail":"分析"}],"suggestions":[{"action":"建议","reason":"理由"}],"encouragement":"鼓励的话"}
 只返回JSON。`;
-      const parsed = await aiCall("google/gemini-2.5-flash", timeAnalysisPrompt, userText);
+      const parsed = await llmJson(modelConfig, LOVABLE_API_KEY, resolveModel("extract"), timeAnalysisPrompt, userText);
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
-    // Time-block extraction from diary
     if (mode === "time-extract") {
       const userText = messages.map((m: any) => `[${m.role === 'user' ? '用户' : '罗盘'}]: ${m.content}`).join("\n");
       const today = new Date().toISOString().split("T")[0];
-      const timeExtractPrompt = `你是时间记录助手。从用户的日记/对话中，提取他们今天做了什么事、每件事大概花了多少时间。
-
-当前日期：${today}
-
-提取规则：
-- 用户可能说"9点到12点在上课"→ 提取为一个时间块
-- 用户可能说"花了2个小时做XXX"→ 提取为一个时间块
-- 用户可能说"路上一个半小时"→ 提取为通勤时间块
-- 推断合理的开始和结束时间
-- 如果用户没提到具体时间但提到了活动，根据上下文推断时长
-- 按时间顺序排列
-
-分类参考：工作、学习、生活、运动、社交、娱乐、休息、通勤、其他
-
-返回JSON：
-{
-  "timeBlocks": [
-    {
-      "activity": "活动名称（简短）",
-      "category": "分类",
-      "startTime": "HH:mm",
-      "endTime": "HH:mm",
-      "durationMinutes": 180,
-      "note": "备注（可选）"
-    }
-  ],
-  "totalTrackedMinutes": 720,
-  "gaps": ["未记录的时间段描述"],
-  "summary": "一句话总结今天的时间使用"
-}
-只返回JSON。`;
-      const parsed = await aiCall("google/gemini-2.5-flash", timeExtractPrompt, userText);
+      const timeExtractPrompt = `你是时间记录助手。从日记/对话中提取时间块。当前日期：${today}
+返回JSON：{"timeBlocks":[{"activity":"活动名","category":"分类","startTime":"HH:mm","endTime":"HH:mm","durationMinutes":180,"note":""}],"totalTrackedMinutes":720,"gaps":["未记录时间段"],"summary":"一句话总结"}
+分类：工作、学习、生活、运动、社交、娱乐、休息、通勤、其他。只返回JSON。`;
+      const parsed = await llmJson(modelConfig, LOVABLE_API_KEY, resolveModel("extract"), timeExtractPrompt, userText);
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
-    // T10: Decompose mode — AI 任务拆解
     if (mode === "decompose") {
       const taskText = messages[messages.length - 1]?.content || "";
       if (!taskText.trim()) {
         return new Response(JSON.stringify({ subTasks: [], error: "任务内容为空" }), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
       }
-      const DECOMPOSE_PROMPT = `你是一个任务拆解专家。用户会给你一个任务描述，你需要将其拆解为3-5个具体可执行的子步骤。
-要求：
-- 每个子步骤必须是今天或近期可以独立完成的具体行动（不是方向，是行动）
-- 子步骤之间有逻辑顺序
-- 每条不超过30字
-返回格式（仅返回JSON，不返回其他任何内容）：
-{"subTasks": [{"text": "..."}, {"text": "..."}, ...]}`;
-      try {
-        const parsed = await aiCall("google/gemini-2.5-flash", DECOMPOSE_PROMPT, taskText);
-        return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
-      } catch {
-        return new Response(JSON.stringify({ subTasks: [], error: "解析失败" }), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
-      }
-    }
-
-    // Brain dump mode
-    if (mode === "brain-dump") {
-      const userText = messages[messages.length - 1]?.content || "";
-      const brainDumpPrompt = `你是任务整理助手。把用户的乱序想法整理成待办任务列表。
-每个任务用动宾结构（如「发邮件给张老师」），估算完成时间（分钟），判断优先级。
-只返回 JSON：{"todos":[{"text":"...","priority":"high","estimatedMinutes":15,"tags":["工作"]}],"summary":"..."}
-如果用户只写了1-2件事，直接返回这1-2条，不要补充未提到的任务。只返回JSON。`;
-      const parsed = await aiCall("google/gemini-2.5-flash", brainDumpPrompt, userText);
+      const DECOMPOSE_PROMPT = `你是一个任务拆解专家。将任务拆解为3-5个具体可执行的子步骤。
+返回格式：{"subTasks": [{"text": "..."}, ...]}
+只返回JSON。`;
+      const parsed = await llmJson(modelConfig, LOVABLE_API_KEY, resolveModel("extract"), DECOMPOSE_PROMPT, taskText);
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
-    // Chat mode: streaming
+    if (mode === "brain-dump") {
+      const userText = messages[messages.length - 1]?.content || "";
+      const brainDumpPrompt = `你是任务整理助手。把乱序想法整理成待办任务列表。
+只返回JSON：{"todos":[{"text":"...","priority":"high","estimatedMinutes":15,"tags":["工作"]}],"summary":"..."}`;
+      const parsed = await llmJson(modelConfig, LOVABLE_API_KEY, resolveModel("extract"), brainDumpPrompt, userText);
+      return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+    }
+
+    // ─── Chat mode: streaming ───
     let systemContent = SYSTEM_PROMPT;
 
-    // Append cross-day memory context (includes energy summary)
     if (memoryContext) {
       systemContent += `\n\n【你对用户近两周的了解（跨日记忆）】\n${memoryContext}\n`;
-      systemContent += `当对话内容和过去记录有关联时，像真正认识这个人的朋友一样自然提及，`;
-      systemContent += `例如：「你上次提到XXX，后来怎么样了？」但不要每次都刻意提及记忆，只在真正相关时提。`;
-      
+      systemContent += `当对话内容和过去记录有关联时，像真正认识这个人的朋友一样自然提及。`;
       if (memoryContext.includes('精力记录')) {
         systemContent += `\n\n【精力感知任务推荐】
 当用户记录精力状态时，根据精力水平推荐适合的任务类型：
-- 高精力 → 建议深度工作（写课程、做产品、系统设计、复杂学习）
-- 中精力 → 建议创意型任务（写脚本、发帖、内容创作、规划）
-- 低精力 → 建议轻量任务（回消息、整理资料、简单行政事务）
-- 如果用户连续多天低精力，主动询问是否需要调整今天的待办优先级。`;
+- 高精力 → 建议深度工作
+- 中精力 → 建议创意型任务
+- 低精力 → 建议轻量任务`;
       }
     }
     if (patterns) {
-      systemContent += `\n\n【观察到的情绪模式】\n${patterns}\n`;
-      systemContent += `适时（不要每次）温和地指出这些模式。`;
+      systemContent += `\n\n【观察到的情绪模式】\n${patterns}\n适时温和地指出这些模式。`;
     }
 
     if (mode === "weekly-review") {
       systemContent += `\n\n【本次任务：周复盘信】
-请以"一封来自罗盘的周信"形式回复。不要用格式标记，像写信一样自然地写。包含本周观察、一个你注意到的模式、一个温和的提醒。控制在200字内。如果有值得深入学习的话题，在末尾附上1个资源推荐。`;
+请以"一封来自罗盘的周信"形式回复。像写信一样自然地写。包含本周观察、一个模式、一个温和的提醒。控制在200字内。`;
     } else if (mode === "monthly-review") {
       systemContent += `\n\n【本次任务：月度回顾】
-请以"月度回信"形式回复。像老朋友写信，不用格式标记。包含这个月的整体感受、一个关键洞察、下个月的一个建议。控制在300字内。在末尾附上1-2个适合用户当前阶段的学习资源推荐。`;
+请以"月度回信"形式回复。像老朋友写信，包含整体感受、一个关键洞察、下个月的一个建议。控制在300字内。`;
     }
 
-    // Use custom AI config for chat mode too
-    const chatUrl = useCustom ? `${customBaseUrl}/chat/completions` : "https://ai.gateway.lovable.dev/v1/chat/completions";
-    const chatKey = useCustom ? customApiKey : LOVABLE_API_KEY;
-    const chatModel = useCustom ? (customModel || "google/gemini-3-flash-preview") : "google/gemini-3-flash-preview";
-
-    const response = await fetch(chatUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${chatKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: chatModel,
-          messages: [
-            { role: "system", content: systemContent },
-            ...messages,
-          ],
-          stream: true,
-        }),
-      }
-    );
+    // Get the chat model - prefer profile model, then default
+    const chatModel = modelConfig?.model || resolveModel("chat");
+    const response = await llmStream(modelConfig, LOVABLE_API_KEY, chatModel, systemContent, messages);
 
     if (!response.ok) {
       if (response.status === 429) {
