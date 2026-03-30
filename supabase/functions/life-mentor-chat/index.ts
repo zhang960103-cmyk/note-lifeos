@@ -318,7 +318,29 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, mode, scores: inputScores, existingTodos, memoryContext, patterns, userAiConfig, modelProfileId } = await req.json();
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+      });
+    }
+
+    const { messages, mode, scores: inputScores, existingTodos, memoryContext, patterns, userAiConfig, modelProfileId } = body;
+
+    // Input validation
+    if (!mode || typeof mode !== "string") {
+      return new Response(JSON.stringify({ error: "Missing or invalid 'mode' parameter" }), {
+        status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+      });
+    }
+    if (mode !== "daily-question" && (!Array.isArray(messages) || messages.length === 0)) {
+      return new Response(JSON.stringify({ error: "Missing or empty 'messages' array" }), {
+        status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
