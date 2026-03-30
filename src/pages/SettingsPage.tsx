@@ -45,11 +45,12 @@ export default function SettingsPage() {
   const [currency, setCurrency] = useState("CNY");
 
   // AI Models
-  const { profiles, loading: modelsLoading, setDefault, updateProfile, addProfile, deleteProfile } = useModelProfiles();
+  const { profiles, activeProfiles, canaryProfiles, deprecatedProfiles, loading: modelsLoading, setDefault, updateProfile, addProfile, deleteProfile, promoteCanary, rollback } = useModelProfiles();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showExperiment, setShowExperiment] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newProfile, setNewProfile] = useState({ name: "", description: "", base_url: "", model: "", api_key_encrypted: "", usage_tag: "chat", is_default: false });
+  const [newProfile, setNewProfile] = useState({ name: "", description: "", base_url: "", model: "", api_key_encrypted: "", usage_tag: "chat", is_default: false, version: "1.0", status: "active" });
 
   // Load profile
   useEffect(() => {
