@@ -746,7 +746,7 @@ const HomePage = () => {
         <VoiceInput
           onTranscript={(text) => {
             setShowVoice(false);
-            sendMessage(text);
+            setInput(text);
           }}
           onClose={() => setShowVoice(false)}
         />
