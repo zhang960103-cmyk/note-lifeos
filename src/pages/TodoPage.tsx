@@ -6,20 +6,20 @@ import { Play, Pause, X, Check, Trash2, Pencil, MessageCircle, ArrowRight, Clock
 import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
 import { useNavigate } from "react-router-dom";
 
-const PRIORITY_CONFIG: Record<Priority, { label: string; emoji: string; color: string }> = {
-  urgent: { label: "紧急", emoji: "🔴", color: "text-los-red" },
-  high: { label: "重要", emoji: "🟠", color: "text-los-orange" },
-  normal: { label: "普通", emoji: "🔵", color: "text-los-blue" },
-  low: { label: "可选", emoji: "⚪", color: "text-muted-foreground" },
+const PRIORITY_CONFIG: Record<Priority, { labelKey: string; emoji: string; color: string }> = {
+  urgent: { labelKey: "todo.priority.urgent", emoji: "🔴", color: "text-los-red" },
+  high: { labelKey: "todo.priority.high", emoji: "🟠", color: "text-los-orange" },
+  normal: { labelKey: "todo.priority.normal", emoji: "🔵", color: "text-los-blue" },
+  low: { labelKey: "todo.priority.low", emoji: "⚪", color: "text-muted-foreground" },
 };
 
 type TabKey = "smart" | "matrix" | "habits" | "templates";
 type StatusColumn = "todo" | "doing" | "done";
 
-const COLUMN_CONFIG: Record<StatusColumn, { label: string; emoji: string; bg: string }> = {
-  todo: { label: "待办", emoji: "📋", bg: "border-gold/30" },
-  doing: { label: "进行中", emoji: "⚡", bg: "border-los-orange/30" },
-  done: { label: "已完成", emoji: "✅", bg: "border-los-green/30" },
+const COLUMN_CONFIG: Record<StatusColumn, { labelKey: string; emoji: string; bg: string }> = {
+  todo: { labelKey: "todo.column.todo", emoji: "📋", bg: "border-gold/30" },
+  doing: { labelKey: "todo.column.doing", emoji: "⚡", bg: "border-los-orange/30" },
+  done: { labelKey: "todo.column.done", emoji: "✅", bg: "border-los-green/30" },
 };
 
 const TodoPage = () => {
