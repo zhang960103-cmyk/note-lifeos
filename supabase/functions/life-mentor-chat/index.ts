@@ -135,9 +135,12 @@ const EXTRACT_PROMPT = `你是一个专业的任务管理AI。你的核心能力
   "completedTodoIds": ["已完成任务的ID"],
   "emotionScore": 6,
   "financeHints": [
-    {"type":"income","amount":500,"category":"教学收入","note":"学生转账"}
+    {"type":"income","amount":500,"category":"教学收入","note":"学生转账","currency":"CNY"}
   ],
-  "clarifyNeeded": "如果用户说的内容模糊无法拆分为具体任务，这里写一句提醒，否则为null"
+  "clarifyNeeded": "如果用户说的内容模糊无法拆分为具体任务，这里写一句提醒，否则为null",
+  "goalHints": [
+    {"krText": "匹配的KR关键结果文本片段", "todoText": "对应的任务文本"}
+  ]
 }
 
 todos去重规则（最重要！）：
@@ -170,6 +173,10 @@ financeHints提取规则（极其重要！）：
 - 例如："小宝转给我500"→ income；"我给房东转了2000"→ expense
 - 工资/课时费等固定收入，如果用户没提到具体金额，不要猜测金额，返回空数组
 - 如果金额不明确或支付主体不明确，宁可不提取，返回空数组 []
+- 多币种支持：识别 $、€、¥、£、AED、SAR 等货币符号和名称，在 currency 字段标注货币代码（如 USD、EUR、CNY），默认 CNY
+
+goalHints 规则：
+- 如果用户的对话提到了某个目标相关的行动（如"写了课程大纲"可能对应KR"完成3门课程"），在 goalHints 里标注
 
 只返回JSON，不要有其他文字。`;
 

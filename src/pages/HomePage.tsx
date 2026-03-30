@@ -54,6 +54,8 @@ const HomePage = () => {
   const canUseVoice = typeof window !== "undefined"
     && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
   const [showTagHint, setShowTagHint] = useState(false);
+  const [extractFailed, setExtractFailed] = useState(false);
+  const [retryMsgs, setRetryMsgs] = useState<ChatMsg[] | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -259,6 +261,8 @@ const HomePage = () => {
           const existingTodosForAI = allTodos
             .filter(t => t.status !== "dropped")
             .map(t => ({ id: t.id, text: t.text, status: t.status, priority: t.priority }));
+          setExtractFailed(false);
+          setRetryMsgs(msgsForExtract);
           extractMeta(msgsForExtract, existingTodosForAI).then(meta => {
             if (meta.completedTodoIds?.length > 0) {
               meta.completedTodoIds.forEach(todoId => {
@@ -308,6 +312,8 @@ const HomePage = () => {
 
             // Auto-extract time blocks from diary and create time-tagged todos
             autoExtractTimeBlocks(msgsForExtract);
+          }).catch(() => {
+            setExtractFailed(true);
           });
         },
         signal: controller.signal,
@@ -479,6 +485,23 @@ const HomePage = () => {
               <div className="text-3xl mb-4">{statusGreeting.emoji}</div>
               <p className="text-foreground text-sm leading-[1.8]">{statusGreeting.text}</p>
               <p className="text-muted-foreground text-xs mt-2 leading-[1.8]">{t("home.input.placeholder")}</p>
+              {/* T08: Starter prompts */}
+              <div className="grid grid-cols-2 gap-2 mt-4 text-left">
+                {[
+                  { emoji: "📝", text: "记录今天发生了什么", msg: "帮我回顾一下今天，我来说说发生了什么" },
+                  { emoji: "🎯", text: "规划我的一天", msg: "帮我规划一下今天要做的事情" },
+                  { emoji: "💭", text: "聊聊最近的想法", msg: "我最近有些想法想整理一下" },
+                  { emoji: "📊", text: "复盘这周表现", msg: "帮我复盘一下这周的表现" },
+                ].map(sp => (
+                  <button
+                    key={sp.msg}
+                    onClick={() => sendMessage(sp.msg)}
+                    className="bg-surface-2 border border-border rounded-xl px-3 py-2.5 hover:bg-surface-3 transition text-xs text-foreground leading-relaxed"
+                  >
+                    <span className="text-sm">{sp.emoji}</span> {sp.text}
+                  </button>
+                ))}
+              </div>
               {/* Emoji mood quick-pick */}
               <div className="flex justify-center gap-2 mt-4">
                 {QUICK_MOODS.map(mood => (
@@ -561,6 +584,40 @@ const HomePage = () => {
           <span className={`text-[9px] text-muted-foreground/50 whitespace-nowrap transition-opacity duration-500 ${showTagHint ? "opacity-100" : "opacity-0"}`}>
             {t("home.tag_hint")}
           </span>
+        </div>
+      )}
+
+      {/* T02: extractMeta retry */}
+      {extractFailed && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-destructive/90 text-destructive-foreground text-xs px-4 py-2 rounded-xl flex items-center gap-2 z-50 animate-in fade-in">
+          <span>⚠️ AI 分析失败</span>
+          <button
+            onClick={() => {
+              if (!retryMsgs) return;
+              setExtractFailed(false);
+              const existingTodosForAI = allTodos
+                .filter(t => t.status !== "dropped")
+                .map(t => ({ id: t.id, text: t.text, status: t.status, priority: t.priority }));
+              extractMeta(retryMsgs, existingTodosForAI).then(meta => {
+                if (meta.emotionTags.length || meta.topicTags.length || meta.todos?.length) {
+                  updateDayMeta(todayKey, {
+                    emotionTags: meta.emotionTags,
+                    topicTags: meta.topicTags,
+                    todos: meta.todos?.length ? meta.todos.map(t => createTodoFromExtract(t, todayKey)) : undefined,
+                    emotionScore: meta.emotionScore || undefined,
+                  });
+                  setTodoToast("重试成功 ✓");
+                  setTimeout(() => setTodoToast(null), 3000);
+                }
+              }).catch(() => setExtractFailed(true));
+            }}
+            className="underline font-medium hover:text-white"
+          >
+            重试
+          </button>
+          <button onClick={() => setExtractFailed(false)} className="ml-1 opacity-60 hover:opacity-100">
+            <X size={12} />
+          </button>
         </div>
       )}
 

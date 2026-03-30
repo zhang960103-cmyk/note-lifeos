@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { format, startOfWeek, addDays, isToday, subDays } from "date-fns";
-import { Play, Pause, X, Check, Trash2, Pencil, MessageCircle, ArrowRight, Clock, BarChart3, Grid3X3, ChevronDown, ChevronRight } from "lucide-react";
+import { Play, Pause, X, Check, Trash2, Pencil, MessageCircle, ArrowRight, Clock, BarChart3, Grid3X3, ChevronDown, ChevronRight, Wand2, Loader2 } from "lucide-react";
 import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
 import { useNavigate } from "react-router-dom";
 
@@ -507,6 +507,7 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
   onDelete: () => void;
   onMove: (todo: TodoItem, status: TaskStatus) => void;
 }) {
+  const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
   const { t: tr } = useLanguage();
   const isDone = todo.status === "done";
   const isDoing = todo.status === "doing";
@@ -514,6 +515,25 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
   const [editPriority, setEditPriority] = useState(todo.priority);
   const [editDueDate, setEditDueDate] = useState(todo.dueDate || "");
   const [editNote, setEditNote] = useState(todo.note || "");
+  const [decomposing, setDecomposing] = useState(false);
+
+  const handleDecompose = useCallback(async () => {
+    setDecomposing(true);
+    try {
+      const resp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ messages: [{ role: "user", content: todo.text }], mode: "decompose" }),
+      });
+      if (!resp.ok) throw new Error();
+      const data = await resp.json();
+      if (data.subTasks?.length) {
+        const newSubs = data.subTasks.map((s: any) => ({ id: crypto.randomUUID(), text: s.text, done: false }));
+        onUpdate({ subTasks: [...(todo.subTasks || []), ...newSubs] });
+      }
+    } catch {}
+    setDecomposing(false);
+  }, [todo.text, todo.subTasks, onUpdate]);
 
   return (
     <div className={`bg-surface-2 border border-border rounded-xl overflow-hidden transition-all ${celebrating ? "ring-2 ring-gold animate-pulse" : ""}`}>
@@ -562,6 +582,11 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
           <button onClick={onEdit} className="text-muted-foreground hover:text-gold transition p-1">
             <Pencil size={12} />
           </button>
+          {!isDone && (
+            <button onClick={handleDecompose} disabled={decomposing} className="text-muted-foreground hover:text-primary transition p-1" title="AI 拆解">
+              {decomposing ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+            </button>
+          )}
         </div>
       </div>
 
