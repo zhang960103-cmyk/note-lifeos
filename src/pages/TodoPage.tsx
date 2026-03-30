@@ -632,4 +632,157 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
   );
 }
 
+// Plan Templates component
+const PLAN_TEMPLATES = [
+  {
+    name: "工作日模板",
+    emoji: "💼",
+    desc: "标准工作日安排",
+    tasks: [
+      { text: "晨间回顾 & 计划", priority: "high" as const, tags: ["工作"], dueTime: "08:00" },
+      { text: "核心工作 - 深度时间", priority: "urgent" as const, tags: ["工作"], dueTime: "09:00" },
+      { text: "午休 & 轻运动", priority: "normal" as const, tags: ["休息"], dueTime: "12:00" },
+      { text: "下午协作 & 会议", priority: "normal" as const, tags: ["工作"], dueTime: "14:00" },
+      { text: "总结复盘 & 记录", priority: "high" as const, tags: ["学习"], dueTime: "17:00" },
+      { text: "个人成长时间", priority: "normal" as const, tags: ["学习"], dueTime: "20:00" },
+    ],
+  },
+  {
+    name: "休息日模板",
+    emoji: "🌴",
+    desc: "放松充电日",
+    tasks: [
+      { text: "自然醒 & 慢早餐", priority: "low" as const, tags: ["生活"], dueTime: "09:00" },
+      { text: "阅读/学习新技能", priority: "normal" as const, tags: ["学习"], dueTime: "10:00" },
+      { text: "运动健身", priority: "high" as const, tags: ["运动"], dueTime: "14:00" },
+      { text: "社交/陪伴家人", priority: "normal" as const, tags: ["社交"], dueTime: "16:00" },
+      { text: "兴趣爱好时间", priority: "low" as const, tags: ["娱乐"], dueTime: "19:00" },
+      { text: "睡前复盘日记", priority: "high" as const, tags: ["学习"], dueTime: "22:00" },
+    ],
+  },
+  {
+    name: "冲刺日模板",
+    emoji: "🚀",
+    desc: "高强度产出日",
+    tasks: [
+      { text: "冥想 5min + 目标确认", priority: "high" as const, tags: ["工作"], dueTime: "07:00" },
+      { text: "深度工作 Block 1 (3h)", priority: "urgent" as const, tags: ["工作"], dueTime: "08:00" },
+      { text: "短休 + 补充能量", priority: "low" as const, tags: ["休息"], dueTime: "11:00" },
+      { text: "深度工作 Block 2 (2h)", priority: "urgent" as const, tags: ["工作"], dueTime: "11:30" },
+      { text: "午休", priority: "normal" as const, tags: ["休息"], dueTime: "13:30" },
+      { text: "创造性工作 (2h)", priority: "high" as const, tags: ["工作"], dueTime: "15:00" },
+      { text: "复盘 & 奖励自己", priority: "normal" as const, tags: ["生活"], dueTime: "18:00" },
+    ],
+  },
+];
+
+function PlanTemplates({ addTodoToDate, todayKey }: { addTodoToDate: (date: string, todo: TodoItem) => void; todayKey: string }) {
+  const [applied, setApplied] = useState<string | null>(null);
+
+  const applyTemplate = (template: typeof PLAN_TEMPLATES[0]) => {
+    template.tasks.forEach(task => {
+      const todo: TodoItem = {
+        id: crypto.randomUUID(),
+        text: task.text,
+        status: "todo",
+        priority: task.priority,
+        tags: task.tags,
+        subTasks: [],
+        recur: "none",
+        dueDate: todayKey,
+        dueTime: task.dueTime,
+        sourceDate: todayKey,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      addTodoToDate(todayKey, todo);
+    });
+    setApplied(template.name);
+    setTimeout(() => setApplied(null), 2000);
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[10px] text-muted-foreground">选择一个模板，一键套用到今天的待办</p>
+      {PLAN_TEMPLATES.map(tmpl => (
+        <div key={tmpl.name} className="bg-surface-2 border border-border rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-foreground">{tmpl.emoji} {tmpl.name}</span>
+            <button onClick={() => applyTemplate(tmpl)}
+              className={`text-[10px] px-3 py-1 rounded-full transition ${applied === tmpl.name ? "bg-los-green/20 text-los-green" : "bg-gold/10 text-gold hover:bg-gold/20"}`}>
+              {applied === tmpl.name ? "✅ 已套用" : "套用"}
+            </button>
+          </div>
+          <p className="text-[10px] text-muted-foreground mb-2">{tmpl.desc}</p>
+          <div className="space-y-1">
+            {tmpl.tasks.map((task, i) => (
+              <div key={i} className="flex items-center gap-2 text-[10px]">
+                <span className="text-muted-foreground font-mono-jb w-[36px]">{task.dueTime}</span>
+                <span className="text-foreground">{task.text}</span>
+                {task.tags.map(t => <span key={t} className="bg-surface-3 text-muted-foreground px-1 rounded text-[8px]">{t}</span>)}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Streak & Reward component
+function StreakReward({ allTodos }: { allTodos: TodoItem[] }) {
+  const streak = useMemo(() => {
+    let count = 0;
+    const now = new Date();
+    for (let i = 0; i < 60; i++) {
+      const d = format(subDays(now, i), "yyyy-MM-dd");
+      const hasDone = allTodos.some(t => t.completedAt?.split("T")[0] === d);
+      if (hasDone) count++;
+      else if (i > 0) break;
+    }
+    return count;
+  }, [allTodos]);
+
+  const totalDone = allTodos.filter(t => t.status === "done").length;
+  const level = totalDone >= 100 ? "🏆 大师" : totalDone >= 50 ? "⭐ 达人" : totalDone >= 20 ? "🌟 进阶" : "🌱 新手";
+
+  const milestones = [
+    { target: 10, reward: "🎯 初心者", unlocked: totalDone >= 10 },
+    { target: 30, reward: "⚡ 行动派", unlocked: totalDone >= 30 },
+    { target: 50, reward: "🔥 效率达人", unlocked: totalDone >= 50 },
+    { target: 100, reward: "🏆 时间大师", unlocked: totalDone >= 100 },
+  ];
+
+  if (streak < 1 && totalDone < 3) return null;
+
+  return (
+    <div className="bg-card border border-primary/20 rounded-2xl p-3 mt-2">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">🔥</span>
+          <span className="text-xs text-foreground font-serif-sc">成就</span>
+        </div>
+        <span className="text-[10px] text-muted-foreground">{level}</span>
+      </div>
+      <div className="flex items-center gap-4 mb-2">
+        <div className="text-center">
+          <div className="text-lg font-mono-jb text-primary">{streak}</div>
+          <div className="text-[8px] text-muted-foreground">连续天数</div>
+        </div>
+        <div className="text-center">
+          <div className="text-lg font-mono-jb text-foreground">{totalDone}</div>
+          <div className="text-[8px] text-muted-foreground">总完成</div>
+        </div>
+      </div>
+      <div className="flex gap-1">
+        {milestones.map((m, i) => (
+          <div key={i} className={`flex-1 text-center py-1 rounded-lg text-[8px] ${m.unlocked ? "bg-primary/10 text-primary" : "bg-surface-2 text-muted-foreground/40"}`}>
+            {m.reward}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default TodoPage;
