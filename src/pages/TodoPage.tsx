@@ -528,9 +528,9 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
           <div className={`text-xs ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>{todo.text}</div>
           <div className="flex gap-1 mt-0.5 flex-wrap">
             <span className="text-[8px] px-1.5 py-0.5 rounded bg-surface-3 text-muted-foreground">
-              {PRIORITY_CONFIG[todo.priority]?.emoji} {t(PRIORITY_CONFIG[todo.priority]?.labelKey)}
+              {PRIORITY_CONFIG[todo.priority]?.emoji} {tr(PRIORITY_CONFIG[todo.priority]?.labelKey)}
             </span>
-            {isDoing && <span className="text-[8px] bg-los-orange/20 text-los-orange px-1.5 rounded">{t("todo.column.doing")}</span>}
+            {isDoing && <span className="text-[8px] bg-los-orange/20 text-los-orange px-1.5 rounded">{tr("todo.column.doing")}</span>}
             {todo.dueDate && <span className="text-[8px] text-muted-foreground font-mono-jb">{todo.dueDate}</span>}
             {todo.tags?.map(t => <span key={t} className="text-[8px] bg-gold-light text-gold px-1 rounded">{t}</span>)}
             {todo.subTasks?.length > 0 && (
