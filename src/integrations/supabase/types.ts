@@ -139,6 +139,36 @@ export type Database = {
         }
         Relationships: []
       }
+      goals: {
+        Row: {
+          created_at: string | null
+          id: string
+          key_results: Json
+          quarter: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          key_results?: Json
+          quarter: string
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          key_results?: Json
+          quarter?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       habits: {
         Row: {
           check_ins: string[]
@@ -169,19 +199,58 @@ export type Database = {
         }
         Relationships: []
       }
+      insight_bookmarks: {
+        Row: {
+          created_at: string | null
+          id: string
+          insight_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          insight_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          insight_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          ai_api_key_encrypted: string | null
+          ai_base_url: string | null
+          ai_model: string | null
+          avatar_url: string | null
           created_at: string
+          currency: string | null
+          display_name: string | null
           id: string
           onboarded: boolean
         }
         Insert: {
+          ai_api_key_encrypted?: string | null
+          ai_base_url?: string | null
+          ai_model?: string | null
+          avatar_url?: string | null
           created_at?: string
+          currency?: string | null
+          display_name?: string | null
           id: string
           onboarded?: boolean
         }
         Update: {
+          ai_api_key_encrypted?: string | null
+          ai_base_url?: string | null
+          ai_model?: string | null
+          avatar_url?: string | null
           created_at?: string
+          currency?: string | null
+          display_name?: string | null
           id?: string
           onboarded?: boolean
         }
