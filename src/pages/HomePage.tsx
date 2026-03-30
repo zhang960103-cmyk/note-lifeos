@@ -149,9 +149,9 @@ const HomePage = () => {
     if (!showSunset) return "";
     const completedCount = todayEntry?.todos.filter(t => t.status === "done").length || 0;
     return completedCount > 0
-      ? `🌅 今天完成了 ${completedCount} 件事。写下今天的感受？`
-      : "🌅 快到今天结束了。有什么想记录的吗？";
-  }, [showSunset, todayEntry]);
+      ? t("home.sunset.completed", { count: completedCount })
+      : t("home.sunset.empty");
+  }, [showSunset, todayEntry, t]);
 
   // Weekly letter ready check
   const weeklyLetterReady = useMemo(() => {

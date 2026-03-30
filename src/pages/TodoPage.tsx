@@ -10,11 +10,11 @@ import {
 import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
 import { useNavigate } from "react-router-dom";
 
-const PRIORITY_CONFIG: Record<Priority, { label: string; dot: string; ring: string }> = {
-  urgent: { label: "紧急", dot: "bg-destructive", ring: "ring-destructive/30" },
-  high: { label: "重要", dot: "bg-los-orange", ring: "ring-los-orange/30" },
-  normal: { label: "普通", dot: "bg-primary", ring: "ring-primary/30" },
-  low: { label: "可选", dot: "bg-muted-foreground", ring: "ring-muted-foreground/30" },
+const PRIORITY_KEYS: Record<Priority, { labelKey: string; dot: string; ring: string }> = {
+  urgent: { labelKey: "todo.priority.urgent", dot: "bg-destructive", ring: "ring-destructive/30" },
+  high: { labelKey: "todo.priority.high", dot: "bg-los-orange", ring: "ring-los-orange/30" },
+  normal: { labelKey: "todo.priority.normal", dot: "bg-primary", ring: "ring-primary/30" },
+  low: { labelKey: "todo.priority.low", dot: "bg-muted-foreground", ring: "ring-muted-foreground/30" },
 };
 
 type ViewMode = "list" | "matrix" | "timeline";
@@ -121,12 +121,12 @@ const TodoPage = () => {
   const eisenhower = useMemo(() => {
     const active = allTodos.filter(t => t.status !== "done" && t.status !== "dropped");
     return [
-      { key: "ui", label: "🔴 紧急重要", sub: "立即做", items: active.filter(t => t.priority === "urgent"), color: "border-destructive/40" },
-      { key: "ni", label: "🟠 重要不急", sub: "计划做", items: active.filter(t => t.priority === "high"), color: "border-los-orange/40" },
-      { key: "un", label: "🔵 急不重要", sub: "委托做", items: active.filter(t => t.priority === "normal"), color: "border-primary/40" },
-      { key: "nn", label: "⚪ 不急不重", sub: "考虑删", items: active.filter(t => t.priority === "low"), color: "border-muted-foreground/30" },
+      { key: "ui", label: `🔴 ${t("todo.priority.urgent")}`, sub: t("todo.matrix.do_now") || "立即做", items: active.filter(t => t.priority === "urgent"), color: "border-destructive/40" },
+      { key: "ni", label: `🟠 ${t("todo.priority.high")}`, sub: t("todo.matrix.plan") || "计划做", items: active.filter(t => t.priority === "high"), color: "border-los-orange/40" },
+      { key: "un", label: `🔵 ${t("todo.priority.normal")}`, sub: t("todo.matrix.delegate") || "委托做", items: active.filter(t => t.priority === "normal"), color: "border-primary/40" },
+      { key: "nn", label: `⚪ ${t("todo.priority.low")}`, sub: t("todo.matrix.drop") || "考虑删", items: active.filter(t => t.priority === "low"), color: "border-muted-foreground/30" },
     ];
-  }, [allTodos]);
+  }, [allTodos, t]);
 
   // Streak
   const streak = useMemo(() => {
@@ -425,8 +425,8 @@ const TodoPage = () => {
               {(["urgent", "high", "normal", "low"] as Priority[]).map(p => (
                 <button key={p} onClick={() => setNewPriority(p)}
                   className={`text-[10px] px-3 py-1.5 rounded-full transition flex items-center gap-1 ${newPriority === p ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                  <span className={`w-2 h-2 rounded-full ${PRIORITY_CONFIG[p].dot}`} />
-                  {PRIORITY_CONFIG[p].label}
+                  <span className={`w-2 h-2 rounded-full ${PRIORITY_KEYS[p].dot}`} />
+                  {t(PRIORITY_KEYS[p].labelKey)}
                 </button>
               ))}
             </div>
@@ -466,6 +466,7 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
   editing: boolean; onEdit: () => void; onUpdate: (u: Partial<TodoItem>) => void; onDelete: () => void;
   onPomodoro: () => void; isTracking: boolean; trackingTime?: string; onStartTracking: () => void;
 }) {
+  const { t } = useLanguage();
   const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
   const isDone = todo.status === "done";
   const isDoing = todo.status === "doing";
@@ -492,7 +493,7 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
     setDecomposing(false);
   }, [todo.text, todo.subTasks, onUpdate]);
 
-  const prio = PRIORITY_CONFIG[todo.priority];
+  const prio = PRIORITY_KEYS[todo.priority];
 
   return (
     <div className={`bg-card border border-border rounded-xl transition-all ${celebrating ? "ring-2 ring-primary animate-pulse" : ""}`}>
@@ -578,7 +579,7 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
             {(["urgent", "high", "normal", "low"] as Priority[]).map(p => (
               <button key={p} onClick={() => setEditPriority(p)}
                 className={`text-[10px] px-2 py-0.5 rounded-full transition flex items-center gap-1 ${editPriority === p ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_CONFIG[p].dot}`} /> {PRIORITY_CONFIG[p].label}
+                <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_KEYS[p].dot}`} /> {t(PRIORITY_KEYS[p].labelKey)}
               </button>
             ))}
           </div>
