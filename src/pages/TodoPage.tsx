@@ -578,7 +578,7 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
             {(["urgent", "high", "normal", "low"] as Priority[]).map(p => (
               <button key={p} onClick={() => setEditPriority(p)}
                 className={`text-[10px] px-2 py-0.5 rounded-full transition flex items-center gap-1 ${editPriority === p ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_CONFIG[p].dot}`} /> {PRIORITY_CONFIG[p].label}
+                <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_KEYS[p].dot}`} /> {t(PRIORITY_KEYS[p].labelKey)}
               </button>
             ))}
           </div>
