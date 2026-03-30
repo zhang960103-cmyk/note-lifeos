@@ -121,12 +121,12 @@ const TodoPage = () => {
   const eisenhower = useMemo(() => {
     const active = allTodos.filter(t => t.status !== "done" && t.status !== "dropped");
     return [
-      { key: "ui", label: "🔴 紧急重要", sub: "立即做", items: active.filter(t => t.priority === "urgent"), color: "border-destructive/40" },
-      { key: "ni", label: "🟠 重要不急", sub: "计划做", items: active.filter(t => t.priority === "high"), color: "border-los-orange/40" },
-      { key: "un", label: "🔵 急不重要", sub: "委托做", items: active.filter(t => t.priority === "normal"), color: "border-primary/40" },
-      { key: "nn", label: "⚪ 不急不重", sub: "考虑删", items: active.filter(t => t.priority === "low"), color: "border-muted-foreground/30" },
+      { key: "ui", label: `🔴 ${t("todo.priority.urgent")}`, sub: t("todo.matrix.do_now") || "立即做", items: active.filter(t => t.priority === "urgent"), color: "border-destructive/40" },
+      { key: "ni", label: `🟠 ${t("todo.priority.high")}`, sub: t("todo.matrix.plan") || "计划做", items: active.filter(t => t.priority === "high"), color: "border-los-orange/40" },
+      { key: "un", label: `🔵 ${t("todo.priority.normal")}`, sub: t("todo.matrix.delegate") || "委托做", items: active.filter(t => t.priority === "normal"), color: "border-primary/40" },
+      { key: "nn", label: `⚪ ${t("todo.priority.low")}`, sub: t("todo.matrix.drop") || "考虑删", items: active.filter(t => t.priority === "low"), color: "border-muted-foreground/30" },
     ];
-  }, [allTodos]);
+  }, [allTodos, t]);
 
   // Streak
   const streak = useMemo(() => {
