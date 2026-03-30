@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode } from "react";
-import { useDayEntries, useWheelScores, useOnboarding, useFinance, useHabits } from "@/hooks/useLifeOs";
+import { useDayEntries, useWheelScores, useOnboarding, useFinance, useHabits, useEnergyLogs, type EnergyLog } from "@/hooks/useLifeOs";
 import type { DayEntry, WheelScore, ChatMessage, TodoItem, FinanceEntry, HabitItem } from "@/types/lifeOs";
 
 interface LifeOsContextType {
