@@ -86,7 +86,7 @@ export default function SettingsPage() {
 
   const handleAddProfile = async () => {
     await addProfile(newProfile);
-    setNewProfile({ name: "", description: "", base_url: "", model: "", api_key_encrypted: "", usage_tag: "chat", is_default: false });
+    setNewProfile({ name: "", description: "", base_url: "", model: "", api_key_encrypted: "", usage_tag: "chat", is_default: false, version: "1.0", status: "active" });
     setShowAddForm(false);
   };
 
