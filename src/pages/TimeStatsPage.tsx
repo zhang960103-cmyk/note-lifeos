@@ -300,24 +300,24 @@ export default function TimeStatsPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-20 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 pb-20 space-y-2.5">
         {showQuickEntry && <QuickTimeEntry onClose={() => setShowQuickEntry(false)} />}
 
         {/* Week View */}
         {viewMode === "week" && (
-          <div className="bg-card border border-border rounded-2xl p-3">
+          <div className="bg-card border border-border rounded-xl p-3">
             <div className="flex items-center gap-2 mb-2">
               <CalendarClock size={13} className="text-primary" />
               <span className="text-[11px] font-serif-sc text-foreground">周时间色块</span>
             </div>
             <div className="flex gap-[2px]">
-              <div className="flex flex-col justify-between text-[6px] text-muted-foreground pr-0.5" style={{ height: 180 }}>
+              <div className="flex flex-col justify-between text-[6px] text-muted-foreground pr-0.5" style={{ height: 160 }}>
                 {[6, 12, 18, 24].map(h => <span key={h}>{h}</span>)}
               </div>
               {weekViewData.map((day, di) => (
                 <div key={di} className="flex-1 flex flex-col">
                   <span className={`text-[7px] text-center mb-0.5 ${day.date === today ? "text-primary font-bold" : "text-muted-foreground"}`}>{day.label}</span>
-                  <div className="relative bg-muted rounded flex-1" style={{ height: 180 }}>
+                  <div className="relative bg-muted rounded flex-1" style={{ height: 160 }}>
                     {(day.blocks as any[]).map((block: any, bi: number) => {
                       const top = ((block.startHour - 6) / 18) * 100;
                       const height = ((block.endHour - block.startHour) / 18) * 100;
@@ -334,196 +334,233 @@ export default function TimeStatsPage() {
           </div>
         )}
 
-        {/* Hero Score - more compact */}
-        <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-4">
-          <div className="relative w-16 h-16 flex-shrink-0">
-            <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-              <circle cx="50" cy="50" r="42" fill="none" stroke="hsl(var(--border))" strokeWidth="8" />
-              <circle cx="50" cy="50" r="42" fill="none" stroke="hsl(var(--primary))" strokeWidth="8" strokeLinecap="round"
-                strokeDasharray={`${productivityScore * 2.64} 264`} className="transition-all duration-1000" />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={`text-lg font-mono-jb font-bold ${scoreColor}`}>{productivityScore}</span>
-              <span className="text-[7px] text-muted-foreground">{scoreLabel}</span>
+        {/* Row 1: Hero Score + Heatmap side by side on wider screens */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {/* Hero Score */}
+          <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
+            <div className="relative w-14 h-14 flex-shrink-0">
+              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="hsl(var(--border))" strokeWidth="8" />
+                <circle cx="50" cy="50" r="42" fill="none" stroke="hsl(var(--primary))" strokeWidth="8" strokeLinecap="round"
+                  strokeDasharray={`${productivityScore * 2.64} 264`} className="transition-all duration-1000" />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className={`text-base font-mono-jb font-bold ${scoreColor}`}>{productivityScore}</span>
+                <span className="text-[6px] text-muted-foreground">{scoreLabel}</span>
+              </div>
+            </div>
+            <div className="flex-1 grid grid-cols-2 gap-1.5">
+              {[
+                { icon: <Target size={9} className="text-primary" />, label: "完成率", value: `${stats.total > 0 ? Math.round(stats.done / stats.total * 100) : 0}%` },
+                { icon: <Flame size={9} className="text-los-orange" />, label: "连续", value: `${streak}天` },
+                { icon: <Zap size={9} className="text-los-blue" />, label: "情绪", value: stats.avgEmotion },
+                { icon: <Clock size={9} className="text-los-green" />, label: "活跃", value: `${stats.activeDays}天` },
+              ].map((s, i) => (
+                <div key={i} className="flex items-center gap-1">
+                  {s.icon}
+                  <div>
+                    <div className="text-[7px] text-muted-foreground leading-none">{s.label}</div>
+                    <div className="text-xs font-mono-jb text-foreground leading-none">{s.value}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="flex-1 grid grid-cols-2 gap-2">
-            {[
-              { icon: <Target size={10} className="text-primary" />, label: "完成率", value: `${stats.total > 0 ? Math.round(stats.done / stats.total * 100) : 0}%` },
-              { icon: <Flame size={10} className="text-los-orange" />, label: "连续", value: `${streak}天` },
-              { icon: <Zap size={10} className="text-los-blue" />, label: "情绪", value: stats.avgEmotion },
-              { icon: <Clock size={10} className="text-los-green" />, label: "活跃", value: `${stats.activeDays}天` },
-            ].map((s, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                {s.icon}
-                <div>
-                  <div className="text-[8px] text-muted-foreground">{s.label}</div>
-                  <div className="text-sm font-mono-jb text-foreground leading-none">{s.value}</div>
+
+          {/* Compact Heatmap */}
+          <div className="bg-card border border-border rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <CalendarClock size={11} className="text-primary" />
+              <span className="text-[10px] font-serif-sc text-foreground">活跃热力图</span>
+              <span className="ml-auto text-[7px] text-muted-foreground">近 8 周</span>
+            </div>
+            <div className="flex gap-[2px] overflow-x-auto">
+              {heatmapData.map((week, wi) => (
+                <div key={wi} className="flex flex-col gap-[2px]">
+                  {week.map((day, di) => (
+                    <div key={di} className="w-[8px] h-[8px] rounded-[1.5px]"
+                      style={{ background: getHeatColor(day.count) }}
+                      title={`${format(day.date, "MM-dd")}: ${day.count}`} />
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-end gap-1 mt-1">
+              <span className="text-[6px] text-muted-foreground">少</span>
+              {[0, 0.2, 0.4, 0.65, 0.9].map((op, i) => (
+                <div key={i} className="w-[6px] h-[6px] rounded-[1px]"
+                  style={{ background: i === 0 ? "hsl(var(--muted))" : `hsl(var(--primary) / ${op})` }} />
+              ))}
+              <span className="text-[6px] text-muted-foreground">多</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Time Distribution + Energy side by side */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {/* Category Pie */}
+          <div className="bg-card border border-border rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Clock size={11} className="text-primary" />
+              <span className="text-[10px] font-serif-sc text-foreground">时间分布</span>
+            </div>
+            {categoryData.length > 0 ? (
+              <div className="flex items-center gap-2.5">
+                <div className="relative w-[80px] h-[80px] flex-shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={categoryData} cx="50%" cy="50%" innerRadius={24} outerRadius={38} dataKey="value" stroke="none" paddingAngle={2}>
+                        {categoryData.map((entry, i) => (
+                          <Cell key={i} fill={CATEGORY_COLORS[entry.name] || CATEGORY_COLORS["其他"]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-sm font-mono-jb font-bold text-foreground">{stats.done}</span>
+                    <span className="text-[6px] text-muted-foreground">完成</span>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-1">
+                  {categoryData.slice(0, 4).map(d => {
+                    const total = categoryData.reduce((s, c) => s + c.value, 0);
+                    const pct = Math.round((d.value / total) * 100);
+                    return (
+                      <div key={d.name} className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: CATEGORY_COLORS[d.name] || CATEGORY_COLORS["其他"] }} />
+                        <span className="text-[9px] text-foreground flex-1">{d.name}</span>
+                        <span className="text-[8px] font-mono-jb text-muted-foreground">{pct}%</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            ))}
+            ) : (
+              <p className="text-[10px] text-muted-foreground/50 text-center py-3">暂无数据</p>
+            )}
           </div>
-        </div>
 
-        {/* Compact Heatmap */}
-        <div className="bg-card border border-border rounded-2xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <CalendarClock size={12} className="text-primary" />
-            <span className="text-[11px] font-serif-sc text-foreground">活跃热力图</span>
-            <span className="ml-auto text-[7px] text-muted-foreground">近 8 周</span>
-          </div>
-          <div className="flex gap-[2px] overflow-x-auto">
-            {heatmapData.map((week, wi) => (
-              <div key={wi} className="flex flex-col gap-[2px]">
-                {week.map((day, di) => (
-                  <div key={di} className="w-[8px] h-[8px] rounded-[1.5px]"
-                    style={{ background: getHeatColor(day.count) }}
-                    title={`${format(day.date, "MM-dd")}: ${day.count}`} />
-                ))}
+          {/* Energy Curve or Emotion mini-bar */}
+          <div className="bg-card border border-border rounded-xl p-3">
+            {energyLogs.length > 0 ? (
+              <>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Battery size={11} className="text-los-green" />
+                  <span className="text-[10px] font-serif-sc text-foreground">精力曲线</span>
+                </div>
+                <ResponsiveContainer width="100%" height={80}>
+                  <LineChart data={(() => {
+                    const levelToNum = (l: string) => l === '高' ? 3 : l === '中' ? 2 : l === '低' ? 1 : 0;
+                    const sevenDaysAgo = subDays(new Date(), 7);
+                    return energyLogs
+                      .filter(l => new Date(l.timestamp) >= sevenDaysAgo)
+                      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                      .map(l => ({ time: format(new Date(l.timestamp), "M/d"), level: levelToNum(l.level) }));
+                  })()}>
+                    <XAxis dataKey="time" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 7 }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[0, 3]} ticks={[1, 2, 3]} tickFormatter={(v: number) => ['', '低', '中', '高'][v] || ''}
+                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 7 }} axisLine={false} tickLine={false} width={20} />
+                    <Line type="monotone" dataKey="level" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 2 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </>
+            ) : emotionTrend.length > 1 ? (
+              <>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs">💫</span>
+                    <span className="text-[10px] font-serif-sc text-foreground">情绪波动</span>
+                  </div>
+                  <button onClick={() => navigate("/insights")} className="text-[8px] text-primary">详细 →</button>
+                </div>
+                <div className="flex items-end gap-[2px] h-[60px]">
+                  {emotionTrend.slice(-14).map((d, i) => (
+                    <div key={i} className="flex-1">
+                      <div className="w-full rounded-t transition-all"
+                        style={{
+                          height: `${(d.score / 10) * 56}px`,
+                          background: d.score >= 7 ? "hsl(var(--los-green))" : d.score >= 4 ? "hsl(var(--primary))" : "hsl(var(--destructive))",
+                          minHeight: "2px",
+                        }} />
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-[10px] text-muted-foreground/50">暂无精力/情绪数据</p>
               </div>
-            ))}
-          </div>
-          <div className="flex items-center justify-end gap-1 mt-1.5">
-            <span className="text-[6px] text-muted-foreground">少</span>
-            {[0, 0.2, 0.4, 0.65, 0.9].map((op, i) => (
-              <div key={i} className="w-[6px] h-[6px] rounded-[1px]"
-                style={{ background: i === 0 ? "hsl(var(--muted))" : `hsl(var(--primary) / ${op})` }} />
-            ))}
-            <span className="text-[6px] text-muted-foreground">多</span>
+            )}
           </div>
         </div>
 
-        {/* Compact Energy Curve */}
-        {energyLogs.length > 0 && (
-          <div className="bg-card border border-border rounded-2xl p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Battery size={12} className="text-los-green" />
-              <span className="text-[11px] font-serif-sc text-foreground">精力曲线</span>
-            </div>
-            <ResponsiveContainer width="100%" height={100}>
-              <LineChart data={(() => {
-                const levelToNum = (l: string) => l === '高' ? 3 : l === '中' ? 2 : l === '低' ? 1 : 0;
-                const sevenDaysAgo = subDays(new Date(), 7);
-                return energyLogs
-                  .filter(l => new Date(l.timestamp) >= sevenDaysAgo)
-                  .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-                  .map(l => ({ time: format(new Date(l.timestamp), "M/d"), level: levelToNum(l.level) }));
-              })()}>
-                <XAxis dataKey="time" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 8 }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 3]} ticks={[1, 2, 3]} tickFormatter={(v: number) => ['', '低', '中', '高'][v] || ''}
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 8 }} axisLine={false} tickLine={false} width={24} />
-                <Line type="monotone" dataKey="level" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* Diary Timeline - auto-extracted, editable */}
+        {/* Diary Timeline */}
         <DiaryTimeline entries={entries} today={today} />
 
-        {/* Category Pie - compact */}
-        <div className="bg-card border border-border rounded-2xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock size={12} className="text-primary" />
-            <span className="text-[11px] font-serif-sc text-foreground">时间分布</span>
-          </div>
-          {categoryData.length > 0 ? (
-            <div className="flex items-center gap-3">
-              <div className="relative w-[100px] h-[100px] flex-shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={categoryData} cx="50%" cy="50%" innerRadius={30} outerRadius={45} dataKey="value" stroke="none" paddingAngle={2}>
-                      {categoryData.map((entry, i) => (
-                        <Cell key={i} fill={CATEGORY_COLORS[entry.name] || CATEGORY_COLORS["其他"]} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-base font-mono-jb font-bold text-foreground">{stats.done}</span>
-                  <span className="text-[7px] text-muted-foreground">完成</span>
-                </div>
+        {/* Row 3: Stacked bar + Insight side by side */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {/* Stacked Bar */}
+          {activeCats.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <TrendingUp size={11} className="text-primary" />
+                <span className="text-[10px] font-serif-sc text-foreground">每日分类</span>
               </div>
-              <div className="flex-1 space-y-1.5">
-                {categoryData.slice(0, 5).map(d => {
-                  const total = categoryData.reduce((s, c) => s + c.value, 0);
-                  const pct = Math.round((d.value / total) * 100);
-                  return (
-                    <div key={d.name} className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: CATEGORY_COLORS[d.name] || CATEGORY_COLORS["其他"] }} />
-                      <span className="text-[10px] text-foreground flex-1">{d.name}</span>
-                      <span className="text-[9px] font-mono-jb text-muted-foreground">{pct}%</span>
-                    </div>
-                  );
-                })}
+              <div className="h-[90px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stackedDailyData} margin={{ top: 2, right: 2, bottom: 2, left: -25 }}>
+                    <XAxis dataKey="date" tick={{ fontSize: 7, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis tick={{ fontSize: 7, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
+                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 9 }} />
+                    {activeCats.map(cat => (
+                      <Bar key={cat} dataKey={cat} stackId="a" fill={CATEGORY_COLORS[cat] || CATEGORY_COLORS["其他"]} radius={0} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
-          ) : (
-            <p className="text-[11px] text-muted-foreground/50 text-center py-4">暂无数据</p>
+          )}
+
+          {/* Smart Insight */}
+          {stats.topCategory !== "无数据" && (
+            <div className="bg-card border border-primary/20 rounded-xl p-3 flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs">📊</span>
+                <span className="text-[10px] font-serif-sc text-foreground">洞察</span>
+              </div>
+              <p className="text-[10px] text-foreground/90 leading-relaxed">
+                这{range === "today" ? "天" : range === "week" ? "周" : "月"}你在「{stats.topCategory}」上花了最多精力
+                {stats.done > 0 && `，完成了 ${stats.done} 项任务`}。
+                {productivityScore >= 70 && " 效率非常棒！🎯"}
+                {productivityScore >= 40 && productivityScore < 70 && " 节奏不错，可以再聚焦一些。"}
+                {productivityScore < 40 && " 试试集中精力在最重要的事上？"}
+              </p>
+            </div>
           )}
         </div>
 
-        {/* Stacked Bar - compact */}
-        {activeCats.length > 0 && (
-          <div className="bg-card border border-border rounded-2xl p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp size={12} className="text-primary" />
-              <span className="text-[11px] font-serif-sc text-foreground">每日分类</span>
-            </div>
-            <div className="h-[120px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stackedDailyData} margin={{ top: 2, right: 2, bottom: 2, left: -25 }}>
-                  <XAxis dataKey="date" tick={{ fontSize: 7, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis tick={{ fontSize: 7, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
-                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 10 }} />
-                  {activeCats.map(cat => (
-                    <Bar key={cat} dataKey={cat} stackId="a" fill={CATEGORY_COLORS[cat] || CATEGORY_COLORS["其他"]} radius={0} />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
-        {/* Emotion mini-bar */}
-        {emotionTrend.length > 1 && (
-          <div className="bg-card border border-border rounded-2xl p-3">
-            <div className="flex items-center justify-between mb-2">
+        {/* Emotion bar (if energy exists, show emotion separately) */}
+        {energyLogs.length > 0 && emotionTrend.length > 1 && (
+          <div className="bg-card border border-border rounded-xl p-3">
+            <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-sm">💫</span>
-                <span className="text-[11px] font-serif-sc text-foreground">情绪波动</span>
+                <span className="text-xs">💫</span>
+                <span className="text-[10px] font-serif-sc text-foreground">情绪波动</span>
               </div>
-              <button onClick={() => navigate("/insights")} className="text-[9px] text-primary">详细 →</button>
+              <button onClick={() => navigate("/insights")} className="text-[8px] text-primary">详细 →</button>
             </div>
-            <div className="flex items-end gap-[2px] h-[36px]">
+            <div className="flex items-end gap-[2px] h-[28px]">
               {emotionTrend.slice(-14).map((d, i) => (
                 <div key={i} className="flex-1">
                   <div className="w-full rounded-t transition-all"
                     style={{
-                      height: `${(d.score / 10) * 32}px`,
+                      height: `${(d.score / 10) * 24}px`,
                       background: d.score >= 7 ? "hsl(var(--los-green))" : d.score >= 4 ? "hsl(var(--primary))" : "hsl(var(--destructive))",
                       minHeight: "2px",
                     }} />
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Smart Insight */}
-        {stats.topCategory !== "无数据" && (
-          <div className="bg-card border border-primary/20 rounded-2xl p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm">📊</span>
-              <span className="text-[11px] font-serif-sc text-foreground">洞察</span>
-            </div>
-            <p className="text-[11px] text-foreground/90 leading-relaxed">
-              这{range === "today" ? "天" : range === "week" ? "周" : "月"}你在「{stats.topCategory}」上花了最多精力
-              {stats.done > 0 && `，完成了 ${stats.done} 项任务`}。
-              {productivityScore >= 70 && " 效率非常棒！🎯"}
-              {productivityScore >= 40 && productivityScore < 70 && " 节奏不错，可以再聚焦一些。"}
-              {productivityScore < 40 && " 试试集中精力在最重要的事上？"}
-            </p>
           </div>
         )}
 
