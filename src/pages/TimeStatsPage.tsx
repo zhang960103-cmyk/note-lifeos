@@ -40,7 +40,7 @@ type TimeBlock = {
 
 export default function TimeStatsPage() {
   const navigate = useNavigate();
-  const { entries, allTodos } = useLifeOs();
+  const { entries, allTodos, energyLogs } = useLifeOs();
   const [range, setRange] = useState<TimeRange>("week");
   const [touchStart, setTouchStart] = useState(0);
 
