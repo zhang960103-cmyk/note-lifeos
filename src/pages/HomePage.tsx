@@ -662,7 +662,7 @@ const HomePage = () => {
           </div>
           <div className="flex gap-3 text-center mb-4">
             <div className="flex-1 bg-surface-2 rounded-lg py-2">
-              <div className="text-[10px] text-muted-foreground">收入</div>
+              <div className="text-[10px] text-muted-foreground">{t("home.finance.income")}</div>
               <div className="text-sm text-los-green font-mono-jb">¥{todayFinanceStats.income}</div>
             </div>
             <div className="flex-1 bg-surface-2 rounded-lg py-2">
