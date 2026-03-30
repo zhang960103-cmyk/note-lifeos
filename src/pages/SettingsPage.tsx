@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Sun, Moon, LogOut, BookOpen, Info, ChevronRight, Globe, Download, Bot, Search, Check } from "lucide-react";
+import { ArrowLeft, Sun, Moon, LogOut, BookOpen, Info, ChevronRight, Globe, Download, Bot, Search, Check, Plus, Trash2, ChevronDown, ChevronUp, Sparkles, Zap, Shield, Pencil } from "lucide-react";
 import { useTheme, ACCENT_OPTIONS, type ThemeMode } from "@/contexts/ThemeContext";
 import { useLanguage, LANGUAGES } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,8 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
 import DataExport from "@/components/DataExport";
 import GlobalSearch from "@/components/GlobalSearch";
+import { useModelProfiles, type ModelProfile } from "@/hooks/useModelProfiles";
 
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.2.0";
 
 const CURRENCY_OPTIONS = [
   { key: "CNY", symbol: "¥", label: "人民币 (CNY)" },
@@ -21,6 +22,13 @@ const CURRENCY_OPTIONS = [
   { key: "RUB", symbol: "₽", label: "卢布 (RUB)" },
 ];
 
+const USAGE_TAG_LABELS: Record<string, { icon: string; label: string }> = {
+  chat: { icon: "💬", label: "日记/对话" },
+  cheap: { icon: "⚡", label: "效率/整理" },
+  private: { icon: "🔒", label: "本地/私有" },
+  extract: { icon: "🔍", label: "数据提取" },
+};
+
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { mode, accent, setMode, setAccent } = useTheme();
@@ -28,32 +36,27 @@ export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-
-  // AI config
-  const [aiBaseUrl, setAiBaseUrl] = useState("");
-  const [aiModel, setAiModel] = useState("");
-  const [aiApiKey, setAiApiKey] = useState("");
-  const [aiSaving, setAiSaving] = useState(false);
-  const [showAiConfig, setShowAiConfig] = useState(false);
-
-  // Currency
-  const [currency, setCurrency] = useState("CNY");
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
   // Profile
   const [displayName, setDisplayName] = useState("");
   const [showProfile, setShowProfile] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [currency, setCurrency] = useState("CNY");
+
+  // AI Models
+  const { profiles, loading: modelsLoading, setDefault, updateProfile, addProfile, deleteProfile } = useModelProfiles();
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newProfile, setNewProfile] = useState({ name: "", description: "", base_url: "", model: "", api_key_encrypted: "", usage_tag: "chat", is_default: false });
 
   // Load profile
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("ai_base_url, ai_model, ai_api_key_encrypted, currency, display_name").eq("id", user.id).single()
+    supabase.from("profiles").select("currency, display_name").eq("id", user.id).single()
       .then(({ data }) => {
         if (data) {
-          setAiBaseUrl(data.ai_base_url || "");
-          setAiModel(data.ai_model || "");
-          setAiApiKey(data.ai_api_key_encrypted ? atob(data.ai_api_key_encrypted) : "");
           setCurrency(data.currency || "CNY");
           setDisplayName(data.display_name || "");
         }
@@ -64,17 +67,6 @@ export default function SettingsPage() {
     if (confirm(t("auth.confirm_logout"))) {
       await signOut();
     }
-  };
-
-  const saveAiConfig = async () => {
-    if (!user) return;
-    setAiSaving(true);
-    await supabase.from("profiles").update({
-      ai_base_url: aiBaseUrl || null,
-      ai_model: aiModel || null,
-      ai_api_key_encrypted: aiApiKey ? btoa(aiApiKey) : null,
-    }).eq("id", user.id);
-    setAiSaving(false);
   };
 
   const saveCurrency = async (c: string) => {
@@ -91,8 +83,15 @@ export default function SettingsPage() {
     setTimeout(() => setProfileSaved(false), 2000);
   };
 
+  const handleAddProfile = async () => {
+    await addProfile(newProfile);
+    setNewProfile({ name: "", description: "", base_url: "", model: "", api_key_encrypted: "", usage_tag: "chat", is_default: false });
+    setShowAddForm(false);
+  };
+
   const currentLang = LANGUAGES.find(l => l.key === lang);
   const currentCurrency = CURRENCY_OPTIONS.find(c => c.key === currency);
+  const defaultProfile = profiles.find(p => p.is_default);
 
   if (showSearch) return <GlobalSearch onClose={() => setShowSearch(false)} />;
 
@@ -129,7 +128,7 @@ export default function SettingsPage() {
             {showProfile && (
               <div className="p-3 border-b border-border space-y-2">
                 <div>
-                  <p className="text-[10px] text-muted-foreground mb-1">{t("settings.nickname") || "昵称"}</p>
+                  <p className="text-[10px] text-muted-foreground mb-0.5">{t("settings.nickname") || "昵称"}</p>
                   <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="输入昵称"
                     className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary" />
                 </div>
@@ -143,11 +142,10 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Language & Currency - combined row */}
+        {/* Language & Currency */}
         <section>
           <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{t("settings.regional") || "地区与语言"}</p>
           <div className="bg-card border border-border rounded-xl">
-            {/* Language */}
             <div className="relative">
               <button onClick={() => { setShowLangPicker(!showLangPicker); setShowCurrencyPicker(false); }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-border hover:bg-accent transition rounded-t-xl">
@@ -170,7 +168,6 @@ export default function SettingsPage() {
                 </>
               )}
             </div>
-            {/* Currency */}
             <div className="relative">
               <button onClick={() => { setShowCurrencyPicker(!showCurrencyPicker); setShowLangPicker(false); }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition rounded-b-xl">
@@ -223,37 +220,144 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* AI Config */}
+        {/* AI Model Profiles */}
         <section>
           <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">🤖 AI 模型</p>
           <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <button onClick={() => setShowAiConfig(!showAiConfig)} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition">
-              <Bot size={14} className="text-muted-foreground" />
-              <span className="text-xs text-foreground flex-1">{aiBaseUrl ? "自定义模型" : "默认模型"}</span>
-              <ChevronRight size={14} className="text-muted-foreground" />
+            {/* Simple card selection */}
+            {modelsLoading ? (
+              <div className="px-4 py-6 text-center text-xs text-muted-foreground">加载中...</div>
+            ) : (
+              <div className="p-3 space-y-2">
+                {profiles.map(p => {
+                  const tagInfo = USAGE_TAG_LABELS[p.usage_tag] || { icon: "🔧", label: p.usage_tag };
+                  const isActive = p.is_default;
+                  return (
+                    <button key={p.id} onClick={() => setDefault(p.id)}
+                      className={`w-full text-left p-3 rounded-xl border transition-all ${
+                        isActive
+                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                          : "border-border hover:border-muted-foreground/30 hover:bg-accent"
+                      }`}>
+                      <div className="flex items-start gap-2.5">
+                        <span className="text-lg mt-0.5">{tagInfo.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-foreground">{p.name}</span>
+                            {isActive && (
+                              <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">默认</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{p.description}</p>
+                          {p.base_url && (
+                            <p className="text-[9px] text-muted-foreground/60 mt-0.5 font-mono-jb truncate">{p.model} · 自定义</p>
+                          )}
+                          {!p.base_url && (
+                            <p className="text-[9px] text-muted-foreground/60 mt-0.5 font-mono-jb truncate">{p.model}</p>
+                          )}
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 ${
+                          isActive ? "border-primary bg-primary" : "border-muted-foreground/30"
+                        }`}>
+                          {isActive && <Check size={10} className="text-primary-foreground" />}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Advanced toggle */}
+            <button onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full flex items-center justify-center gap-1.5 px-4 py-2 border-t border-border text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent transition">
+              {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              高级设置
             </button>
-            {showAiConfig && (
-              <div className="p-3 border-t border-border space-y-2">
-                {[
-                  { label: "Base URL", value: aiBaseUrl, set: setAiBaseUrl, placeholder: "https://api.openclaw.ai/v1" },
-                  { label: "模型", value: aiModel, set: setAiModel, placeholder: "gpt-4o" },
-                ].map(f => (
-                  <div key={f.label}>
-                    <p className="text-[9px] text-muted-foreground mb-0.5">{f.label}</p>
-                    <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder}
-                      className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary" />
+
+            {/* Advanced panel */}
+            {showAdvanced && (
+              <div className="border-t border-border p-3 space-y-3">
+                {profiles.map(p => (
+                  <div key={p.id} className="bg-muted/50 border border-border rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-foreground">{p.name}</span>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setEditingId(editingId === p.id ? null : p.id)}
+                          className="p-1 hover:bg-accent rounded-lg transition text-muted-foreground hover:text-foreground">
+                          <Pencil size={12} />
+                        </button>
+                        {!p.is_system && (
+                          <button onClick={() => deleteProfile(p.id)}
+                            className="p-1 hover:bg-destructive/10 rounded-lg transition text-muted-foreground hover:text-destructive">
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {editingId === p.id && (
+                      <div className="space-y-1.5">
+                        <FieldInput label="名称" value={p.name}
+                          onChange={v => updateProfile(p.id, { name: v })} />
+                        <FieldInput label="说明" value={p.description}
+                          onChange={v => updateProfile(p.id, { description: v })} />
+                        <FieldInput label="Base URL" value={p.base_url} placeholder="留空使用默认网关"
+                          onChange={v => updateProfile(p.id, { base_url: v })} />
+                        <FieldInput label="模型" value={p.model} placeholder="google/gemini-3-flash-preview"
+                          onChange={v => updateProfile(p.id, { model: v })} />
+                        <FieldInput label="API Key" value={p.api_key_encrypted ? "••••••" : ""} placeholder="留空使用默认密钥" type="password"
+                          onChange={v => { if (v !== "••••••") updateProfile(p.id, { api_key_encrypted: v ? btoa(v) : "" }); }} />
+                        <div>
+                          <p className="text-[9px] text-muted-foreground mb-0.5">用途标签</p>
+                          <div className="flex gap-1 flex-wrap">
+                            {Object.entries(USAGE_TAG_LABELS).map(([tag, info]) => (
+                              <button key={tag} onClick={() => updateProfile(p.id, { usage_tag: tag })}
+                                className={`text-[9px] px-2 py-1 rounded-lg transition ${p.usage_tag === tag ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+                                {info.icon} {info.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
-                <div>
-                  <p className="text-[9px] text-muted-foreground mb-0.5">API Key</p>
-                  <input type="password" value={aiApiKey} onChange={e => setAiApiKey(e.target.value)} placeholder="sk-..."
-                    className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary" />
-                </div>
-                <button onClick={saveAiConfig} disabled={aiSaving}
-                  className="w-full bg-primary text-primary-foreground text-xs py-2 rounded-lg disabled:opacity-50">
-                  {aiSaving ? "保存中..." : "保存"}
-                </button>
-                <p className="text-[8px] text-muted-foreground/60">支持 OpenAI 兼容格式 API（OpenClaw、Ollama 等）</p>
+
+                {/* Add new profile */}
+                {showAddForm ? (
+                  <div className="bg-muted/50 border border-dashed border-primary/30 rounded-xl p-3 space-y-1.5">
+                    <p className="text-xs font-medium text-foreground mb-2">新增模型预设</p>
+                    <FieldInput label="名称" value={newProfile.name} placeholder="我的自定义模型"
+                      onChange={v => setNewProfile(p => ({ ...p, name: v }))} />
+                    <FieldInput label="说明" value={newProfile.description} placeholder="用途简介"
+                      onChange={v => setNewProfile(p => ({ ...p, description: v }))} />
+                    <FieldInput label="Base URL" value={newProfile.base_url} placeholder="https://api.openclaw.ai/v1"
+                      onChange={v => setNewProfile(p => ({ ...p, base_url: v }))} />
+                    <FieldInput label="模型" value={newProfile.model} placeholder="gpt-4o"
+                      onChange={v => setNewProfile(p => ({ ...p, model: v }))} />
+                    <FieldInput label="API Key" value={newProfile.api_key_encrypted} placeholder="sk-..." type="password"
+                      onChange={v => setNewProfile(p => ({ ...p, api_key_encrypted: v ? btoa(v) : "" }))} />
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={handleAddProfile} disabled={!newProfile.name || !newProfile.model}
+                        className="flex-1 text-xs bg-primary text-primary-foreground py-1.5 rounded-lg disabled:opacity-50">
+                        保存
+                      </button>
+                      <button onClick={() => setShowAddForm(false)}
+                        className="text-xs text-muted-foreground px-3 py-1.5 hover:text-foreground">
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowAddForm(true)}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-border rounded-xl text-xs text-muted-foreground hover:text-foreground hover:border-muted-foreground/30 transition">
+                    <Plus size={12} /> 新增模型预设
+                  </button>
+                )}
+
+                <p className="text-[8px] text-muted-foreground/60 text-center">
+                  支持 OpenAI 兼容格式 API · 留空 Base URL 和 API Key 将使用内置网关
+                </p>
               </div>
             )}
           </div>
@@ -289,6 +393,24 @@ export default function SettingsPage() {
           <p className="text-[9px] text-muted-foreground">{t("settings.app_desc")}</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FieldInput({ label, value, placeholder, type, onChange }: {
+  label: string; value: string; placeholder?: string; type?: string;
+  onChange: (v: string) => void;
+}) {
+  const [localVal, setLocalVal] = useState(value);
+  useEffect(() => setLocalVal(value), [value]);
+  return (
+    <div>
+      <p className="text-[9px] text-muted-foreground mb-0.5">{label}</p>
+      <input type={type || "text"} value={localVal}
+        onChange={e => setLocalVal(e.target.value)}
+        onBlur={() => { if (localVal !== value) onChange(localVal); }}
+        placeholder={placeholder}
+        className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary" />
     </div>
   );
 }

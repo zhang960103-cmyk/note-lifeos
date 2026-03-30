@@ -11,6 +11,7 @@ export async function streamChat({
   onDelta,
   onDone,
   signal,
+  modelProfileId,
 }: {
   messages: ChatMsg[];
   mode?: ChatMode;
@@ -19,6 +20,7 @@ export async function streamChat({
   onDelta: (text: string) => void;
   onDone: () => void;
   signal?: AbortSignal;
+  modelProfileId?: string;
 }) {
   const resp = await fetch(CHAT_URL, {
     method: "POST",
@@ -26,7 +28,7 @@ export async function streamChat({
       "Content-Type": "application/json",
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ messages, mode, memoryContext, patterns }),
+    body: JSON.stringify({ messages, mode, memoryContext, patterns, modelProfileId }),
     signal,
   });
 
