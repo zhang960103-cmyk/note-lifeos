@@ -343,7 +343,7 @@ const TodoPage = () => {
               </Section>
             )}
           </div>
-        ) : (
+        ) : view === "matrix" ? (
           /* Matrix view */
           <div className="grid grid-cols-2 gap-2">
             {eisenhower.map(q => (
@@ -366,6 +366,9 @@ const TodoPage = () => {
               </div>
             ))}
           </div>
+        ) : (
+          /* Timeline view - integrated from diary */
+          <InlineTimeline entries={entries} allTodos={allTodos} todayKey={todayKey} updateTodo={updateTodo} />
         )}
       </div>
 
