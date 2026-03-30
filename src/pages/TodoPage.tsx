@@ -193,15 +193,19 @@ const TodoPage = () => {
           {streak > 0 && <p className="text-[10px] text-muted-foreground flex items-center gap-1"><Flame size={10} className="text-primary" />{streak}天连续完成</p>}
         </div>
         <div className="flex items-center gap-1.5">
-          <button onClick={() => setView(view === "list" ? "matrix" : "list")}
-            className="p-2 rounded-lg hover:bg-muted transition text-muted-foreground hover:text-foreground"
-            title={view === "list" ? "矩阵视图" : "列表视图"}>
-            {view === "list" ? <LayoutGrid size={16} /> : <List size={16} />}
-          </button>
-          <button onClick={() => navigate("/time-stats")}
-            className="p-2 rounded-lg hover:bg-muted transition text-muted-foreground hover:text-foreground" title="时间统计">
-            <BarChart3 size={16} />
-          </button>
+          <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
+            {([
+              { key: "list" as const, icon: <List size={14} />, label: "列表" },
+              { key: "matrix" as const, icon: <LayoutGrid size={14} />, label: "矩阵" },
+              { key: "timeline" as const, icon: <CalendarClock size={14} />, label: "时间线" },
+            ]).map(v => (
+              <button key={v.key} onClick={() => setView(v.key)}
+                className={`p-1.5 rounded-md transition text-xs flex items-center gap-1 ${view === v.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                title={v.label}>
+                {v.icon}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
