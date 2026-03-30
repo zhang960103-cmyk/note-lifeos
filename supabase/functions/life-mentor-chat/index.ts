@@ -166,14 +166,17 @@ priority智能评估规则（按优先级矩阵）：
 - 「月底前」→ 本月最后一天
 - 「下午3点」→ dueTime=15:00
 
-financeHints提取规则（极其重要！）：
-- 只提取用户明确表示自己支付/收到的金额
-- 如果用户只是抱怨某个价格贵/便宜，但没有明确说"我花了/我付了/我买了"，不要提取为支出
-- 例如："两个人吃了84块太贵了"≠用户花了84，可能是AA或对方请客，除非用户明确说"我请的"或"我花的"
-- 例如："小宝转给我500"→ income；"我给房东转了2000"→ expense
-- 工资/课时费等固定收入，如果用户没提到具体金额，不要猜测金额，返回空数组
-- 如果金额不明确或支付主体不明确，宁可不提取，返回空数组 []
-- 多币种支持：识别 $、€、¥、£、AED、SAR 等货币符号和名称，在 currency 字段标注货币代码（如 USD、EUR、CNY），默认 CNY
+financeHints提取规则（极其重要！必须严格遵守！）：
+- ⚠️ 宁可漏记也绝不误记！当有任何不确定时，返回空数组 []
+- 只提取用户以第一人称明确表示自己支付/收到的金额（"我花了"、"我买了"、"我付了"、"收到了"、"赚了"）
+- 如果用户只是描述价格、讨论费用、抱怨贵/便宜，但没有第一人称支付动词，绝对不提取
+- 如果用户在讨论计划中的消费（"打算买"、"想花"、"准备投"），不提取——只有已完成的实际交易才提取
+- 如果是精力记录、情绪记录、待办讨论等非财务场景，financeHints 必须返回空数组 []
+- 例如："两个人吃了84块"≠用户花了84（可能AA或对方请客），除非用户说"我请的/我付的"
+- 例如："当前精力：中" → financeHints: []（这是精力记录，不是财务）
+- 例如："今天心情不好" → financeHints: []
+- 工资/课时费等固定收入，如果用户没提到具体金额，不要猜测，返回空数组
+- 多币种支持：识别 $、€、¥、£、AED、SAR 等，在 currency 字段标注货币代码，默认 CNY
 
 goalHints 规则：
 - 如果用户的对话提到了某个目标相关的行动（如"写了课程大纲"可能对应KR"完成3门课程"），在 goalHints 里标注
@@ -564,15 +567,13 @@ serve(async (req) => {
       systemContent += `当对话内容和过去记录有关联时，像真正认识这个人的朋友一样自然提及，`;
       systemContent += `例如：「你上次提到XXX，后来怎么样了？」但不要每次都刻意提及记忆，只在真正相关时提。`;
       
-      // Energy-aware task recommendations
       if (memoryContext.includes('精力记录')) {
         systemContent += `\n\n【精力感知任务推荐】
 当用户记录精力状态时，根据精力水平推荐适合的任务类型：
 - 高精力 → 建议深度工作（写课程、做产品、系统设计、复杂学习）
 - 中精力 → 建议创意型任务（写脚本、发帖、内容创作、规划）
 - 低精力 → 建议轻量任务（回消息、整理资料、简单行政事务）
-- 如果用户连续多天低精力，主动询问是否需要调整今天的待办优先级，把重任务往后挪。
-- 如果用户记录低精力，温和建议："要不要把今天的重任务往后挪，先处理轻量的？"`;
+- 如果用户连续多天低精力，主动询问是否需要调整今天的待办优先级。`;
       }
     }
     if (patterns) {
@@ -588,16 +589,19 @@ serve(async (req) => {
 请以"月度回信"形式回复。像老朋友写信，不用格式标记。包含这个月的整体感受、一个关键洞察、下个月的一个建议。控制在300字内。在末尾附上1-2个适合用户当前阶段的学习资源推荐。`;
     }
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
+    // Use custom AI config for chat mode too
+    const chatUrl = useCustom ? `${customBaseUrl}/chat/completions` : "https://ai.gateway.lovable.dev/v1/chat/completions";
+    const chatKey = useCustom ? customApiKey : LOVABLE_API_KEY;
+    const chatModel = useCustom ? (customModel || "google/gemini-3-flash-preview") : "google/gemini-3-flash-preview";
+
+    const response = await fetch(chatUrl, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${chatKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: chatModel,
           messages: [
             { role: "system", content: systemContent },
             ...messages,

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type ChangeEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Send, Loader2, DollarSign, X, Clock, Settings, Zap, Brain, Mic } from "lucide-react";
+import { Send, Loader2, X, Clock, Settings, Mic, Plus, Zap, Brain, DollarSign } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat, extractMeta, type ChatMsg, type ExtractResult } from "@/lib/streamChat";
 import { updateKRProgressFromGoalHints } from "@/pages/GoalsPage";
@@ -53,6 +53,7 @@ const HomePage = () => {
   const [brainDumpText, setBrainDumpText] = useState("");
   const [showFocusPicker, setShowFocusPicker] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
+  const [showToolMenu, setShowToolMenu] = useState(false);
   const canUseVoice = typeof window !== "undefined"
     && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
   const [showTagHint, setShowTagHint] = useState(false);
@@ -663,52 +664,53 @@ const HomePage = () => {
         </button>
       </div>
 
-      {/* Input */}
-      <div className="px-4 py-3 pb-2">
-        <div className="flex gap-2 items-end">
-          <button
-            onClick={() => setShowEnergyPicker(!showEnergyPicker)}
-            className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
-            title="记录精力"
-          >
-            <Zap size={18} />
-          </button>
-          <button
-            onClick={() => setShowFinance(!showFinance)}
-            className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
-          >
-            <DollarSign size={18} />
-          </button>
-          <button
-            onClick={() => setShowBrainDump(true)}
-            className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
-            title="脑清空"
-          >
-            <Brain size={18} />
-          </button>
-          {canUseVoice && (
+      {/* Input area - consolidated */}
+      <div className="px-3 py-2 pb-1">
+        <div className="flex gap-1.5 items-end">
+          {/* Tools toggle */}
+          <div className="relative flex-shrink-0">
             <button
-              onClick={() => setShowVoice(true)}
-              className="text-muted-foreground hover:text-gold transition-colors p-2.5 flex-shrink-0"
-              title="语音输入"
+              onClick={() => setShowToolMenu(v => !v)}
+              className={`p-2 rounded-full transition-all ${showToolMenu ? "bg-primary text-primary-foreground rotate-45" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
             >
-              <Mic size={18} />
+              <Plus size={18} />
             </button>
-          )}
+            {showToolMenu && (
+              <div className="absolute bottom-12 left-0 bg-popover border border-border rounded-xl shadow-lg p-1.5 flex gap-1 z-50 animate-in fade-in slide-in-from-bottom-2">
+                <button onClick={() => { setShowToolMenu(false); setShowEnergyPicker(true); }} className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg hover:bg-accent transition" title="精力">
+                  <Zap size={16} className="text-primary" /><span className="text-[9px] text-muted-foreground">精力</span>
+                </button>
+                <button onClick={() => { setShowToolMenu(false); setShowFinance(true); }} className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg hover:bg-accent transition" title="记账">
+                  <DollarSign size={16} className="text-primary" /><span className="text-[9px] text-muted-foreground">记账</span>
+                </button>
+                <button onClick={() => { setShowToolMenu(false); setShowBrainDump(true); }} className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg hover:bg-accent transition" title="脑清空">
+                  <Brain size={16} className="text-primary" /><span className="text-[9px] text-muted-foreground">脑清空</span>
+                </button>
+              </div>
+            )}
+          </div>
           <textarea
             ref={textareaRef}
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
             placeholder={t("home.input.placeholder")}
-            rows={3}
-            className="flex-1 bg-surface-2 border border-border rounded-2xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:border-gold-border transition-colors leading-[1.8]"
-            style={{ minHeight: "72px", maxHeight: "160px" }}
+            rows={2}
+            className="flex-1 bg-muted border border-border rounded-2xl px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:border-primary transition-colors leading-relaxed"
+            style={{ minHeight: "44px", maxHeight: "120px" }}
           />
+          {canUseVoice && (
+            <button
+              onClick={() => setShowVoice(true)}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition flex-shrink-0"
+            >
+              <Mic size={18} />
+            </button>
+          )}
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || isLoading}
-            className="bg-gold text-background rounded-full p-2.5 disabled:opacity-20 hover:bg-gold/90 transition-all flex-shrink-0"
+            className="bg-primary text-primary-foreground rounded-full p-2 disabled:opacity-20 hover:bg-primary/90 transition-all flex-shrink-0"
           >
             {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
           </button>
