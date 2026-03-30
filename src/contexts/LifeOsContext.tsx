@@ -46,6 +46,7 @@ export function LifeOsProvider({ children, userId }: { children: ReactNode; user
   const { onboarded, completeOnboarding } = useOnboarding(userId);
   const { entries: financeEntries, addEntry: addFinanceEntry, deleteEntry: deleteFinanceEntry, updateEntry: updateFinanceEntry, todayStats: todayFinanceStats, monthStats: monthFinanceStats } = useFinance(userId);
   const { habits, addHabit, checkIn: checkInHabit, deleteHabit } = useHabits(userId);
+  const { logs: energyLogs, addLog: addEnergyLog, recentSummary: energySummary, consecutiveLowDays } = useEnergyLogs(userId);
 
   return (
     <LifeOsContext.Provider value={{
