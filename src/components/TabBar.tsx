@@ -9,6 +9,7 @@ export default function TabBar() {
   const tabs = [
     { path: "/", icon: "🧭", labelKey: "tab.today" },
     { path: "/todos", icon: "✅", labelKey: "tab.todo" },
+    { path: "/time-stats", icon: "⏰", labelKey: "tab.time" },
     { path: "/wheel", icon: "⚖️", labelKey: "tab.compass" },
     { path: "/wealth", icon: "💰", labelKey: "tab.wealth" },
   ];
