@@ -559,7 +559,7 @@ const HomePage = () => {
             <span key={t} className="text-[9px] bg-gold-light text-gold px-2 py-0.5 rounded-full whitespace-nowrap">{t}</span>
           ))}
           <span className={`text-[9px] text-muted-foreground/50 whitespace-nowrap transition-opacity duration-500 ${showTagHint ? "opacity-100" : "opacity-0"}`}>
-            AI 自动提取
+            {t("home.tag_hint")}
           </span>
         </div>
       )}
