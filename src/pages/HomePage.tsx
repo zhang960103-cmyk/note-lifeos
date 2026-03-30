@@ -704,7 +704,7 @@ const HomePage = () => {
               <X size={16} />
             </button>
           </div>
-          <p className="px-4 text-[10px] text-muted-foreground mb-2">随便倒，罗盘会自动整理成待办、记录时间和财务</p>
+          <p className="px-4 text-[10px] text-muted-foreground mb-2">{t("home.braindump.desc")}</p>
           <textarea
             value={brainDumpText}
             onChange={e => setBrainDumpText(e.target.value)}
