@@ -12,8 +12,7 @@ const PRIORITY_CONFIG: Record<Priority, { label: string; emoji: string; color: s
   low: { label: "可选", emoji: "⚪", color: "text-muted-foreground" },
 };
 
-type TabKey = "smart" | "matrix" | "habits";
-type StatusColumn = "todo" | "doing" | "done";
+type TabKey = "smart" | "matrix" | "habits" | "templates";
 
 const COLUMN_CONFIG: Record<StatusColumn, { label: string; emoji: string; bg: string }> = {
   todo: { label: "待办", emoji: "📋", bg: "border-gold/30" },
