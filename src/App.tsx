@@ -99,7 +99,10 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <AuthGate />
+          <Routes>
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="*" element={<AuthGate />} />
+          </Routes>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
