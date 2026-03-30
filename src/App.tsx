@@ -18,6 +18,7 @@ import InsightsPage from "@/pages/InsightsPage";
 import GoalsPage from "@/pages/GoalsPage";
 import TimeStatsPage from "@/pages/TimeStatsPage";
 import AuthPage from "@/pages/AuthPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import NotFound from "@/pages/NotFound";
 import Onboarding from "@/components/Onboarding";
 import InstallBanner from "@/components/InstallBanner";
@@ -97,7 +98,10 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <AuthGate />
+          <Routes>
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="*" element={<AuthGate />} />
+          </Routes>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

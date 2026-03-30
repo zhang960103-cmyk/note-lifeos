@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
-import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
+import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, addDays } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line, CartesianGrid } from "recharts";
-import { ArrowLeft, Clock, TrendingUp, Sparkles, Loader2, CalendarClock, Flame, Target, Zap, Battery } from "lucide-react";
-
+import { ArrowLeft, Clock, TrendingUp, Sparkles, Loader2, CalendarClock, Flame, Target, Zap, Battery, Search, Timer, Plus } from "lucide-react";
+import QuickTimeEntry from "@/components/QuickTimeEntry";
 const CATEGORY_COLORS: Record<string, string> = {
   "工作": "hsl(39 58% 53%)",
   "学习": "hsl(211 55% 60%)",
@@ -43,6 +43,10 @@ export default function TimeStatsPage() {
   const { entries, allTodos, energyLogs } = useLifeOs();
   const [range, setRange] = useState<TimeRange>("week");
   const [touchStart, setTouchStart] = useState(0);
+  const [showQuickEntry, setShowQuickEntry] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [viewMode, setViewMode] = useState<"overview" | "week">("overview");
 
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -206,6 +210,67 @@ export default function TimeStatsPage() {
     return Array.from(cats);
   }, [stackedDailyData]);
 
+  // Search filter
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return allTodos.filter(t => {
+      const text = t.text.toLowerCase();
+      const note = (t.note || "").toLowerCase();
+      const tags = (t.tags || []).join(" ").toLowerCase();
+      return text.includes(q) || note.includes(q) || tags.includes(q);
+    }).slice(0, 20);
+  }, [allTodos, searchQuery]);
+
+  // Week view data - 7 days, 24h per day, color blocks
+  const weekViewData = useMemo(() => {
+    const now = new Date();
+    const ws = startOfWeek(now, { weekStartsOn: 1 });
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = addDays(ws, i);
+      const dateStr = format(d, "yyyy-MM-dd");
+      const dayTodos = allTodos.filter(t => {
+        const td = t.completedAt?.split("T")[0] || t.sourceDate || "";
+        return td === dateStr && t.status === "done";
+      });
+      // Parse time blocks from notes
+      const blocks = dayTodos.map(t => {
+        const cat = categorize(t);
+        const timeMatch = t.note?.match(/⏱\s*(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+        if (timeMatch) {
+          const [, start, end] = timeMatch;
+          const [sh, sm] = start.split(":").map(Number);
+          const [eh, em] = end.split(":").map(Number);
+          return { startHour: sh + sm / 60, endHour: eh + em / 60, category: cat, text: t.text };
+        }
+        return null;
+      }).filter(Boolean);
+      return { date: dateStr, label: ["一", "二", "三", "四", "五", "六", "日"][i], blocks };
+    });
+    return days;
+  }, [allTodos]);
+
+  // Time disc data - 24h clock visualization
+  const timeDiscData = useMemo(() => {
+    const todayTodos = allTodos.filter(t => {
+      const td = t.completedAt?.split("T")[0] || t.sourceDate || "";
+      return td === today && t.status === "done";
+    });
+    return todayTodos.map(t => {
+      const cat = categorize(t);
+      const timeMatch = t.note?.match(/⏱\s*(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+      if (timeMatch) {
+        const [, start, end] = timeMatch;
+        const [sh, sm] = start.split(":").map(Number);
+        const [eh, em] = end.split(":").map(Number);
+        const startAngle = ((sh + sm / 60) / 24) * 360 - 90;
+        const endAngle = ((eh + em / 60) / 24) * 360 - 90;
+        return { startAngle, endAngle, category: cat, text: t.text, time: `${start}-${end}` };
+      }
+      return null;
+    }).filter(Boolean);
+  }, [allTodos, today]);
+
   const getHeatColor = (count: number) => {
     if (count === 0) return "hsl(30 25% 8%)";
     const intensity = count / maxActivity;
@@ -233,26 +298,180 @@ export default function TimeStatsPage() {
           <ArrowLeft size={18} />
         </button>
         <span className="font-serif-sc text-lg text-foreground">时间都去哪了</span>
+        <div className="ml-auto flex gap-1.5">
+          <button onClick={() => setShowSearch(!showSearch)}
+            className={`p-1.5 rounded-lg transition ${showSearch ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+            <Search size={16} />
+          </button>
+          <button onClick={() => setShowQuickEntry(!showQuickEntry)}
+            className={`p-1.5 rounded-lg transition ${showQuickEntry ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+            <Timer size={16} />
+          </button>
+        </div>
       </div>
 
-      {/* Time Range Tabs */}
-      <div className="flex gap-1 px-4 mb-3">
-        {([
-          { key: "today" as TimeRange, label: "今天" },
-          { key: "week" as TimeRange, label: "本周" },
-          { key: "month" as TimeRange, label: "本月" },
-        ]).map(t => (
-          <button
-            key={t.key}
-            onClick={() => setRange(t.key)}
-            className={`text-xs px-3 py-1.5 rounded-full transition ${range === t.key ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}
-          >
-            {t.label}
+      {/* Search bar */}
+      {showSearch && (
+        <div className="px-4 mb-2">
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+            placeholder="搜索活动、备注、标签..."
+            autoFocus
+            className="w-full bg-surface-2 border border-border rounded-xl px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-gold-border" />
+          {searchResults.length > 0 && (
+            <div className="mt-2 bg-card border border-border rounded-xl max-h-[200px] overflow-y-auto">
+              {searchResults.map(t => (
+                <div key={t.id} className="px-3 py-2 border-b border-border last:border-0">
+                  <p className="text-xs text-foreground">{t.text}</p>
+                  <div className="flex gap-2 mt-0.5">
+                    {t.note && <span className="text-[9px] text-muted-foreground truncate">{t.note}</span>}
+                    <span className="text-[9px] text-muted-foreground font-mono-jb">{t.sourceDate || t.completedAt?.split("T")[0]}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Time Range + View Mode Tabs */}
+      <div className="flex gap-1 px-4 mb-3 justify-between">
+        <div className="flex gap-1">
+          {([
+            { key: "today" as TimeRange, label: "今天" },
+            { key: "week" as TimeRange, label: "本周" },
+            { key: "month" as TimeRange, label: "本月" },
+          ]).map(t => (
+            <button
+              key={t.key}
+              onClick={() => setRange(t.key)}
+              className={`text-xs px-3 py-1.5 rounded-full transition ${range === t.key ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1">
+          <button onClick={() => setViewMode("overview")}
+            className={`text-[10px] px-2 py-1 rounded-full transition ${viewMode === "overview" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>
+            概览
           </button>
-        ))}
+          <button onClick={() => setViewMode("week")}
+            className={`text-[10px] px-2 py-1 rounded-full transition ${viewMode === "week" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>
+            周视图
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-4">
+        {/* Quick Time Entry */}
+        {showQuickEntry && <QuickTimeEntry onClose={() => setShowQuickEntry(false)} />}
+
+        {/* Week View Mode */}
+        {viewMode === "week" && (
+          <div className="bg-card border border-border rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarClock size={14} className="text-primary" />
+              <span className="text-xs font-serif-sc text-foreground">周时间色块</span>
+            </div>
+            <div className="flex gap-1">
+              {/* Hour labels */}
+              <div className="flex flex-col justify-between text-[7px] text-muted-foreground pr-1" style={{ height: 240 }}>
+                {[6, 9, 12, 15, 18, 21, 24].map(h => (
+                  <span key={h}>{h}:00</span>
+                ))}
+              </div>
+              {/* Day columns */}
+              {weekViewData.map((day, di) => (
+                <div key={di} className="flex-1 flex flex-col">
+                  <span className={`text-[8px] text-center mb-1 ${day.date === today ? "text-primary font-bold" : "text-muted-foreground"}`}>
+                    {day.label}
+                  </span>
+                  <div className="relative bg-surface-2 rounded-lg flex-1" style={{ height: 240 }}>
+                    {(day.blocks as any[]).map((block: any, bi: number) => {
+                      const top = ((block.startHour - 6) / 18) * 100;
+                      const height = ((block.endHour - block.startHour) / 18) * 100;
+                      return (
+                        <div key={bi}
+                          className="absolute left-0.5 right-0.5 rounded-sm"
+                          style={{
+                            top: `${Math.max(0, top)}%`,
+                            height: `${Math.max(2, height)}%`,
+                            background: CATEGORY_COLORS[block.category] || CATEGORY_COLORS["其他"],
+                            opacity: 0.8,
+                          }}
+                          title={`${block.text}`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 justify-center">
+              {Object.entries(CATEGORY_COLORS).slice(0, 6).map(([cat, color]) => (
+                <div key={cat} className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-sm" style={{ background: color }} />
+                  <span className="text-[7px] text-muted-foreground">{cat}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Time Disc (24h clock) - shown in overview today */}
+        {viewMode === "overview" && range === "today" && (timeDiscData as any[]).length > 0 && (
+          <div className="bg-card border border-border rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Clock size={14} className="text-primary" />
+              <span className="text-xs font-serif-sc text-foreground">24小时圆盘</span>
+            </div>
+            <div className="flex justify-center">
+              <svg viewBox="0 0 200 200" className="w-[180px] h-[180px]">
+                {/* Background circle */}
+                <circle cx="100" cy="100" r="85" fill="none" stroke="hsl(var(--border))" strokeWidth="20" />
+                {/* Hour markers */}
+                {Array.from({ length: 24 }, (_, i) => {
+                  const angle = (i / 24) * 360 - 90;
+                  const rad = angle * Math.PI / 180;
+                  const x1 = 100 + 75 * Math.cos(rad);
+                  const y1 = 100 + 75 * Math.sin(rad);
+                  const x2 = 100 + 95 * Math.cos(rad);
+                  const y2 = 100 + 95 * Math.sin(rad);
+                  const tx = 100 + 68 * Math.cos(rad);
+                  const ty = 100 + 68 * Math.sin(rad);
+                  return (
+                    <g key={i}>
+                      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="hsl(var(--muted-foreground))" strokeWidth={i % 6 === 0 ? 1.5 : 0.5} opacity={0.3} />
+                      {i % 6 === 0 && <text x={tx} y={ty} textAnchor="middle" dominantBaseline="central" fill="hsl(var(--muted-foreground))" fontSize="7">{i}</text>}
+                    </g>
+                  );
+                })}
+                {/* Time blocks as arcs */}
+                {(timeDiscData as any[]).map((block: any, i: number) => {
+                  const startRad = block.startAngle * Math.PI / 180;
+                  const endRad = block.endAngle * Math.PI / 180;
+                  const r = 85;
+                  const x1 = 100 + r * Math.cos(startRad);
+                  const y1 = 100 + r * Math.sin(startRad);
+                  const x2 = 100 + r * Math.cos(endRad);
+                  const y2 = 100 + r * Math.sin(endRad);
+                  const largeArc = (block.endAngle - block.startAngle) > 180 ? 1 : 0;
+                  return (
+                    <path key={i}
+                      d={`M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`}
+                      fill="none"
+                      stroke={CATEGORY_COLORS[block.category] || CATEGORY_COLORS["其他"]}
+                      strokeWidth="18"
+                      opacity="0.75"
+                    >
+                      <title>{block.text} ({block.time})</title>
+                    </path>
+                  );
+                })}
+              </svg>
+            </div>
+          </div>
+        )}
         {/* ─── Hero: Productivity Score ─── */}
         <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-5">
           <div className="relative w-[88px] h-[88px]">
