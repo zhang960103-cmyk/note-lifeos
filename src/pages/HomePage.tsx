@@ -47,8 +47,6 @@ const HomePage = () => {
   const [showEnergyPicker, setShowEnergyPicker] = useState(false);
   const [showBrainDump, setShowBrainDump] = useState(false);
   const [brainDumpText, setBrainDumpText] = useState("");
-  const [brainDumpLoading, setBrainDumpLoading] = useState(false);
-  const [brainDumpResult, setBrainDumpResult] = useState<{ todos: any[]; summary: string } | null>(null);
   const [showFocusPicker, setShowFocusPicker] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const canUseVoice = typeof window !== "undefined"
