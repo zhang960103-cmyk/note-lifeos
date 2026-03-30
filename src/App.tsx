@@ -98,14 +98,16 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <ThemeProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <Routes>
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="*" element={<AuthGate />} />
-            </Routes>
-          </TooltipProvider>
+          <ErrorBoundary>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <Routes>
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="*" element={<AuthGate />} />
+              </Routes>
+            </TooltipProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </LanguageProvider>
     </QueryClientProvider>
