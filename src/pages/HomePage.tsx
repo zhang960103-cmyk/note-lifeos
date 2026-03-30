@@ -261,6 +261,8 @@ const HomePage = () => {
           const existingTodosForAI = allTodos
             .filter(t => t.status !== "dropped")
             .map(t => ({ id: t.id, text: t.text, status: t.status, priority: t.priority }));
+          setExtractFailed(false);
+          setRetryMsgs(msgsForExtract);
           extractMeta(msgsForExtract, existingTodosForAI).then(meta => {
             if (meta.completedTodoIds?.length > 0) {
               meta.completedTodoIds.forEach(todoId => {
