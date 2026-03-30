@@ -171,7 +171,7 @@ const HomePage = () => {
 
   const handleQuickMood = (mood: typeof QUICK_MOODS[0]) => {
     updateDayMeta(todayKey, { emotionTags: [mood.tag], emotionScore: mood.score });
-    sendMessage(`[快速情绪记录] ${mood.emoji} ${mood.label}`);
+    sendMessage(`[快速情绪记录] ${mood.emoji} ${t(mood.labelKey)}`);
   };
 
   const focusTodo = useMemo(() => {
