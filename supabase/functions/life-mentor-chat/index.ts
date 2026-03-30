@@ -28,10 +28,10 @@ const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 // Default model mapping by usage tag
 const DEFAULT_MODELS: Record<string, string> = {
-  chat: "google/gemini-3-flash-preview",
+  chat: "google/gemini-2.5-pro",
   cheap: "google/gemini-2.5-flash-lite",
   extract: "google/gemini-2.5-flash",
-  private: "google/gemini-3-flash-preview",
+  private: "google/gemini-2.5-pro",
 };
 
 function resolveModel(usageTag: string): string {
@@ -104,11 +104,12 @@ async function llmStream(
 }
 
 // Resolve model config: try DB profile first, then fall back
+// Supports canary routing: if profileId points to a canary profile, use it
 async function resolveModelConfig(
   supabaseUrl: string,
   serviceKey: string,
   userId: string | null,
-  profileId: string | null, // specific profile ID from request
+  profileId: string | null,
   usageTag: string,
 ): Promise<ModelConfig | null> {
   if (!userId) return null;
@@ -116,11 +117,13 @@ async function resolveModelConfig(
     const sb = createClient(supabaseUrl, serviceKey);
     let query;
     if (profileId) {
-      query = sb.from("ai_model_profiles").select("base_url, model, api_key_encrypted").eq("id", profileId).eq("user_id", userId).single();
+      // Specific profile (could be canary) — allow any status
+      query = sb.from("ai_model_profiles").select("base_url, model, api_key_encrypted, status")
+        .eq("id", profileId).eq("user_id", userId).single();
     } else {
-      // Find default for this usage tag, or the overall default
-      query = sb.from("ai_model_profiles").select("base_url, model, api_key_encrypted")
-        .eq("user_id", userId).eq("is_default", true).limit(1).single();
+      // Default active profile
+      query = sb.from("ai_model_profiles").select("base_url, model, api_key_encrypted, status")
+        .eq("user_id", userId).eq("is_default", true).eq("status", "active").limit(1).single();
     }
     const { data } = await query;
     if (data && data.base_url && data.api_key_encrypted) {
@@ -130,7 +133,6 @@ async function resolveModelConfig(
         apiKey: data.api_key_encrypted ? atob(data.api_key_encrypted) : "",
       };
     }
-    // If the profile has no custom base_url, use Lovable gateway with the profile's model
     if (data && data.model) {
       return { baseUrl: "", model: data.model, apiKey: "" };
     }
