@@ -433,7 +433,7 @@ const HomePage = () => {
           <button onClick={() => navigate("/history")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2">
             <Clock size={16} />
           </button>
-          <button onClick={() => navigate("/settings")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2" title="设置">
+          <button onClick={() => navigate("/settings")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2" title={t("settings.title")}>
             <Settings size={16} />
           </button>
         </div>
