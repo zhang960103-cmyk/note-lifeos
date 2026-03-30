@@ -76,6 +76,10 @@ const AppInner = () => {
 const AuthGate = () => {
   const { user, loading, signUp, signIn } = useAuth();
 
+  useEffect(() => {
+    initSupabaseHealth();
+  }, []);
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-background flex items-center justify-center">
