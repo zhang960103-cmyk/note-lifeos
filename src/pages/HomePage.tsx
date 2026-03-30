@@ -31,7 +31,7 @@ const HomePage = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [searchParams] = useSearchParams();
-  // Auth no longer needed directly here - moved to settings
+  const { user } = useAuth();
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
     addFinanceEntry, todayFinanceStats, wheelScores, entries, allTodos, toggleTodo,
