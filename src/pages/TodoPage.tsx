@@ -22,7 +22,7 @@ type ViewMode = "list" | "matrix" | "timeline";
 const TodoPage = () => {
   const {
     allTodos, todayKey, toggleTodo, updateTodo, addTodoToDate, deleteTodo,
-    habits, addHabit, checkInHabit, deleteHabit,
+    habits, addHabit, checkInHabit, deleteHabit, entries,
   } = useLifeOs();
   const { t } = useLanguage();
   const navigate = useNavigate();
