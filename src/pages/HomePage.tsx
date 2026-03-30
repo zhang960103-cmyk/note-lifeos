@@ -238,6 +238,8 @@ const HomePage = () => {
 
     const memoryContext = buildMemoryContext(entries, 14);
     const patterns = getKeyPatterns(entries);
+    // Inject energy summary into memory context
+    const fullMemoryContext = [memoryContext, energySummary].filter(Boolean).join('\n');
 
     try {
       await streamChat({
