@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Mail, Lock, Loader2, Phone, ArrowLeft, CheckCircle, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { useLanguage, LANGUAGES } from "@/contexts/LanguageContext";
 
 interface AuthPageProps {
