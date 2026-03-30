@@ -2,8 +2,8 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
-import { ArrowLeft, Clock, TrendingUp, Sparkles, Loader2, CalendarClock, Flame, Target, Zap } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line, CartesianGrid } from "recharts";
+import { ArrowLeft, Clock, TrendingUp, Sparkles, Loader2, CalendarClock, Flame, Target, Zap, Battery } from "lucide-react";
 
 const CATEGORY_COLORS: Record<string, string> = {
   "工作": "hsl(39 58% 53%)",
