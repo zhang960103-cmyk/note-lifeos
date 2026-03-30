@@ -55,6 +55,7 @@ export function LifeOsProvider({ children, userId }: { children: ReactNode; user
       wheelScores, addWheelScore, onboarded, completeOnboarding,
       financeEntries, addFinanceEntry, deleteFinanceEntry, updateFinanceEntry, todayFinanceStats, monthFinanceStats,
       habits, addHabit, checkInHabit, deleteHabit,
+      energyLogs, addEnergyLog, energySummary, consecutiveLowDays,
     }}>
       {children}
     </LifeOsContext.Provider>
