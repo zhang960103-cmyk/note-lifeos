@@ -478,7 +478,7 @@ const HomePage = () => {
               {/* UX 1: Status-aware greeting */}
               <div className="text-3xl mb-4">{statusGreeting.emoji}</div>
               <p className="text-foreground text-sm leading-[1.8]">{statusGreeting.text}</p>
-              <p className="text-muted-foreground text-xs mt-2 leading-[1.8]">随便聊，我在听。</p>
+              <p className="text-muted-foreground text-xs mt-2 leading-[1.8]">{t("home.input.placeholder")}</p>
               {/* Emoji mood quick-pick */}
               <div className="flex justify-center gap-2 mt-4">
                 {QUICK_MOODS.map(mood => (
