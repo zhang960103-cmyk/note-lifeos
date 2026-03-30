@@ -243,17 +243,17 @@ const TodoPage = () => {
       {/* Tabs - simplified */}
       <div className="flex gap-1 px-4 mb-3">
         {([
-          { key: "smart" as TabKey, label: "任务" },
-          { key: "matrix" as TabKey, label: "矩阵", icon: <Grid3X3 size={10} /> },
-          { key: "habits" as TabKey, label: "习惯" },
-          { key: "templates" as TabKey, label: "计划模板", icon: <Clock size={10} /> },
-        ]).map(t => (
+          { key: "smart" as TabKey, labelKey: "todo.smart", icon: "⚡" },
+          { key: "matrix" as TabKey, labelKey: "todo.matrix", icon: "📊" },
+          { key: "habits" as TabKey, labelKey: "todo.habits", icon: "💪" },
+          { key: "templates" as TabKey, labelKey: "todo.templates", icon: "📋" },
+        ]).map(tb => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`text-xs px-3 py-1.5 rounded-full transition flex items-center gap-1 ${tab === t.key ? "bg-gold text-background" : "bg-surface-2 text-muted-foreground"}`}
+            key={tb.key}
+            onClick={() => setTab(tb.key)}
+            className={`text-xs px-3 py-1.5 rounded-full transition flex items-center gap-1 ${tab === tb.key ? "bg-gold text-background" : "bg-surface-2 text-muted-foreground"}`}
           >
-            {t.icon} {t.label}
+            {tb.icon} {t(tb.labelKey)}
           </button>
         ))}
       </div>
