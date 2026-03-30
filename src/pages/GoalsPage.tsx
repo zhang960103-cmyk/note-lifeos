@@ -1,18 +1,21 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
-import { Plus, Trash2, ChevronDown, ChevronUp, Target } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { Plus, Trash2, ChevronDown, ChevronUp, Target, Loader2, Wand2 } from "lucide-react";
+import { CardSkeleton } from "@/components/SkeletonLoaders";
 
 interface KeyResult {
   id: string;
   text: string;
-  progress: number; // 0-100
+  progress: number;
   linkedTodoCount: number;
 }
 
 interface Goal {
   id: string;
   title: string;
-  quarter: string; // e.g. "2026-Q1"
+  quarter: string;
   keyResults: KeyResult[];
   createdAt: string;
 }
@@ -25,50 +28,82 @@ const getCurrentQuarter = () => {
 
 const GoalsPage = () => {
   const { allTodos } = useLifeOs();
-  const [goals, setGoals] = useState<Goal[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem("los-goals") || "[]");
-    } catch { return []; }
-  });
+  const { user } = useAuth();
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newKRs, setNewKRs] = useState(["", "", ""]);
 
-  const saveGoals = useCallback((g: Goal[]) => {
-    setGoals(g);
-    localStorage.setItem("los-goals", JSON.stringify(g));
-  }, []);
+  // Load from Supabase
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from("goals")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (data) {
+        setGoals(data.map((g: any) => ({
+          id: g.id,
+          title: g.title,
+          quarter: g.quarter,
+          keyResults: (g.key_results as any[]) || [],
+          createdAt: g.created_at,
+        })));
+      }
+      setLoading(false);
+    };
+    load();
+  }, [user]);
 
-  const createGoal = () => {
-    if (!newTitle.trim()) return;
+  const createGoal = useCallback(async () => {
+    if (!newTitle.trim() || !user) return;
     const krs: KeyResult[] = newKRs
       .filter(k => k.trim())
       .map(k => ({ id: crypto.randomUUID(), text: k, progress: 0, linkedTodoCount: 0 }));
     if (krs.length === 0) return;
 
-    const goal: Goal = {
-      id: crypto.randomUUID(),
+    const { data, error } = await supabase.from("goals").insert({
+      user_id: user.id,
       title: newTitle,
       quarter: getCurrentQuarter(),
-      keyResults: krs,
-      createdAt: new Date().toISOString(),
-    };
-    saveGoals([goal, ...goals]);
+      key_results: krs as any,
+    }).select().single();
+
+    if (data && !error) {
+      setGoals(prev => [{
+        id: data.id,
+        title: data.title,
+        quarter: data.quarter,
+        keyResults: (data.key_results as any[]) || [],
+        createdAt: data.created_at,
+      }, ...prev]);
+    }
     setNewTitle("");
     setNewKRs(["", "", ""]);
     setShowCreate(false);
-  };
+  }, [newTitle, newKRs, user]);
 
-  const deleteGoal = (id: string) => saveGoals(goals.filter(g => g.id !== id));
+  const deleteGoal = useCallback(async (id: string) => {
+    setGoals(prev => prev.filter(g => g.id !== id));
+    await supabase.from("goals").delete().eq("id", id);
+  }, []);
 
-  const updateKRProgress = (goalId: string, krId: string, progress: number) => {
-    saveGoals(goals.map(g =>
+  const updateKRProgress = useCallback(async (goalId: string, krId: string, progress: number) => {
+    setGoals(prev => prev.map(g =>
       g.id === goalId
         ? { ...g, keyResults: g.keyResults.map(kr => kr.id === krId ? { ...kr, progress } : kr) }
         : g
     ));
-  };
+    const goal = goals.find(g => g.id === goalId);
+    if (goal) {
+      const updated = goal.keyResults.map(kr => kr.id === krId ? { ...kr, progress } : kr);
+      await supabase.from("goals").update({ key_results: updated as any }).eq("id", goalId);
+    }
+  }, [goals]);
 
   // Auto-link todos to KRs by keyword matching
   const goalsWithLinked = useMemo(() => {
@@ -86,6 +121,8 @@ const GoalsPage = () => {
     }));
   }, [goals, allTodos]);
 
+  if (loading) return <CardSkeleton count={3} />;
+
   return (
     <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4">
       <div className="py-4 flex items-center justify-between">
@@ -101,7 +138,6 @@ const GoalsPage = () => {
         </button>
       </div>
 
-      {/* Create form */}
       {showCreate && (
         <div className="bg-surface-2 border border-gold-border rounded-xl p-4 mb-4 animate-in fade-in">
           <input
@@ -115,11 +151,7 @@ const GoalsPage = () => {
             <input
               key={i}
               value={kr}
-              onChange={e => {
-                const next = [...newKRs];
-                next[i] = e.target.value;
-                setNewKRs(next);
-              }}
+              onChange={e => { const next = [...newKRs]; next[i] = e.target.value; setNewKRs(next); }}
               placeholder={`KR${i + 1}（如：每周发布2篇文章）`}
               className="w-full bg-surface-3 border border-border rounded-lg px-3 py-1.5 text-xs text-foreground mb-1.5 focus:outline-none focus:border-gold-border"
             />
@@ -130,7 +162,6 @@ const GoalsPage = () => {
         </div>
       )}
 
-      {/* Goals list */}
       {goalsWithLinked.length === 0 ? (
         <div className="text-center py-16">
           <Target size={32} className="text-muted-foreground/30 mx-auto mb-3" />
@@ -161,7 +192,6 @@ const GoalsPage = () => {
                   </div>
                   {isExpanded ? <ChevronUp size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
                 </button>
-
                 {isExpanded && (
                   <div className="px-4 pb-4 border-t border-border space-y-3 pt-3">
                     {goal.keyResults.map(kr => (
@@ -171,14 +201,9 @@ const GoalsPage = () => {
                           <span className="text-[9px] text-muted-foreground font-mono-jb">{kr.linkedTodoCount} 关联</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            value={kr.progress}
+                          <input type="range" min={0} max={100} value={kr.progress}
                             onChange={e => updateKRProgress(goal.id, kr.id, +e.target.value)}
-                            className="flex-1 accent-gold h-1"
-                          />
+                            className="flex-1 accent-gold h-1" />
                           <span className="text-[10px] text-gold font-mono-jb w-8 text-right">{kr.progress}%</span>
                         </div>
                       </div>
