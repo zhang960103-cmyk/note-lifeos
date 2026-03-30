@@ -361,35 +361,13 @@ const HomePage = () => {
     setFinanceNLLoading(false);
   };
 
-  // Feature 2: Brain dump
+  // Feature 2: Brain dump - simplified to send as chat message (chat already extracts todos)
   const handleBrainDump = async () => {
-    if (!brainDumpText.trim() || brainDumpLoading) return;
-    setBrainDumpLoading(true);
-    try {
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ mode: "brain-dump", messages: [{ role: "user", content: brainDumpText }] }),
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        setBrainDumpResult(data);
-      }
-    } catch {}
-    setBrainDumpLoading(false);
-  };
-
-  const confirmBrainDump = () => {
-    if (!brainDumpResult) return;
-    const todoItems: TodoItem[] = brainDumpResult.todos.map(t => createTodoFromExtract(t, todayKey));
-    if (todoItems.length > 0) {
-      updateDayMeta(todayKey, { todos: todoItems });
-      setTodoToast(`已添加 ${todoItems.length} 条待办`);
-      setTimeout(() => setTodoToast(null), 3000);
-    }
-    setBrainDumpText("");
-    setBrainDumpResult(null);
+    if (!brainDumpText.trim()) return;
+    const text = `🧠 脑清空：\n${brainDumpText}`;
     setShowBrainDump(false);
+    setBrainDumpText("");
+    sendMessage(text);
   };
 
   // Auto-extract time blocks from diary conversation and create time-tagged todos
