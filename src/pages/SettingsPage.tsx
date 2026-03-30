@@ -225,12 +225,12 @@ export default function SettingsPage() {
         <section>
           <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">🤖 AI 模型</p>
           <div className="bg-card border border-border rounded-xl overflow-hidden">
-            {/* Simple card selection */}
+            {/* Simple card selection - only active profiles */}
             {modelsLoading ? (
               <div className="px-4 py-6 text-center text-xs text-muted-foreground">加载中...</div>
             ) : (
               <div className="p-3 space-y-2">
-                {profiles.map(p => {
+                {activeProfiles.map(p => {
                   const tagInfo = USAGE_TAG_LABELS[p.usage_tag] || { icon: "🔧", label: p.usage_tag };
                   const isActive = p.is_default;
                   return (
@@ -249,13 +249,7 @@ export default function SettingsPage() {
                               <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">默认</span>
                             )}
                           </div>
-                          <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{p.description}</p>
-                          {p.base_url && (
-                            <p className="text-[9px] text-muted-foreground/60 mt-0.5 font-mono-jb truncate">{p.model} · 自定义</p>
-                          )}
-                          {!p.base_url && (
-                            <p className="text-[9px] text-muted-foreground/60 mt-0.5 font-mono-jb truncate">{p.model}</p>
-                          )}
+                          <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{p.description}</p>
                         </div>
                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 ${
                           isActive ? "border-primary bg-primary" : "border-muted-foreground/30"
@@ -266,6 +260,60 @@ export default function SettingsPage() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Canary experiment zone */}
+            {canaryProfiles.length > 0 && (
+              <div className="border-t border-border p-3 space-y-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <FlaskConical size={12} className="text-warning" />
+                  <span className="text-[10px] font-medium text-warning">实验中</span>
+                </div>
+                {canaryProfiles.map(p => (
+                  <div key={p.id} className="p-2.5 rounded-xl border border-dashed border-warning/40 bg-warning/5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-medium text-foreground">{p.name}</span>
+                        <span className="text-[9px] text-warning ml-2 bg-warning/10 px-1.5 py-0.5 rounded-full">canary v{p.version}</span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">{p.description}</p>
+                    <div className="flex gap-1.5">
+                      <button onClick={() => promoteCanary(p.id)}
+                        className="flex items-center gap-1 text-[9px] bg-primary/10 text-primary px-2 py-1 rounded-lg hover:bg-primary/20 transition">
+                        <ArrowUpCircle size={10} /> 上线
+                      </button>
+                      <button onClick={() => setDefault(p.id)}
+                        className="flex items-center gap-1 text-[9px] bg-accent text-foreground px-2 py-1 rounded-lg hover:bg-muted transition">
+                        <Check size={10} /> 试用
+                      </button>
+                      <button onClick={() => deleteProfile(p.id)}
+                        className="flex items-center gap-1 text-[9px] text-destructive px-2 py-1 rounded-lg hover:bg-destructive/10 transition">
+                        <Trash2 size={10} /> 删除
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Deprecated rollback */}
+            {deprecatedProfiles.length > 0 && (
+              <div className="border-t border-border p-3 space-y-1.5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Archive size={12} className="text-muted-foreground" />
+                  <span className="text-[10px] text-muted-foreground">已归档</span>
+                </div>
+                {deprecatedProfiles.map(p => (
+                  <div key={p.id} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-muted/30">
+                    <span className="text-[10px] text-muted-foreground">{p.name} <span className="opacity-60">v{p.version}</span></span>
+                    <button onClick={() => rollback(p.id)}
+                      className="flex items-center gap-1 text-[9px] text-foreground bg-accent px-2 py-1 rounded-lg hover:bg-muted transition">
+                      <RotateCcw size={9} /> 回滚
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -280,9 +328,16 @@ export default function SettingsPage() {
             {showAdvanced && (
               <div className="border-t border-border p-3 space-y-3">
                 {profiles.map(p => (
-                  <div key={p.id} className="bg-muted/50 border border-border rounded-xl p-3 space-y-2">
+                  <div key={p.id} className={`bg-muted/50 border rounded-xl p-3 space-y-2 ${p.status === 'deprecated' ? 'border-border/50 opacity-60' : p.status === 'canary' ? 'border-warning/30' : 'border-border'}`}>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-foreground">{p.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-foreground">{p.name}</span>
+                        <span className={`text-[8px] px-1.5 py-0.5 rounded-full ${
+                          p.status === 'active' ? 'bg-los-green/20 text-los-green' : 
+                          p.status === 'canary' ? 'bg-warning/20 text-warning' : 
+                          'bg-muted text-muted-foreground'
+                        }`}>{p.status} v{p.version}</span>
+                      </div>
                       <div className="flex items-center gap-1">
                         <button onClick={() => setEditingId(editingId === p.id ? null : p.id)}
                           className="p-1 hover:bg-accent rounded-lg transition text-muted-foreground hover:text-foreground">
@@ -304,10 +359,25 @@ export default function SettingsPage() {
                           onChange={v => updateProfile(p.id, { description: v })} />
                         <FieldInput label="Base URL" value={p.base_url} placeholder="留空使用默认网关"
                           onChange={v => updateProfile(p.id, { base_url: v })} />
-                        <FieldInput label="模型" value={p.model} placeholder="google/gemini-3-flash-preview"
+                        <FieldInput label="模型" value={p.model} placeholder="google/gemini-2.5-pro"
                           onChange={v => updateProfile(p.id, { model: v })} />
                         <FieldInput label="API Key" value={p.api_key_encrypted ? "••••••" : ""} placeholder="留空使用默认密钥" type="password"
                           onChange={v => { if (v !== "••••••") updateProfile(p.id, { api_key_encrypted: v ? btoa(v) : "" }); }} />
+                        <FieldInput label="版本" value={p.version} placeholder="1.0"
+                          onChange={v => updateProfile(p.id, { version: v })} />
+                        <div>
+                          <p className="text-[9px] text-muted-foreground mb-0.5">状态</p>
+                          <div className="flex gap-1">
+                            {(['active', 'canary', 'deprecated'] as const).map(s => (
+                              <button key={s} onClick={() => updateProfile(p.id, { status: s })}
+                                className={`text-[9px] px-2 py-1 rounded-lg transition ${p.status === s ? 
+                                  s === 'active' ? 'bg-los-green/20 text-los-green' : s === 'canary' ? 'bg-warning/20 text-warning' : 'bg-muted text-muted-foreground'
+                                  : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+                                {s === 'active' ? '✅ 上线' : s === 'canary' ? '🧪 实验' : '📦 归档'}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                         <div>
                           <p className="text-[9px] text-muted-foreground mb-0.5">用途标签</p>
                           <div className="flex gap-1 flex-wrap">
@@ -334,10 +404,23 @@ export default function SettingsPage() {
                       onChange={v => setNewProfile(p => ({ ...p, description: v }))} />
                     <FieldInput label="Base URL" value={newProfile.base_url} placeholder="https://api.openclaw.ai/v1"
                       onChange={v => setNewProfile(p => ({ ...p, base_url: v }))} />
-                    <FieldInput label="模型" value={newProfile.model} placeholder="gpt-4o"
+                    <FieldInput label="模型" value={newProfile.model} placeholder="deepseek-chat"
                       onChange={v => setNewProfile(p => ({ ...p, model: v }))} />
                     <FieldInput label="API Key" value={newProfile.api_key_encrypted} placeholder="sk-..." type="password"
                       onChange={v => setNewProfile(p => ({ ...p, api_key_encrypted: v ? btoa(v) : "" }))} />
+                    <div>
+                      <p className="text-[9px] text-muted-foreground mb-0.5">初始状态</p>
+                      <div className="flex gap-1">
+                        <button onClick={() => setNewProfile(p => ({ ...p, status: 'canary' }))}
+                          className={`text-[9px] px-2 py-1 rounded-lg transition ${newProfile.status === 'canary' ? 'bg-warning/20 text-warning' : 'bg-muted text-muted-foreground'}`}>
+                          🧪 实验（仅自己可见）
+                        </button>
+                        <button onClick={() => setNewProfile(p => ({ ...p, status: 'active' }))}
+                          className={`text-[9px] px-2 py-1 rounded-lg transition ${newProfile.status === 'active' ? 'bg-los-green/20 text-los-green' : 'bg-muted text-muted-foreground'}`}>
+                          ✅ 直接上线
+                        </button>
+                      </div>
+                    </div>
                     <div className="flex gap-2 pt-1">
                       <button onClick={handleAddProfile} disabled={!newProfile.name || !newProfile.model}
                         className="flex-1 text-xs bg-primary text-primary-foreground py-1.5 rounded-lg disabled:opacity-50">
@@ -357,7 +440,7 @@ export default function SettingsPage() {
                 )}
 
                 <p className="text-[8px] text-muted-foreground/60 text-center">
-                  支持 OpenAI 兼容格式 API · 留空 Base URL 和 API Key 将使用内置网关
+                  支持 OpenAI 兼容格式 · 留空 Base URL 使用内置网关 · 新模型建议先标记为🧪实验
                 </p>
               </div>
             )}
