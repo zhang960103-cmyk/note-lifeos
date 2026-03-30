@@ -392,6 +392,55 @@ const HomePage = () => {
     setShowBrainDump(false);
   };
 
+  // Auto-extract time blocks from diary conversation and create time-tagged todos
+  const autoExtractTimeBlocks = useCallback(async (msgs: ChatMsg[]) => {
+    try {
+      const resp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ messages: msgs, mode: "time-extract" }),
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const blocks = data.timeBlocks || [];
+      if (blocks.length === 0) return;
+
+      // Create time-tagged todos for each block so TimeStats can visualize them
+      let created = 0;
+      blocks.forEach((block: any) => {
+        // Check if a matching todo already exists (avoid duplicates)
+        const exists = allTodos.some(t => {
+          const noteMatch = t.note?.includes(`⏱ ${block.startTime}-${block.endTime}`);
+          const textMatch = t.text.toLowerCase().includes(block.activity.toLowerCase().slice(0, 6));
+          return noteMatch || (textMatch && t.note?.includes("⏱"));
+        });
+        if (exists) return;
+
+        const todo: TodoItem = {
+          id: crypto.randomUUID(),
+          text: block.activity,
+          status: "done" as const,
+          priority: "normal" as const,
+          tags: [block.category || "其他"],
+          subTasks: [],
+          recur: "none" as const,
+          note: `⏱ ${block.startTime}-${block.endTime} (${block.durationMinutes}分钟)${block.note ? `\n${block.note}` : ""}`,
+          completedAt: new Date().toISOString(),
+          sourceDate: todayKey,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        addTodoToDate(todayKey, todo);
+        created++;
+      });
+
+      if (created > 0) {
+        setTodoToast(`⏱ 已自动记录 ${created} 个时间段`);
+        setTimeout(() => setTodoToast(null), 3000);
+      }
+    } catch {}
+  }, [allTodos, todayKey, addTodoToDate]);
+
   // Feature 1: Go deeper
   const handleGoDeeper = (msgContent: string) => {
     const lastSentence = msgContent.split(/[。？！.?!\n]/).filter(Boolean).pop() || msgContent.slice(-30);
