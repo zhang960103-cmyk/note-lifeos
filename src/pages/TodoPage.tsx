@@ -17,7 +17,7 @@ const PRIORITY_CONFIG: Record<Priority, { label: string; dot: string; ring: stri
   low: { label: "可选", dot: "bg-muted-foreground", ring: "ring-muted-foreground/30" },
 };
 
-type ViewMode = "list" | "matrix";
+type ViewMode = "list" | "matrix" | "timeline";
 
 const TodoPage = () => {
   const {
