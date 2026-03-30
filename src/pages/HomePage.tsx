@@ -592,9 +592,9 @@ const HomePage = () => {
       <div className="px-4 h-6 flex items-center">
         <button onClick={() => setShowFocusPicker(true)} className="w-full text-left truncate">
           {focusTodo ? (
-            <span className="text-[11px] text-gold">⚡ 现在：{focusTodo.text.slice(0, 20)}{focusTodo.text.length > 20 ? "..." : ""}</span>
+            <span className="text-[11px] text-gold">{t("home.focus.now")}{focusTodo.text.slice(0, 20)}{focusTodo.text.length > 20 ? "..." : ""}</span>
           ) : (
-            <span className="text-[11px] text-muted-foreground/50">· 无聚焦任务</span>
+            <span className="text-[11px] text-muted-foreground/50">{t("home.focus.none")}</span>
           )}
         </button>
       </div>
