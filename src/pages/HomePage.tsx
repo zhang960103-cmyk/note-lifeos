@@ -718,7 +718,7 @@ const HomePage = () => {
               disabled={!brainDumpText.trim() || isLoading}
               className="w-full bg-gold text-background py-3 rounded-xl text-sm disabled:opacity-30 hover:bg-gold/90 transition flex items-center justify-center gap-2"
             >
-              📤 发给罗盘整理
+              {t("home.braindump.send")}
             </button>
           </div>
         </div>
