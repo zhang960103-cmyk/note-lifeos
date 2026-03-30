@@ -243,6 +243,7 @@ const TodoPage = () => {
           { key: "smart" as TabKey, label: "任务" },
           { key: "matrix" as TabKey, label: "矩阵", icon: <Grid3X3 size={10} /> },
           { key: "habits" as TabKey, label: "习惯" },
+          { key: "templates" as TabKey, label: "计划模板", icon: <Clock size={10} /> },
         ]).map(t => (
           <button
             key={t.key}
