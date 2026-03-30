@@ -693,28 +693,29 @@ export default function TimeStatsPage() {
           </div>
         )}
 
-        {/* ─── Emotion Wave ─── */}
+        {/* ─── Emotion Wave (link to InsightsPage for deeper analysis) ─── */}
         {emotionTrend.length > 1 && (
           <div className="bg-card border border-border rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-sm">💫</span>
-              <span className="text-xs font-serif-sc text-foreground">情绪波动</span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">💫</span>
+                <span className="text-xs font-serif-sc text-foreground">情绪波动</span>
+              </div>
+              <button onClick={() => navigate("/insights")} className="text-[9px] text-primary hover:text-primary/80 transition">
+                查看详细分析 →
+              </button>
             </div>
-            <div className="flex items-end gap-[3px] h-[70px]">
-              {emotionTrend.map((d, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
-                  <div className="opacity-0 group-hover:opacity-100 absolute -top-5 bg-card border border-border rounded px-1.5 py-0.5 text-[8px] text-foreground whitespace-nowrap z-10 transition">
-                    {d.date} · {d.score}分
-                  </div>
+            <div className="flex items-end gap-[3px] h-[50px]">
+              {emotionTrend.slice(-14).map((d, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative">
                   <div
                     className="w-full rounded-t transition-all"
                     style={{
-                      height: `${(d.score / 10) * 55}px`,
+                      height: `${(d.score / 10) * 40}px`,
                       background: d.score >= 7 ? "hsl(var(--los-green))" : d.score >= 4 ? "hsl(var(--gold))" : "hsl(var(--los-red))",
-                      minHeight: "3px",
+                      minHeight: "2px",
                     }}
                   />
-                  <span className="text-[6px] text-muted-foreground">{d.date.slice(-2)}</span>
                 </div>
               ))}
             </div>
