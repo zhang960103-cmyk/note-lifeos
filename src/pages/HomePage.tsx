@@ -53,6 +53,7 @@ const HomePage = () => {
   const [brainDumpText, setBrainDumpText] = useState("");
   const [showFocusPicker, setShowFocusPicker] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
+  const [showToolMenu, setShowToolMenu] = useState(false);
   const canUseVoice = typeof window !== "undefined"
     && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
   const [showTagHint, setShowTagHint] = useState(false);
