@@ -54,6 +54,8 @@ const HomePage = () => {
   const canUseVoice = typeof window !== "undefined"
     && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
   const [showTagHint, setShowTagHint] = useState(false);
+  const [extractFailed, setExtractFailed] = useState(false);
+  const [retryMsgs, setRetryMsgs] = useState<ChatMsg[] | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
