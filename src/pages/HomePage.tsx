@@ -689,7 +689,7 @@ const HomePage = () => {
               className="w-full bg-gold text-background py-2.5 rounded-xl text-sm disabled:opacity-30 hover:bg-gold/90 transition flex items-center justify-center gap-2"
             >
               {financeNLLoading ? <Loader2 size={14} className="animate-spin" /> : null}
-              AI 智能记账
+              {t("home.finance.submit")}
             </button>
           </div>
         </div>
