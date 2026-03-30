@@ -59,6 +59,7 @@ const AppInner = () => {
             <Route path="/insights" element={<InsightsPage />} />
             <Route path="/goals" element={<GoalsPage />} />
             <Route path="/time-stats" element={<TimeStatsPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
