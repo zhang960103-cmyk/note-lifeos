@@ -1,25 +1,25 @@
-import { useNavigate } from "react-router-dom";
 import { Sun, Moon, X } from "lucide-react";
 import { useTheme, ACCENT_OPTIONS, type ThemeMode } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function ThemeSettings({ onClose }: { onClose: () => void }) {
   const { mode, accent, setMode, setAccent } = useTheme();
-  const navigate = useNavigate();
+  const { t } = useLanguage();
 
   return (
     <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl p-5 z-50 animate-in slide-in-from-bottom">
       <div className="flex justify-between items-center mb-5">
-        <span className="text-sm font-serif-sc text-foreground">主题设置</span>
+        <span className="text-sm font-serif-sc text-foreground">{t("settings.appearance")}</span>
         <button onClick={onClose}><X size={16} className="text-muted-foreground" /></button>
       </div>
 
       {/* Mode toggle */}
       <div className="mb-5">
-        <p className="text-[10px] text-muted-foreground mb-2">显示模式</p>
+        <p className="text-[10px] text-muted-foreground mb-2">{t("settings.mode")}</p>
         <div className="flex gap-2">
           {([
-            { key: "dark" as ThemeMode, icon: <Moon size={14} />, label: "深色" },
-            { key: "light" as ThemeMode, icon: <Sun size={14} />, label: "浅色" },
+            { key: "dark" as ThemeMode, icon: <Moon size={14} />, labelKey: "settings.mode.dark" },
+            { key: "light" as ThemeMode, icon: <Sun size={14} />, labelKey: "settings.mode.light" },
           ]).map(m => (
             <button
               key={m.key}
@@ -28,7 +28,7 @@ export default function ThemeSettings({ onClose }: { onClose: () => void }) {
                 mode === m.key ? "bg-gold text-background" : "bg-surface-2 text-muted-foreground hover:text-foreground"
               }`}
             >
-              {m.icon} {m.label}
+              {m.icon} {t(m.labelKey)}
             </button>
           ))}
         </div>
@@ -36,7 +36,7 @@ export default function ThemeSettings({ onClose }: { onClose: () => void }) {
 
       {/* Accent color */}
       <div>
-        <p className="text-[10px] text-muted-foreground mb-2">主题色</p>
+        <p className="text-[10px] text-muted-foreground mb-2">{t("settings.accent")}</p>
         <div className="grid grid-cols-3 gap-2">
           {ACCENT_OPTIONS.map(a => (
             <button

@@ -1,24 +1,25 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { format, startOfWeek, addDays, isToday, subDays } from "date-fns";
 import { Play, Pause, X, Check, Trash2, Pencil, MessageCircle, ArrowRight, Clock, BarChart3, Grid3X3, ChevronDown, ChevronRight } from "lucide-react";
 import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
 import { useNavigate } from "react-router-dom";
 
-const PRIORITY_CONFIG: Record<Priority, { label: string; emoji: string; color: string }> = {
-  urgent: { label: "紧急", emoji: "🔴", color: "text-los-red" },
-  high: { label: "重要", emoji: "🟠", color: "text-los-orange" },
-  normal: { label: "普通", emoji: "🔵", color: "text-los-blue" },
-  low: { label: "可选", emoji: "⚪", color: "text-muted-foreground" },
+const PRIORITY_CONFIG: Record<Priority, { labelKey: string; emoji: string; color: string }> = {
+  urgent: { labelKey: "todo.priority.urgent", emoji: "🔴", color: "text-los-red" },
+  high: { labelKey: "todo.priority.high", emoji: "🟠", color: "text-los-orange" },
+  normal: { labelKey: "todo.priority.normal", emoji: "🔵", color: "text-los-blue" },
+  low: { labelKey: "todo.priority.low", emoji: "⚪", color: "text-muted-foreground" },
 };
 
 type TabKey = "smart" | "matrix" | "habits" | "templates";
 type StatusColumn = "todo" | "doing" | "done";
 
-const COLUMN_CONFIG: Record<StatusColumn, { label: string; emoji: string; bg: string }> = {
-  todo: { label: "待办", emoji: "📋", bg: "border-gold/30" },
-  doing: { label: "进行中", emoji: "⚡", bg: "border-los-orange/30" },
-  done: { label: "已完成", emoji: "✅", bg: "border-los-green/30" },
+const COLUMN_CONFIG: Record<StatusColumn, { labelKey: string; emoji: string; bg: string }> = {
+  todo: { labelKey: "todo.column.todo", emoji: "📋", bg: "border-gold/30" },
+  doing: { labelKey: "todo.column.doing", emoji: "⚡", bg: "border-los-orange/30" },
+  done: { labelKey: "todo.column.done", emoji: "✅", bg: "border-los-green/30" },
 };
 
 const TodoPage = () => {
@@ -26,6 +27,7 @@ const TodoPage = () => {
     allTodos, todayKey, toggleTodo, updateTodo, addTodoToDate, deleteTodo,
     habits, addHabit, checkInHabit, deleteHabit,
   } = useLifeOs();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>("smart");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -241,17 +243,17 @@ const TodoPage = () => {
       {/* Tabs - simplified */}
       <div className="flex gap-1 px-4 mb-3">
         {([
-          { key: "smart" as TabKey, label: "任务" },
-          { key: "matrix" as TabKey, label: "矩阵", icon: <Grid3X3 size={10} /> },
-          { key: "habits" as TabKey, label: "习惯" },
-          { key: "templates" as TabKey, label: "计划模板", icon: <Clock size={10} /> },
-        ]).map(t => (
+          { key: "smart" as TabKey, labelKey: "todo.smart", icon: "⚡" },
+          { key: "matrix" as TabKey, labelKey: "todo.matrix", icon: "📊" },
+          { key: "habits" as TabKey, labelKey: "todo.habits", icon: "💪" },
+          { key: "templates" as TabKey, labelKey: "todo.templates", icon: "📋" },
+        ]).map(tb => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`text-xs px-3 py-1.5 rounded-full transition flex items-center gap-1 ${tab === t.key ? "bg-gold text-background" : "bg-surface-2 text-muted-foreground"}`}
+            key={tb.key}
+            onClick={() => setTab(tb.key)}
+            className={`text-xs px-3 py-1.5 rounded-full transition flex items-center gap-1 ${tab === tb.key ? "bg-gold text-background" : "bg-surface-2 text-muted-foreground"}`}
           >
-            {t.icon} {t.label}
+            {tb.icon} {t(tb.labelKey)}
           </button>
         ))}
       </div>
@@ -263,7 +265,7 @@ const TodoPage = () => {
             {/* Doing section */}
             {smartGroups.doing.length > 0 && (
               <SmartSection
-                title="进行中" emoji="⚡" count={smartGroups.doing.length}
+                title={t("todo.column.doing")} emoji="⚡" count={smartGroups.doing.length}
                 borderColor="border-los-orange/30"
                 collapsed={collapsedSections.has("doing")}
                 onToggle={() => toggleSection("doing")}
@@ -290,7 +292,7 @@ const TodoPage = () => {
 
             {/* Todo section */}
             <SmartSection
-              title="待办" emoji="📋" count={smartGroups.todo.length}
+              title={t("todo.column.todo")} emoji="📋" count={smartGroups.todo.length}
               borderColor="border-gold/30"
               collapsed={collapsedSections.has("todo")}
               onToggle={() => toggleSection("todo")}
@@ -322,7 +324,7 @@ const TodoPage = () => {
             {/* Done section - collapsed by default */}
             {smartGroups.done.length > 0 && (
               <SmartSection
-                title="已完成" emoji="✅" count={smartGroups.done.length}
+                title={t("todo.column.done")} emoji="✅" count={smartGroups.done.length}
                 borderColor="border-los-green/30"
                 collapsed={collapsedSections.has("done")}
                 onToggle={() => toggleSection("done")}
@@ -505,6 +507,7 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
   onDelete: () => void;
   onMove: (todo: TodoItem, status: TaskStatus) => void;
 }) {
+  const { t: tr } = useLanguage();
   const isDone = todo.status === "done";
   const isDoing = todo.status === "doing";
   const [editText, setEditText] = useState(todo.text);
@@ -525,9 +528,9 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
           <div className={`text-xs ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>{todo.text}</div>
           <div className="flex gap-1 mt-0.5 flex-wrap">
             <span className="text-[8px] px-1.5 py-0.5 rounded bg-surface-3 text-muted-foreground">
-              {PRIORITY_CONFIG[todo.priority]?.emoji} {PRIORITY_CONFIG[todo.priority]?.label}
+              {PRIORITY_CONFIG[todo.priority]?.emoji} {tr(PRIORITY_CONFIG[todo.priority]?.labelKey)}
             </span>
-            {isDoing && <span className="text-[8px] bg-los-orange/20 text-los-orange px-1.5 rounded">进行中</span>}
+            {isDoing && <span className="text-[8px] bg-los-orange/20 text-los-orange px-1.5 rounded">{tr("todo.column.doing")}</span>}
             {todo.dueDate && <span className="text-[8px] text-muted-foreground font-mono-jb">{todo.dueDate}</span>}
             {todo.tags?.map(t => <span key={t} className="text-[8px] bg-gold-light text-gold px-1 rounded">{t}</span>)}
             {todo.subTasks?.length > 0 && (

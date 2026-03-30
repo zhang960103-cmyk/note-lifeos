@@ -5,28 +5,30 @@ import VoiceInput from "@/components/VoiceInput";
 import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
 import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { createTodoFromExtract } from "@/hooks/useLifeOs";
 import { format, subDays, parseISO } from "date-fns";
 import type { TodoItem } from "@/types/lifeOs";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
 const ENERGY_LEVELS = [
-  { value: "high", emoji: "🔥", label: "高" },
-  { value: "medium", emoji: "⚡", label: "中" },
-  { value: "low", emoji: "🔋", label: "低" },
+  { value: "high", emoji: "🔥", labelKey: "home.energy.high" },
+  { value: "medium", emoji: "⚡", labelKey: "home.energy.medium" },
+  { value: "low", emoji: "🔋", labelKey: "home.energy.low" },
 ];
 
 const QUICK_MOODS = [
-  { emoji: "😊", label: "开心", score: 8, tag: "开心" },
-  { emoji: "😌", label: "平静", score: 6, tag: "平静" },
-  { emoji: "😤", label: "烦躁", score: 3, tag: "烦躁" },
-  { emoji: "😔", label: "低落", score: 2, tag: "低落" },
-  { emoji: "😰", label: "焦虑", score: 3, tag: "焦虑" },
-  { emoji: "🤩", label: "兴奋", score: 9, tag: "兴奋" },
+  { emoji: "😊", labelKey: "home.mood.happy", score: 8, tag: "开心" },
+  { emoji: "😌", labelKey: "home.mood.calm", score: 6, tag: "平静" },
+  { emoji: "😤", labelKey: "home.mood.irritated", score: 3, tag: "烦躁" },
+  { emoji: "😔", labelKey: "home.mood.down", score: 2, tag: "低落" },
+  { emoji: "😰", labelKey: "home.mood.anxious", score: 3, tag: "焦虑" },
+  { emoji: "🤩", labelKey: "home.mood.excited", score: 9, tag: "兴奋" },
 ];
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   // Auth no longer needed directly here - moved to settings
   const {
@@ -95,7 +97,7 @@ const HomePage = () => {
 
     // Priority 1: Yesterday low emotion
     if (yesterdayEntry && yesterdayEntry.emotionScore <= 4) {
-      return { emoji: "🌧️", text: "昨天有点难熬，今天怎么样？" };
+      return { emoji: "🌧️", text: t("home.greeting.yesterday_low") };
     }
 
     // Priority 2: Habit streak 3+ days
@@ -112,7 +114,7 @@ const HomePage = () => {
             else break;
           }
           if (streak >= 3) {
-            return { emoji: "⚡", text: `我注意到你已经坚持了 ${streak} 天了` };
+            return { emoji: "⚡", text: t("home.greeting.streak", { days: streak }) };
           }
         }
       }
@@ -120,18 +122,17 @@ const HomePage = () => {
 
     // Priority 3: Monday
     if (new Date().getDay() === 1) {
-      return { emoji: "🚀", text: "新的一周。有什么想带着走的吗？" };
+      return { emoji: "🚀", text: t("home.greeting.monday") };
     }
 
-    // Priority 4: Default with time awareness
-    if (h < 6) return { emoji: "🧭", text: "夜深了，还在思考什么？" };
-    if (h < 9) return { emoji: "🧭", text: "早安，新的一天开始了" };
-    if (h < 12) return { emoji: "🧭", text: "上午好，今天有什么计划？" };
-    if (h < 14) return { emoji: "🧭", text: "中午好，休息一下" };
-    if (h < 18) return { emoji: "🧭", text: "下午好，精力如何？" };
-    if (h < 21) return { emoji: "🧭", text: "晚上好，今天过得怎么样？" };
-    return { emoji: "🧭", text: "夜深了，今天有什么收获？" };
-  }, [entries, habits]);
+    if (h < 6) return { emoji: "🧭", text: t("home.greeting.night_late") };
+    if (h < 9) return { emoji: "🧭", text: t("home.greeting.morning_early") };
+    if (h < 12) return { emoji: "🧭", text: t("home.greeting.morning") };
+    if (h < 14) return { emoji: "🧭", text: t("home.greeting.noon") };
+    if (h < 18) return { emoji: "🧭", text: t("home.greeting.afternoon") };
+    if (h < 21) return { emoji: "🧭", text: t("home.greeting.evening") };
+    return { emoji: "🧭", text: t("home.greeting.night") };
+  }, [entries, habits, t]);
 
   // Feature 4: Sunset ritual
   const isSunsetHour = useMemo(() => {
@@ -169,7 +170,7 @@ const HomePage = () => {
 
   const handleQuickMood = (mood: typeof QUICK_MOODS[0]) => {
     updateDayMeta(todayKey, { emotionTags: [mood.tag], emotionScore: mood.score });
-    sendMessage(`[快速情绪记录] ${mood.emoji} ${mood.label}`);
+    sendMessage(`[快速情绪记录] ${mood.emoji} ${t(mood.labelKey)}`);
   };
 
   const focusTodo = useMemo(() => {
@@ -432,7 +433,7 @@ const HomePage = () => {
           <button onClick={() => navigate("/history")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2">
             <Clock size={16} />
           </button>
-          <button onClick={() => navigate("/settings")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2" title="设置">
+          <button onClick={() => navigate("/settings")} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-surface-2" title={t("settings.title")}>
             <Settings size={16} />
           </button>
         </div>
@@ -477,7 +478,7 @@ const HomePage = () => {
               {/* UX 1: Status-aware greeting */}
               <div className="text-3xl mb-4">{statusGreeting.emoji}</div>
               <p className="text-foreground text-sm leading-[1.8]">{statusGreeting.text}</p>
-              <p className="text-muted-foreground text-xs mt-2 leading-[1.8]">随便聊，我在听。</p>
+              <p className="text-muted-foreground text-xs mt-2 leading-[1.8]">{t("home.input.placeholder")}</p>
               {/* Emoji mood quick-pick */}
               <div className="flex justify-center gap-2 mt-4">
                 {QUICK_MOODS.map(mood => (
@@ -485,7 +486,7 @@ const HomePage = () => {
                     key={mood.tag}
                     onClick={() => handleQuickMood(mood)}
                     className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center text-lg hover:scale-110 hover:bg-surface-3 transition-all"
-                    title={mood.label}
+                    title={t(mood.labelKey)}
                   >
                     {mood.emoji}
                   </button>
@@ -526,7 +527,7 @@ const HomePage = () => {
                     onClick={() => handleGoDeeper(msg.content)}
                     className="text-[10px] text-muted-foreground/40 hover:text-gold cursor-pointer px-1 mt-0.5 transition-colors"
                   >
-                    ↓ 深探
+                    {t("home.go_deeper")}
                   </button>
                 )}
               </div>
@@ -558,7 +559,7 @@ const HomePage = () => {
             <span key={t} className="text-[9px] bg-gold-light text-gold px-2 py-0.5 rounded-full whitespace-nowrap">{t}</span>
           ))}
           <span className={`text-[9px] text-muted-foreground/50 whitespace-nowrap transition-opacity duration-500 ${showTagHint ? "opacity-100" : "opacity-0"}`}>
-            AI 自动提取
+            {t("home.tag_hint")}
           </span>
         </div>
       )}
@@ -581,7 +582,7 @@ const HomePage = () => {
           {ENERGY_LEVELS.map(e => (
             <button key={e.value} onClick={() => handleEnergyLog(e.value)} className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg hover:bg-surface-3 transition">
               <span className="text-lg">{e.emoji}</span>
-              <span className="text-[9px] text-muted-foreground">{e.label}</span>
+              <span className="text-[9px] text-muted-foreground">{t(e.labelKey)}</span>
             </button>
           ))}
         </div>
@@ -591,9 +592,9 @@ const HomePage = () => {
       <div className="px-4 h-6 flex items-center">
         <button onClick={() => setShowFocusPicker(true)} className="w-full text-left truncate">
           {focusTodo ? (
-            <span className="text-[11px] text-gold">⚡ 现在：{focusTodo.text.slice(0, 20)}{focusTodo.text.length > 20 ? "..." : ""}</span>
+            <span className="text-[11px] text-gold">{t("home.focus.now")}{focusTodo.text.slice(0, 20)}{focusTodo.text.length > 20 ? "..." : ""}</span>
           ) : (
-            <span className="text-[11px] text-muted-foreground/50">· 无聚焦任务</span>
+            <span className="text-[11px] text-muted-foreground/50">{t("home.focus.none")}</span>
           )}
         </button>
       </div>
@@ -635,7 +636,7 @@ const HomePage = () => {
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder="说点什么..."
+            placeholder={t("home.input.placeholder")}
             rows={3}
             className="flex-1 bg-surface-2 border border-border rounded-2xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:border-gold-border transition-colors leading-[1.8]"
             style={{ minHeight: "72px", maxHeight: "160px" }}
@@ -654,22 +655,22 @@ const HomePage = () => {
       {showFinance && (
         <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl p-5 z-50 animate-in slide-in-from-bottom">
           <div className="flex justify-between items-center mb-4">
-            <span className="text-xs text-foreground font-serif-sc">记账</span>
+            <span className="text-xs text-foreground font-serif-sc">{t("home.finance.title")}</span>
             <button onClick={() => setShowFinance(false)} className="text-muted-foreground">
               <X size={16} />
             </button>
           </div>
           <div className="flex gap-3 text-center mb-4">
             <div className="flex-1 bg-surface-2 rounded-lg py-2">
-              <div className="text-[10px] text-muted-foreground">收入</div>
+              <div className="text-[10px] text-muted-foreground">{t("home.finance.income")}</div>
               <div className="text-sm text-los-green font-mono-jb">¥{todayFinanceStats.income}</div>
             </div>
             <div className="flex-1 bg-surface-2 rounded-lg py-2">
-              <div className="text-[10px] text-muted-foreground">支出</div>
+              <div className="text-[10px] text-muted-foreground">{t("home.finance.expense")}</div>
               <div className="text-sm text-los-orange font-mono-jb">¥{todayFinanceStats.expense}</div>
             </div>
             <div className="flex-1 bg-surface-2 rounded-lg py-2">
-              <div className="text-[10px] text-muted-foreground">净值</div>
+              <div className="text-[10px] text-muted-foreground">{t("home.finance.net")}</div>
               <div className="text-sm text-gold font-mono-jb">¥{todayFinanceStats.net}</div>
             </div>
           </div>
@@ -678,7 +679,7 @@ const HomePage = () => {
               value={financeNLInput}
               onChange={e => setFinanceNLInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") handleFinanceNL(); }}
-              placeholder="随便说，如：今天收了600学费，买书花了89..."
+              placeholder={t("home.finance.placeholder")}
               className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-gold-border"
               autoFocus
             />
@@ -688,7 +689,7 @@ const HomePage = () => {
               className="w-full bg-gold text-background py-2.5 rounded-xl text-sm disabled:opacity-30 hover:bg-gold/90 transition flex items-center justify-center gap-2"
             >
               {financeNLLoading ? <Loader2 size={14} className="animate-spin" /> : null}
-              AI 智能记账
+              {t("home.finance.submit")}
             </button>
           </div>
         </div>
@@ -698,12 +699,12 @@ const HomePage = () => {
       {showBrainDump && (
         <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl z-50 animate-in slide-in-from-bottom flex flex-col" style={{ height: "50vh" }}>
           <div className="flex justify-between items-center p-4 pb-2">
-            <span className="text-xs text-foreground font-serif-sc">🧠 脑清空</span>
+            <span className="text-xs text-foreground font-serif-sc">{t("home.braindump.title")}</span>
             <button onClick={() => setShowBrainDump(false)} className="text-muted-foreground">
               <X size={16} />
             </button>
           </div>
-          <p className="px-4 text-[10px] text-muted-foreground mb-2">随便倒，罗盘会自动整理成待办、记录时间和财务</p>
+          <p className="px-4 text-[10px] text-muted-foreground mb-2">{t("home.braindump.desc")}</p>
           <textarea
             value={brainDumpText}
             onChange={e => setBrainDumpText(e.target.value)}
@@ -717,7 +718,7 @@ const HomePage = () => {
               disabled={!brainDumpText.trim() || isLoading}
               className="w-full bg-gold text-background py-3 rounded-xl text-sm disabled:opacity-30 hover:bg-gold/90 transition flex items-center justify-center gap-2"
             >
-              📤 发给罗盘整理
+              {t("home.braindump.send")}
             </button>
           </div>
         </div>
@@ -727,14 +728,14 @@ const HomePage = () => {
       {showFocusPicker && (
         <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl p-5 z-50 animate-in slide-in-from-bottom max-h-[50vh] flex flex-col">
           <div className="flex justify-between items-center mb-3">
-            <span className="text-xs text-foreground font-serif-sc">选择聚焦任务</span>
+            <span className="text-xs text-foreground font-serif-sc">{t("home.focus.title")}</span>
             <button onClick={() => setShowFocusPicker(false)} className="text-muted-foreground">
               <X size={16} />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto space-y-1">
             {todayUndoneTodos.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-4">暂无待办任务</p>
+              <p className="text-xs text-muted-foreground text-center py-4">{t("home.focus.empty")}</p>
             ) : (
               todayUndoneTodos.map(todo => (
                 <button
