@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, addDays } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line, CartesianGrid } from "recharts";
-import { ArrowLeft, Clock, TrendingUp, Sparkles, Loader2, CalendarClock, Flame, Target, Zap, Battery, Search, Timer, Pencil, Check, X } from "lucide-react";
-import QuickTimeEntry from "@/components/QuickTimeEntry";
+import { Clock, TrendingUp, Sparkles, Loader2, CalendarClock, Flame, Target, Zap, Battery, Search, Timer, Pencil, Check, X } from "lucide-react";
 
 const CATEGORY_COLORS: Record<string, string> = {
   "工作": "hsl(39 58% 53%)",
