@@ -43,6 +43,10 @@ export default function TimeStatsPage() {
   const { entries, allTodos, energyLogs } = useLifeOs();
   const [range, setRange] = useState<TimeRange>("week");
   const [touchStart, setTouchStart] = useState(0);
+  const [showQuickEntry, setShowQuickEntry] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [viewMode, setViewMode] = useState<"overview" | "week">("overview");
 
   const today = format(new Date(), "yyyy-MM-dd");
 
