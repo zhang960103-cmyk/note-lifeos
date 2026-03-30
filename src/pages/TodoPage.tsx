@@ -13,6 +13,7 @@ const PRIORITY_CONFIG: Record<Priority, { label: string; emoji: string; color: s
 };
 
 type TabKey = "smart" | "matrix" | "habits" | "templates";
+type StatusColumn = "todo" | "doing" | "done";
 
 const COLUMN_CONFIG: Record<StatusColumn, { label: string; emoji: string; bg: string }> = {
   todo: { label: "待办", emoji: "📋", bg: "border-gold/30" },
