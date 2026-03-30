@@ -208,10 +208,13 @@ const HomePage = () => {
     setInput(ta.value);
   };
 
-  const handleEnergyLog = (level: string) => {
+  const handleEnergyLog = async (level: string) => {
     setShowEnergyPicker(false);
     const emoji = ENERGY_LEVELS.find(e => e.value === level)?.emoji || "⚡";
-    const text = `[精力记录] ${emoji} 当前精力：${level === "high" ? "高" : level === "medium" ? "中" : "低"}`;
+    const cnLevel = level === "high" ? "高" : level === "medium" ? "中" : "低";
+    // Save to Supabase
+    await addEnergyLog(cnLevel as any);
+    const text = `[精力记录] ${emoji} 当前精力：${cnLevel}`;
     sendMessage(text);
   };
 
