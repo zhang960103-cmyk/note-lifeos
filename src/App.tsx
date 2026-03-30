@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -8,6 +9,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
+import { initSupabaseHealth } from "@/integrations/supabase/validate";
 import HomePage from "@/pages/HomePage";
 import TodoPage from "@/pages/TodoPage";
 import HistoryPage from "@/pages/HistoryPage";
@@ -73,6 +75,10 @@ const AppInner = () => {
 
 const AuthGate = () => {
   const { user, loading, signUp, signIn } = useAuth();
+
+  useEffect(() => {
+    initSupabaseHealth();
+  }, []);
 
   if (loading) {
     return (

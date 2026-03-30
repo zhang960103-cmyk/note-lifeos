@@ -325,15 +325,19 @@ const HomePage = () => {
           });
         },
         signal: controller.signal,
+        maxRetries: 2,
+        timeoutMs: 30000,
       });
     } catch (e: any) {
       if (e.name !== "AbortError") {
-        addMessage({ role: "assistant", content: `抱歉，出了点问题。${e.message || ""}`, timestamp: new Date().toISOString() });
+        const errorMsg = e.message || "网络错误，请检查连接";
+        console.error("[sendMessage] Error:", { code: e.code, message: e.message, status: e.status, isRetryable: e.isRetryable });
+        addMessage({ role: "assistant", content: `抱歉，出了点问题。${errorMsg}`, timestamp: new Date().toISOString() });
       }
       setStreamingContent("");
       setIsLoading(false);
     }
-  }, [isLoading, addMessage, updateDayMeta, todayKey, addFinanceEntry, allTodos, toggleTodo]);
+  }, [isLoading, addMessage, updateDayMeta, todayKey, addFinanceEntry, allTodos, toggleTodo, user]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
