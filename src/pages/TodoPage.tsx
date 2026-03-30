@@ -196,11 +196,13 @@ const TodoPage = () => {
       <div className="flex items-center justify-between px-4 py-3">
         <span className="font-serif-sc text-lg text-foreground">待办</span>
         <div className="flex items-center gap-2">
-          <button onClick={() => navigate("/time-stats")} className="text-muted-foreground hover:text-gold transition p-1.5" title="时间统计">
-            <BarChart3 size={16} />
+          <button onClick={() => navigate("/time-stats")}
+            className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-primary/20 transition font-medium"
+            title="时间统计">
+            <BarChart3 size={12} /> <span>时间去哪了</span>
           </button>
           <button onClick={() => navigate("/")} className="text-xs text-gold bg-gold/10 px-3 py-1 rounded-full flex items-center gap-1">
-            <MessageCircle size={12} /> 对话生成
+            <MessageCircle size={12} /> 对话
           </button>
         </div>
       </div>
