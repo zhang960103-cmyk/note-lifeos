@@ -56,7 +56,7 @@ const TodoPage = () => {
 
   // Celebrate
   const [celebrateId, setCelebrateId] = useState<string | null>(null);
-
+const [isProcessing, setIsProcessing] = useState(false);
   // Pomodoro timer
   useEffect(() => {
     if (pomodoroRunning && pomodoroTime > 0) {
@@ -141,7 +141,19 @@ const TodoPage = () => {
   }, [allTodos]);
 
   const handleToggle = (todo: TodoItem) => {
-    toggleTodo(todo.sourceDate || todayKey, todo.id);
+  if (isProcessing) return;  // ✅ 防止重复点击
+  
+  setIsProcessing(true);
+  toggleTodo(todo.sourceDate || todayKey, todo.id);
+  
+  if (todo.status !== "done") {
+    setCelebrateId(todo.id);
+    setTimeout(() => setCelebrateId(null), 800);
+  }
+  
+  // 模拟处理完成
+  setTimeout(() => setIsProcessing(false), 300);
+};
     if (todo.status !== "done") { setCelebrateId(todo.id); setTimeout(() => setCelebrateId(null), 800); }
   };
 

@@ -63,6 +63,7 @@ const HomePage = () => {
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevTagCountRef = useRef(0);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Handle prefill from URL param (e.g. from InsightsPage)
   useEffect(() => {
@@ -223,8 +224,9 @@ const HomePage = () => {
   };
 
   const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || isLoading) return;
+    if (!text.trim() || isLoading || isProcessing) return;
 
+    setIsProcessing(true);
     const userMsg = { role: "user" as const, content: text, timestamp: new Date().toISOString() };
     addMessage(userMsg);
     setInput("");
@@ -259,6 +261,7 @@ const HomePage = () => {
           addMessage({ role: "assistant", content: full, timestamp: new Date().toISOString() });
           setStreamingContent("");
           setIsLoading(false);
+          setIsProcessing(false);
 
           const msgsForExtract = [...allMsgs, { role: "assistant" as const, content: full }];
           const existingTodosForAI = allTodos
@@ -318,10 +321,13 @@ const HomePage = () => {
               updateKRProgressFromGoalHints(meta.goalHints, user.id);
             }
 
-            // Auto-extract time blocks from diary and create time-tagged todos
-            autoExtractTimeBlocks(msgsForExtract);
+            // 只有对话里含时间信息时才发起时间块提取，节省 API 额度
+            const combinedText = text + full;
+            const hasTimeHints = /\d{1,2}[:：点时]\d{0,2}|上午|下午|凌晨|小时|分钟|半天|整天/.test(combinedText);
+            if (hasTimeHints) autoExtractTimeBlocks(msgsForExtract);
           }).catch(() => {
             setExtractFailed(true);
+            setIsProcessing(false);
           });
         },
         signal: controller.signal,
@@ -336,8 +342,9 @@ const HomePage = () => {
       }
       setStreamingContent("");
       setIsLoading(false);
+      setIsProcessing(false);
     }
-  }, [isLoading, addMessage, updateDayMeta, todayKey, addFinanceEntry, allTodos, toggleTodo, user]);
+  }, [isLoading, isProcessing, addMessage, updateDayMeta, todayKey, addFinanceEntry, allTodos, toggleTodo, user, entries, energySummary, addTodoToDate]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -551,7 +558,7 @@ const HomePage = () => {
                   className={`max-w-full rounded-2xl px-4 py-3 ${
                     msg.role === "user"
                       ? `bg-gold text-background rounded-br-sm text-sm leading-[1.8]${i === displayMessages.length - 1 ? " animate-msg-in" : ""}`
-                      : "text-muted-foreground rounded-bl-sm text-[13px] leading-[1.8]"
+                      : "text-muted-foreground rounded-bl-sm text-[13px] leading-[1.8] bg-surface-2 border border-border"
                   }`}
                 >
                   {msg.content}
@@ -713,7 +720,7 @@ const HomePage = () => {
           )}
           <button
             onClick={() => sendMessage(input)}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || isProcessing}
             className="bg-primary text-primary-foreground rounded-full p-2 disabled:opacity-20 hover:bg-primary/90 transition-all flex-shrink-0"
           >
             {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
