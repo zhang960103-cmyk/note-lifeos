@@ -679,7 +679,7 @@ const HomePage = () => {
               value={financeNLInput}
               onChange={e => setFinanceNLInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") handleFinanceNL(); }}
-              placeholder="随便说，如：今天收了600学费，买书花了89..."
+              placeholder={t("home.finance.placeholder")}
               className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-gold-border"
               autoFocus
             />
