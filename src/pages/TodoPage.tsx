@@ -10,11 +10,11 @@ import {
 import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
 import { useNavigate } from "react-router-dom";
 
-const PRIORITY_CONFIG: Record<Priority, { label: string; dot: string; ring: string }> = {
-  urgent: { label: "紧急", dot: "bg-destructive", ring: "ring-destructive/30" },
-  high: { label: "重要", dot: "bg-los-orange", ring: "ring-los-orange/30" },
-  normal: { label: "普通", dot: "bg-primary", ring: "ring-primary/30" },
-  low: { label: "可选", dot: "bg-muted-foreground", ring: "ring-muted-foreground/30" },
+const PRIORITY_KEYS: Record<Priority, { labelKey: string; dot: string; ring: string }> = {
+  urgent: { labelKey: "todo.priority.urgent", dot: "bg-destructive", ring: "ring-destructive/30" },
+  high: { labelKey: "todo.priority.high", dot: "bg-los-orange", ring: "ring-los-orange/30" },
+  normal: { labelKey: "todo.priority.normal", dot: "bg-primary", ring: "ring-primary/30" },
+  low: { labelKey: "todo.priority.low", dot: "bg-muted-foreground", ring: "ring-muted-foreground/30" },
 };
 
 type ViewMode = "list" | "matrix" | "timeline";
