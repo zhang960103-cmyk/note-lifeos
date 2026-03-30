@@ -6,6 +6,7 @@ import { streamChat, extractMeta, type ChatMsg, type ExtractResult } from "@/lib
 import { updateKRProgressFromGoalHints } from "@/pages/GoalsPage";
 import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { createTodoFromExtract } from "@/hooks/useLifeOs";
 import { format, subDays, parseISO } from "date-fns";
