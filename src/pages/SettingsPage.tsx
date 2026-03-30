@@ -146,11 +146,11 @@ export default function SettingsPage() {
         {/* Language & Currency - combined row */}
         <section>
           <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{t("settings.regional") || "地区与语言"}</p>
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="bg-card border border-border rounded-xl">
             {/* Language */}
             <div className="relative">
               <button onClick={() => { setShowLangPicker(!showLangPicker); setShowCurrencyPicker(false); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-border hover:bg-accent transition">
+                className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-border hover:bg-accent transition rounded-t-xl">
                 <Globe size={14} className="text-muted-foreground" />
                 <span className="text-xs text-foreground flex-1">{currentLang?.flag} {currentLang?.label}</span>
                 <ChevronRight size={14} className="text-muted-foreground" />
@@ -158,10 +158,10 @@ export default function SettingsPage() {
               {showLangPicker && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowLangPicker(false)} />
-                  <div className="absolute left-0 right-0 top-full bg-popover border border-border rounded-xl shadow-lg z-50 max-h-[240px] overflow-y-auto">
+                  <div className="fixed left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-[280px] bg-popover border border-border rounded-xl shadow-lg z-50 max-h-[320px] overflow-y-auto">
                     {LANGUAGES.map(l => (
                       <button key={l.key} onClick={() => { setLang(l.key); setShowLangPicker(false); }}
-                        className={`w-full flex items-center gap-2 px-4 py-2 text-xs transition hover:bg-accent ${lang === l.key ? "text-primary bg-accent" : "text-foreground"}`}>
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-accent ${lang === l.key ? "text-primary bg-accent" : "text-foreground"}`}>
                         <span className="text-base">{l.flag}</span><span>{l.label}</span>
                         {lang === l.key && <Check size={12} className="ml-auto text-primary" />}
                       </button>
@@ -173,7 +173,7 @@ export default function SettingsPage() {
             {/* Currency */}
             <div className="relative">
               <button onClick={() => { setShowCurrencyPicker(!showCurrencyPicker); setShowLangPicker(false); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition">
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition rounded-b-xl">
                 <span className="text-sm w-[14px] text-center">{currentCurrency?.symbol}</span>
                 <span className="text-xs text-foreground flex-1">{currentCurrency?.label}</span>
                 <ChevronRight size={14} className="text-muted-foreground" />
@@ -181,10 +181,10 @@ export default function SettingsPage() {
               {showCurrencyPicker && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowCurrencyPicker(false)} />
-                  <div className="absolute left-0 right-0 top-full bg-popover border border-border rounded-xl shadow-lg z-50 max-h-[240px] overflow-y-auto">
+                  <div className="fixed left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-[280px] bg-popover border border-border rounded-xl shadow-lg z-50 max-h-[320px] overflow-y-auto">
                     {CURRENCY_OPTIONS.map(c => (
                       <button key={c.key} onClick={() => saveCurrency(c.key)}
-                        className={`w-full flex items-center gap-2 px-4 py-2 text-xs transition hover:bg-accent ${currency === c.key ? "text-primary bg-accent" : "text-foreground"}`}>
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-accent ${currency === c.key ? "text-primary bg-accent" : "text-foreground"}`}>
                         <span className="text-sm w-5 text-center">{c.symbol}</span><span>{c.label}</span>
                         {currency === c.key && <Check size={12} className="ml-auto text-primary" />}
                       </button>
