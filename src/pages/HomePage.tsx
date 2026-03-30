@@ -2,9 +2,11 @@ import { useState, useRef, useEffect, useCallback, useMemo, type ChangeEvent } f
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Send, Loader2, DollarSign, X, Clock, Settings, Zap, Brain, Mic } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
-import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
+import { streamChat, extractMeta, type ChatMsg, type ExtractResult } from "@/lib/streamChat";
+import { updateKRProgressFromGoalHints } from "@/pages/GoalsPage";
 import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { createTodoFromExtract } from "@/hooks/useLifeOs";
 import { format, subDays, parseISO } from "date-fns";
@@ -30,7 +32,7 @@ const HomePage = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [searchParams] = useSearchParams();
-  // Auth no longer needed directly here - moved to settings
+  const { user } = useAuth();
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
     addFinanceEntry, todayFinanceStats, wheelScores, entries, allTodos, toggleTodo,
@@ -308,6 +310,11 @@ const HomePage = () => {
               setFinanceToast(true);
               setTodoToast(`💰 已自动记录${types} ¥${total}`);
               setTimeout(() => { setFinanceToast(false); setTodoToast(null); }, 3000);
+            }
+
+            // Auto-link KR progress from goalHints
+            if (meta.goalHints && meta.goalHints.length > 0 && user) {
+              updateKRProgressFromGoalHints(meta.goalHints, user.id);
             }
 
             // Auto-extract time blocks from diary and create time-tagged todos
