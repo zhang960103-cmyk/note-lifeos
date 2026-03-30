@@ -35,6 +35,8 @@ const zh: Record<string, string> = {
   "auth.password.placeholder": "密码（至少6位）",
   "auth.login": "登录",
   "auth.signup": "注册",
+  "auth.or": "或",
+  "auth.google": "使用 Google 登录",
   "auth.no_account": "没有账号？注册",
   "auth.has_account": "已有账号？登录",
   "auth.forgot": "忘记密码？",
