@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, addDays } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line, CartesianGrid } from "recharts";
-import { ArrowLeft, Clock, TrendingUp, Sparkles, Loader2, CalendarClock, Flame, Target, Zap, Battery, Search, Timer, Plus } from "lucide-react";
+import { ArrowLeft, Clock, TrendingUp, Sparkles, Loader2, CalendarClock, Flame, Target, Zap, Battery, Search, Timer, Pencil, Check, X } from "lucide-react";
 import QuickTimeEntry from "@/components/QuickTimeEntry";
+
 const CATEGORY_COLORS: Record<string, string> = {
   "工作": "hsl(39 58% 53%)",
   "学习": "hsl(211 55% 60%)",
@@ -28,7 +29,6 @@ const TAG_TO_CATEGORY: Record<string, string> = {
 };
 
 type TimeRange = "today" | "week" | "month";
-
 type TimeBlock = {
   activity: string;
   category: string;
@@ -42,7 +42,6 @@ export default function TimeStatsPage() {
   const navigate = useNavigate();
   const { entries, allTodos, energyLogs } = useLifeOs();
   const [range, setRange] = useState<TimeRange>("week");
-  const [touchStart, setTouchStart] = useState(0);
   const [showQuickEntry, setShowQuickEntry] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -84,27 +83,6 @@ export default function TimeStatsPage() {
       .sort((a, b) => b.value - a.value);
   }, [filteredTodos]);
 
-  const dailyData = useMemo(() => {
-    const now = new Date();
-    let days: string[];
-    if (range === "today") days = [today];
-    else if (range === "week") days = Array.from({ length: 7 }, (_, i) => format(subDays(now, 6 - i), "yyyy-MM-dd"));
-    else {
-      const start = startOfMonth(now);
-      const end = endOfMonth(now);
-      days = eachDayOfInterval({ start, end }).map(d => format(d, "yyyy-MM-dd"));
-    }
-    return days.map(d => {
-      const dayTodos = allTodos.filter(t => {
-        const td = t.completedAt?.split("T")[0] || t.sourceDate || "";
-        return td === d;
-      });
-      const done = dayTodos.filter(t => t.status === "done").length;
-      const total = dayTodos.length;
-      return { date: d.slice(5), done, total };
-    });
-  }, [allTodos, range, today]);
-
   const emotionTrend = useMemo(() => {
     const now = new Date();
     let days: string[];
@@ -129,7 +107,6 @@ export default function TimeStatsPage() {
     return { total, done, topCategory, avgEmotion, activeDays };
   }, [filteredTodos, categoryData, emotionTrend]);
 
-  // Productivity score (RescueTime-inspired)
   const productivityScore = useMemo(() => {
     if (stats.total === 0) return 0;
     const completionRate = stats.done / stats.total;
@@ -138,7 +115,6 @@ export default function TimeStatsPage() {
     return Math.round((completionRate * 0.7 + emotionBonus + diversityBonus) * 100);
   }, [stats, categoryData]);
 
-  // Streak calculation - reuse from entries activity (shared with TodoPage)
   const streak = useMemo(() => {
     let count = 0;
     const now = new Date();
@@ -152,11 +128,11 @@ export default function TimeStatsPage() {
     return count;
   }, [entries, allTodos]);
 
-  // Heatmap data (last 12 weeks)
+  // Compact heatmap (last 8 weeks instead of 12)
   const heatmapData = useMemo(() => {
     const now = new Date();
     const weeks: { date: Date; count: number }[][] = [];
-    const start = subDays(now, 83); // 12 weeks
+    const start = subDays(now, 55); // 8 weeks
     let current = start;
     let week: { date: Date; count: number }[] = [];
     while (current <= now) {
@@ -168,10 +144,7 @@ export default function TimeStatsPage() {
       }).length;
       const activity = (entry?.messages.length || 0) + todoCount;
       week.push({ date: new Date(current), count: activity });
-      if (week.length === 7) {
-        weeks.push(week);
-        week = [];
-      }
+      if (week.length === 7) { weeks.push(week); week = []; }
       current = new Date(current.getTime() + 86400000);
     }
     if (week.length > 0) weeks.push(week);
@@ -180,13 +153,28 @@ export default function TimeStatsPage() {
 
   const maxActivity = useMemo(() => Math.max(1, ...heatmapData.flat().map(d => d.count)), [heatmapData]);
 
-  // Stacked daily category breakdown
+  const dailyData = useMemo(() => {
+    const now = new Date();
+    let days: string[];
+    if (range === "today") days = [today];
+    else if (range === "week") days = Array.from({ length: 7 }, (_, i) => format(subDays(now, 6 - i), "yyyy-MM-dd"));
+    else days = eachDayOfInterval({ start: startOfMonth(now), end: endOfMonth(now) }).map(d => format(d, "yyyy-MM-dd"));
+    return days.map(d => {
+      const dayTodos = allTodos.filter(t => {
+        const td = t.completedAt?.split("T")[0] || t.sourceDate || "";
+        return td === d;
+      });
+      const done = dayTodos.filter(t => t.status === "done").length;
+      return { date: d.slice(5), done, total: dayTodos.length };
+    });
+  }, [allTodos, range, today]);
+
+  // Stacked daily
   const stackedDailyData = useMemo(() => {
     const now = new Date();
     const days = range === "today" ? [today]
       : range === "week" ? Array.from({ length: 7 }, (_, i) => format(subDays(now, 6 - i), "yyyy-MM-dd"))
       : eachDayOfInterval({ start: startOfMonth(now), end: endOfMonth(now) }).map(d => format(d, "yyyy-MM-dd"));
-
     const cats = Object.keys(CATEGORY_COLORS);
     return days.map(d => {
       const dayTodos = allTodos.filter(t => {
@@ -194,9 +182,7 @@ export default function TimeStatsPage() {
         return td === d && t.status === "done";
       });
       const row: Record<string, any> = { date: d.slice(5) };
-      cats.forEach(cat => {
-        row[cat] = dayTodos.filter(t => categorize(t) === cat).length;
-      });
+      cats.forEach(cat => { row[cat] = dayTodos.filter(t => categorize(t) === cat).length; });
       return row;
     });
   }, [allTodos, range, today]);
@@ -204,14 +190,11 @@ export default function TimeStatsPage() {
   const activeCats = useMemo(() => {
     const cats = new Set<string>();
     stackedDailyData.forEach(row => {
-      Object.keys(CATEGORY_COLORS).forEach(cat => {
-        if (row[cat] > 0) cats.add(cat);
-      });
+      Object.keys(CATEGORY_COLORS).forEach(cat => { if (row[cat] > 0) cats.add(cat); });
     });
     return Array.from(cats);
   }, [stackedDailyData]);
 
-  // Search filter
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
@@ -223,18 +206,17 @@ export default function TimeStatsPage() {
     }).slice(0, 20);
   }, [allTodos, searchQuery]);
 
-  // Week view data - 7 days, 24h per day, color blocks
+  // Week view
   const weekViewData = useMemo(() => {
     const now = new Date();
     const ws = startOfWeek(now, { weekStartsOn: 1 });
-    const days = Array.from({ length: 7 }, (_, i) => {
+    return Array.from({ length: 7 }, (_, i) => {
       const d = addDays(ws, i);
       const dateStr = format(d, "yyyy-MM-dd");
       const dayTodos = allTodos.filter(t => {
         const td = t.completedAt?.split("T")[0] || t.sourceDate || "";
         return td === dateStr && t.status === "done";
       });
-      // Parse time blocks from notes
       const blocks = dayTodos.map(t => {
         const cat = categorize(t);
         const timeMatch = t.note?.match(/⏱\s*(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
@@ -248,85 +230,53 @@ export default function TimeStatsPage() {
       }).filter(Boolean);
       return { date: dateStr, label: ["一", "二", "三", "四", "五", "六", "日"][i], blocks };
     });
-    return days;
   }, [allTodos]);
 
-  // Time disc data - 24h clock visualization
-  const timeDiscData = useMemo(() => {
-    const todayTodos = allTodos.filter(t => {
-      const td = t.completedAt?.split("T")[0] || t.sourceDate || "";
-      return td === today && t.status === "done";
-    });
-    return todayTodos.map(t => {
-      const cat = categorize(t);
-      const timeMatch = t.note?.match(/⏱\s*(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
-      if (timeMatch) {
-        const [, start, end] = timeMatch;
-        const [sh, sm] = start.split(":").map(Number);
-        const [eh, em] = end.split(":").map(Number);
-        const startAngle = ((sh + sm / 60) / 24) * 360 - 90;
-        const endAngle = ((eh + em / 60) / 24) * 360 - 90;
-        return { startAngle, endAngle, category: cat, text: t.text, time: `${start}-${end}` };
-      }
-      return null;
-    }).filter(Boolean);
-  }, [allTodos, today]);
-
   const getHeatColor = (count: number) => {
-    if (count === 0) return "hsl(30 25% 8%)";
+    if (count === 0) return "hsl(var(--muted))";
     const intensity = count / maxActivity;
-    if (intensity < 0.25) return "hsl(39 58% 53% / 0.2)";
-    if (intensity < 0.5) return "hsl(39 58% 53% / 0.4)";
-    if (intensity < 0.75) return "hsl(39 58% 53% / 0.65)";
-    return "hsl(39 58% 53% / 0.9)";
+    if (intensity < 0.25) return "hsl(var(--primary) / 0.2)";
+    if (intensity < 0.5) return "hsl(var(--primary) / 0.4)";
+    if (intensity < 0.75) return "hsl(var(--primary) / 0.65)";
+    return "hsl(var(--primary) / 0.9)";
   };
 
-  const scoreColor = productivityScore >= 70 ? "text-los-green" : productivityScore >= 40 ? "text-gold" : "text-los-red";
+  const scoreColor = productivityScore >= 70 ? "text-los-green" : productivityScore >= 40 ? "text-primary" : "text-destructive";
   const scoreLabel = productivityScore >= 70 ? "高效" : productivityScore >= 40 ? "正常" : "待提升";
 
   return (
-    <div
-      className="flex flex-col h-full max-w-[700px] mx-auto"
-      onTouchStart={e => setTouchStart(e.touches[0].clientX)}
-      onTouchEnd={e => {
-        const delta = e.changedTouches[0].clientX - touchStart;
-        if (touchStart < 30 && delta > 70) navigate(-1);
-      }}
-    >
+    <div className="flex flex-col h-full max-w-[700px] mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
         <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft size={18} />
         </button>
-        <span className="font-serif-sc text-lg text-foreground">时间都去哪了</span>
-        <div className="ml-auto flex gap-1.5">
+        <span className="font-serif-sc text-base text-foreground">时间都去哪了</span>
+        <div className="ml-auto flex gap-1">
           <button onClick={() => setShowSearch(!showSearch)}
-            className={`p-1.5 rounded-lg transition ${showSearch ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
-            <Search size={16} />
+            className={`p-1.5 rounded-lg transition ${showSearch ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>
+            <Search size={15} />
           </button>
           <button onClick={() => setShowQuickEntry(!showQuickEntry)}
-            className={`p-1.5 rounded-lg transition ${showQuickEntry ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
-            <Timer size={16} />
+            className={`p-1.5 rounded-lg transition ${showQuickEntry ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>
+            <Timer size={15} />
           </button>
         </div>
       </div>
 
-      {/* Search bar */}
+      {/* Search */}
       {showSearch && (
         <div className="px-4 mb-2">
           <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
             placeholder="搜索活动、备注、标签..."
             autoFocus
-            className="w-full bg-surface-2 border border-border rounded-xl px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-gold-border" />
+            className="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary" />
           {searchResults.length > 0 && (
-            <div className="mt-2 bg-card border border-border rounded-xl max-h-[200px] overflow-y-auto">
+            <div className="mt-2 bg-card border border-border rounded-xl max-h-[160px] overflow-y-auto">
               {searchResults.map(t => (
-                <div key={t.id} className="px-3 py-2 border-b border-border last:border-0">
-                  <p className="text-xs text-foreground">{t.text}</p>
-                  <div className="flex gap-2 mt-0.5">
-                    {t.note && <span className="text-[9px] text-muted-foreground truncate">{t.note}</span>}
-                    <span className="text-[9px] text-muted-foreground font-mono-jb">{t.sourceDate || t.completedAt?.split("T")[0]}</span>
-                  </div>
+                <div key={t.id} className="px-3 py-1.5 border-b border-border last:border-0">
+                  <p className="text-[11px] text-foreground">{t.text}</p>
+                  <span className="text-[9px] text-muted-foreground">{t.sourceDate || t.completedAt?.split("T")[0]}</span>
                 </div>
               ))}
             </div>
@@ -334,429 +284,259 @@ export default function TimeStatsPage() {
         </div>
       )}
 
-      {/* Time Range + View Mode Tabs */}
+      {/* Tabs */}
       <div className="flex gap-1 px-4 mb-3 justify-between">
         <div className="flex gap-1">
-          {([
-            { key: "today" as TimeRange, label: "今天" },
-            { key: "week" as TimeRange, label: "本周" },
-            { key: "month" as TimeRange, label: "本月" },
-          ]).map(t => (
-            <button
-              key={t.key}
-              onClick={() => setRange(t.key)}
-              className={`text-xs px-3 py-1.5 rounded-full transition ${range === t.key ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}
-            >
-              {t.label}
+          {(["today", "week", "month"] as TimeRange[]).map(key => (
+            <button key={key} onClick={() => setRange(key)}
+              className={`text-[11px] px-3 py-1 rounded-full transition ${range === key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+              {key === "today" ? "今天" : key === "week" ? "本周" : "本月"}
             </button>
           ))}
         </div>
         <div className="flex gap-1">
           <button onClick={() => setViewMode("overview")}
-            className={`text-[10px] px-2 py-1 rounded-full transition ${viewMode === "overview" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>
-            概览
-          </button>
+            className={`text-[10px] px-2 py-1 rounded-full transition ${viewMode === "overview" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>概览</button>
           <button onClick={() => setViewMode("week")}
-            className={`text-[10px] px-2 py-1 rounded-full transition ${viewMode === "week" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>
-            周视图
-          </button>
+            className={`text-[10px] px-2 py-1 rounded-full transition ${viewMode === "week" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>周视图</button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-4">
-        {/* Quick Time Entry */}
+      <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-3">
         {showQuickEntry && <QuickTimeEntry onClose={() => setShowQuickEntry(false)} />}
 
-        {/* Week View Mode */}
+        {/* Week View */}
         {viewMode === "week" && (
-          <div className="bg-card border border-border rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <CalendarClock size={14} className="text-primary" />
-              <span className="text-xs font-serif-sc text-foreground">周时间色块</span>
+          <div className="bg-card border border-border rounded-2xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <CalendarClock size={13} className="text-primary" />
+              <span className="text-[11px] font-serif-sc text-foreground">周时间色块</span>
             </div>
-            <div className="flex gap-1">
-              {/* Hour labels */}
-              <div className="flex flex-col justify-between text-[7px] text-muted-foreground pr-1" style={{ height: 240 }}>
-                {[6, 9, 12, 15, 18, 21, 24].map(h => (
-                  <span key={h}>{h}:00</span>
-                ))}
+            <div className="flex gap-[2px]">
+              <div className="flex flex-col justify-between text-[6px] text-muted-foreground pr-0.5" style={{ height: 180 }}>
+                {[6, 12, 18, 24].map(h => <span key={h}>{h}</span>)}
               </div>
-              {/* Day columns */}
               {weekViewData.map((day, di) => (
                 <div key={di} className="flex-1 flex flex-col">
-                  <span className={`text-[8px] text-center mb-1 ${day.date === today ? "text-primary font-bold" : "text-muted-foreground"}`}>
-                    {day.label}
-                  </span>
-                  <div className="relative bg-surface-2 rounded-lg flex-1" style={{ height: 240 }}>
+                  <span className={`text-[7px] text-center mb-0.5 ${day.date === today ? "text-primary font-bold" : "text-muted-foreground"}`}>{day.label}</span>
+                  <div className="relative bg-muted rounded flex-1" style={{ height: 180 }}>
                     {(day.blocks as any[]).map((block: any, bi: number) => {
                       const top = ((block.startHour - 6) / 18) * 100;
                       const height = ((block.endHour - block.startHour) / 18) * 100;
                       return (
-                        <div key={bi}
-                          className="absolute left-0.5 right-0.5 rounded-sm"
-                          style={{
-                            top: `${Math.max(0, top)}%`,
-                            height: `${Math.max(2, height)}%`,
-                            background: CATEGORY_COLORS[block.category] || CATEGORY_COLORS["其他"],
-                            opacity: 0.8,
-                          }}
-                          title={`${block.text}`}
-                        />
+                        <div key={bi} className="absolute left-0.5 right-0.5 rounded-sm"
+                          style={{ top: `${Math.max(0, top)}%`, height: `${Math.max(2, height)}%`, background: CATEGORY_COLORS[block.category] || CATEGORY_COLORS["其他"], opacity: 0.8 }}
+                          title={block.text} />
                       );
                     })}
                   </div>
                 </div>
               ))}
             </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 justify-center">
-              {Object.entries(CATEGORY_COLORS).slice(0, 6).map(([cat, color]) => (
-                <div key={cat} className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-sm" style={{ background: color }} />
-                  <span className="text-[7px] text-muted-foreground">{cat}</span>
-                </div>
-              ))}
-            </div>
           </div>
         )}
 
-        {/* Time Disc (24h clock) - shown in overview today */}
-        {viewMode === "overview" && range === "today" && (timeDiscData as any[]).length > 0 && (
-          <div className="bg-card border border-border rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Clock size={14} className="text-primary" />
-              <span className="text-xs font-serif-sc text-foreground">24小时圆盘</span>
-            </div>
-            <div className="flex justify-center">
-              <svg viewBox="0 0 200 200" className="w-[180px] h-[180px]">
-                {/* Background circle */}
-                <circle cx="100" cy="100" r="85" fill="none" stroke="hsl(var(--border))" strokeWidth="20" />
-                {/* Hour markers */}
-                {Array.from({ length: 24 }, (_, i) => {
-                  const angle = (i / 24) * 360 - 90;
-                  const rad = angle * Math.PI / 180;
-                  const x1 = 100 + 75 * Math.cos(rad);
-                  const y1 = 100 + 75 * Math.sin(rad);
-                  const x2 = 100 + 95 * Math.cos(rad);
-                  const y2 = 100 + 95 * Math.sin(rad);
-                  const tx = 100 + 68 * Math.cos(rad);
-                  const ty = 100 + 68 * Math.sin(rad);
-                  return (
-                    <g key={i}>
-                      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="hsl(var(--muted-foreground))" strokeWidth={i % 6 === 0 ? 1.5 : 0.5} opacity={0.3} />
-                      {i % 6 === 0 && <text x={tx} y={ty} textAnchor="middle" dominantBaseline="central" fill="hsl(var(--muted-foreground))" fontSize="7">{i}</text>}
-                    </g>
-                  );
-                })}
-                {/* Time blocks as arcs */}
-                {(timeDiscData as any[]).map((block: any, i: number) => {
-                  const startRad = block.startAngle * Math.PI / 180;
-                  const endRad = block.endAngle * Math.PI / 180;
-                  const r = 85;
-                  const x1 = 100 + r * Math.cos(startRad);
-                  const y1 = 100 + r * Math.sin(startRad);
-                  const x2 = 100 + r * Math.cos(endRad);
-                  const y2 = 100 + r * Math.sin(endRad);
-                  const largeArc = (block.endAngle - block.startAngle) > 180 ? 1 : 0;
-                  return (
-                    <path key={i}
-                      d={`M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`}
-                      fill="none"
-                      stroke={CATEGORY_COLORS[block.category] || CATEGORY_COLORS["其他"]}
-                      strokeWidth="18"
-                      opacity="0.75"
-                    >
-                      <title>{block.text} ({block.time})</title>
-                    </path>
-                  );
-                })}
-              </svg>
-            </div>
-          </div>
-        )}
-        {/* ─── Hero: Productivity Score ─── */}
-        <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-5">
-          <div className="relative w-[88px] h-[88px]">
+        {/* Hero Score - more compact */}
+        <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-4">
+          <div className="relative w-16 h-16 flex-shrink-0">
             <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-              <circle cx="50" cy="50" r="42" fill="none" stroke="hsl(var(--border))" strokeWidth="7" />
-              <circle
-                cx="50" cy="50" r="42" fill="none"
-                stroke="hsl(var(--primary))"
-                strokeWidth="7"
-                strokeLinecap="round"
-                strokeDasharray={`${productivityScore * 2.64} 264`}
-                className="transition-all duration-1000"
-              />
+              <circle cx="50" cy="50" r="42" fill="none" stroke="hsl(var(--border))" strokeWidth="8" />
+              <circle cx="50" cy="50" r="42" fill="none" stroke="hsl(var(--primary))" strokeWidth="8" strokeLinecap="round"
+                strokeDasharray={`${productivityScore * 2.64} 264`} className="transition-all duration-1000" />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={`text-2xl font-mono-jb font-bold ${scoreColor}`}>{productivityScore}</span>
-              <span className="text-[8px] text-muted-foreground">{scoreLabel}</span>
+              <span className={`text-lg font-mono-jb font-bold ${scoreColor}`}>{productivityScore}</span>
+              <span className="text-[7px] text-muted-foreground">{scoreLabel}</span>
             </div>
           </div>
-          <div className="flex-1 grid grid-cols-2 gap-3">
-            <div>
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Target size={11} className="text-primary" />
-                <span className="text-[9px] text-muted-foreground">完成率</span>
+          <div className="flex-1 grid grid-cols-2 gap-2">
+            {[
+              { icon: <Target size={10} className="text-primary" />, label: "完成率", value: `${stats.total > 0 ? Math.round(stats.done / stats.total * 100) : 0}%` },
+              { icon: <Flame size={10} className="text-los-orange" />, label: "连续", value: `${streak}天` },
+              { icon: <Zap size={10} className="text-los-blue" />, label: "情绪", value: stats.avgEmotion },
+              { icon: <Clock size={10} className="text-los-green" />, label: "活跃", value: `${stats.activeDays}天` },
+            ].map((s, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                {s.icon}
+                <div>
+                  <div className="text-[8px] text-muted-foreground">{s.label}</div>
+                  <div className="text-sm font-mono-jb text-foreground leading-none">{s.value}</div>
+                </div>
               </div>
-              <span className="text-lg font-mono-jb text-foreground">
-                {stats.total > 0 ? Math.round(stats.done / stats.total * 100) : 0}%
-              </span>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Flame size={11} className="text-los-orange" />
-                <span className="text-[9px] text-muted-foreground">连续打卡</span>
-              </div>
-              <span className="text-lg font-mono-jb text-foreground">{streak}天</span>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Zap size={11} className="text-los-blue" />
-                <span className="text-[9px] text-muted-foreground">情绪均值</span>
-              </div>
-              <span className="text-lg font-mono-jb text-foreground">{stats.avgEmotion}</span>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Clock size={11} className="text-los-green" />
-                <span className="text-[9px] text-muted-foreground">活跃天数</span>
-              </div>
-              <span className="text-lg font-mono-jb text-foreground">{stats.activeDays}</span>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* ─── Activity Heatmap (GitHub-style) ─── */}
-        <div className="bg-card border border-border rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <CalendarClock size={14} className="text-primary" />
-            <span className="text-xs font-serif-sc text-foreground">活跃热力图</span>
-            <span className="ml-auto text-[8px] text-muted-foreground">近 12 周</span>
+        {/* Compact Heatmap */}
+        <div className="bg-card border border-border rounded-2xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <CalendarClock size={12} className="text-primary" />
+            <span className="text-[11px] font-serif-sc text-foreground">活跃热力图</span>
+            <span className="ml-auto text-[7px] text-muted-foreground">近 8 周</span>
           </div>
-          <div className="flex gap-[3px] overflow-x-auto pb-1">
+          <div className="flex gap-[2px] overflow-x-auto">
             {heatmapData.map((week, wi) => (
-              <div key={wi} className="flex flex-col gap-[3px]">
+              <div key={wi} className="flex flex-col gap-[2px]">
                 {week.map((day, di) => (
-                  <div
-                    key={di}
-                    className="w-[10px] h-[10px] rounded-[2px] transition-colors"
+                  <div key={di} className="w-[8px] h-[8px] rounded-[1.5px]"
                     style={{ background: getHeatColor(day.count) }}
-                    title={`${format(day.date, "MM-dd")}: ${day.count} 项活动`}
-                  />
+                    title={`${format(day.date, "MM-dd")}: ${day.count}`} />
                 ))}
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-end gap-1.5 mt-2">
-            <span className="text-[7px] text-muted-foreground">少</span>
+          <div className="flex items-center justify-end gap-1 mt-1.5">
+            <span className="text-[6px] text-muted-foreground">少</span>
             {[0, 0.2, 0.4, 0.65, 0.9].map((op, i) => (
-              <div
-                key={i}
-                className="w-[8px] h-[8px] rounded-[2px]"
-                style={{ background: i === 0 ? "hsl(30 25% 8%)" : `hsl(39 58% 53% / ${op})` }}
-              />
+              <div key={i} className="w-[6px] h-[6px] rounded-[1px]"
+                style={{ background: i === 0 ? "hsl(var(--muted))" : `hsl(var(--primary) / ${op})` }} />
             ))}
-            <span className="text-[7px] text-muted-foreground">多</span>
+            <span className="text-[6px] text-muted-foreground">多</span>
           </div>
         </div>
 
-        {/* ─── Energy Curve Chart ─── */}
+        {/* Compact Energy Curve */}
         {energyLogs.length > 0 && (
-          <div className="bg-card border border-border rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Battery size={14} className="text-los-green" />
-              <span className="text-xs font-serif-sc text-foreground">精力曲线</span>
-              <span className="ml-auto text-[8px] text-muted-foreground">近 7 天</span>
+          <div className="bg-card border border-border rounded-2xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Battery size={12} className="text-los-green" />
+              <span className="text-[11px] font-serif-sc text-foreground">精力曲线</span>
             </div>
-            <ResponsiveContainer width="100%" height={160}>
+            <ResponsiveContainer width="100%" height={100}>
               <LineChart data={(() => {
                 const levelToNum = (l: string) => l === '高' ? 3 : l === '中' ? 2 : l === '低' ? 1 : 0;
                 const sevenDaysAgo = subDays(new Date(), 7);
                 return energyLogs
                   .filter(l => new Date(l.timestamp) >= sevenDaysAgo)
                   .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-                  .map(l => ({
-                    time: format(new Date(l.timestamp), "M/d HH:mm"),
-                    level: levelToNum(l.level),
-                    label: l.level,
-                  }));
+                  .map(l => ({ time: format(new Date(l.timestamp), "M/d"), level: levelToNum(l.level) }));
               })()}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="time" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} axisLine={false} tickLine={false} />
-                <YAxis
-                  domain={[0, 3]}
-                  ticks={[0, 1, 2, 3]}
-                  tickFormatter={(v: number) => ['透支', '低', '中', '高'][v] || ''}
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={30}
-                />
-                <Tooltip
-                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }}
-                  formatter={(value: number) => [['透支', '低', '中', '高'][value] || '', '精力']}
-                />
-                <Line type="monotone" dataKey="level" stroke="hsl(39 58% 53%)" strokeWidth={2} dot={{ fill: "hsl(39 58% 53%)", r: 4 }} />
+                <XAxis dataKey="time" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 8 }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 3]} ticks={[1, 2, 3]} tickFormatter={(v: number) => ['', '低', '中', '高'][v] || ''}
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 8 }} axisLine={false} tickLine={false} width={24} />
+                <Line type="monotone" dataKey="level" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         )}
 
-        {/* ─── Diary Timeline ─── */}
+        {/* Diary Timeline - auto-extracted, editable */}
         <DiaryTimeline entries={entries} today={today} />
 
-        {/* ─── Category Pie (爱时间-style with center label) ─── */}
-        <div className="bg-card border border-border rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Clock size={14} className="text-primary" />
-            <span className="text-xs font-serif-sc text-foreground">时间分布</span>
+        {/* Category Pie - compact */}
+        <div className="bg-card border border-border rounded-2xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock size={12} className="text-primary" />
+            <span className="text-[11px] font-serif-sc text-foreground">时间分布</span>
           </div>
           {categoryData.length > 0 ? (
-            <div className="flex items-center gap-4">
-              <div className="relative w-[140px] h-[140px]">
+            <div className="flex items-center gap-3">
+              <div className="relative w-[100px] h-[100px] flex-shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={categoryData} cx="50%" cy="50%" innerRadius={38} outerRadius={62} dataKey="value" stroke="none" paddingAngle={2}>
+                    <Pie data={categoryData} cx="50%" cy="50%" innerRadius={30} outerRadius={45} dataKey="value" stroke="none" paddingAngle={2}>
                       {categoryData.map((entry, i) => (
                         <Cell key={i} fill={CATEGORY_COLORS[entry.name] || CATEGORY_COLORS["其他"]} />
                       ))}
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-xl font-mono-jb font-bold text-foreground">{stats.done}</span>
-                  <span className="text-[8px] text-muted-foreground">已完成</span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-base font-mono-jb font-bold text-foreground">{stats.done}</span>
+                  <span className="text-[7px] text-muted-foreground">完成</span>
                 </div>
               </div>
-              <div className="flex-1 space-y-2">
-                {categoryData.map((d) => {
+              <div className="flex-1 space-y-1.5">
+                {categoryData.slice(0, 5).map(d => {
                   const total = categoryData.reduce((s, c) => s + c.value, 0);
                   const pct = Math.round((d.value / total) * 100);
                   return (
-                    <div key={d.name} className="space-y-0.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: CATEGORY_COLORS[d.name] || CATEGORY_COLORS["其他"] }} />
-                          <span className="text-[10px] text-foreground">{d.name}</span>
-                        </div>
-                        <span className="text-[10px] font-mono-jb text-muted-foreground">{pct}%</span>
-                      </div>
-                      <div className="h-[3px] rounded-full bg-secondary ml-4">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${pct}%`,
-                            background: CATEGORY_COLORS[d.name] || CATEGORY_COLORS["其他"],
-                          }}
-                        />
-                      </div>
+                    <div key={d.name} className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: CATEGORY_COLORS[d.name] || CATEGORY_COLORS["其他"] }} />
+                      <span className="text-[10px] text-foreground flex-1">{d.name}</span>
+                      <span className="text-[9px] font-mono-jb text-muted-foreground">{pct}%</span>
                     </div>
                   );
                 })}
               </div>
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground/50 text-center py-6">暂无数据</p>
+            <p className="text-[11px] text-muted-foreground/50 text-center py-4">暂无数据</p>
           )}
         </div>
 
-        {/* ─── Stacked Category Bar (Toggl-style) ─── */}
+        {/* Stacked Bar - compact */}
         {activeCats.length > 0 && (
-          <div className="bg-card border border-border rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp size={14} className="text-primary" />
-              <span className="text-xs font-serif-sc text-foreground">每日分类明细</span>
+          <div className="bg-card border border-border rounded-2xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp size={12} className="text-primary" />
+              <span className="text-[11px] font-serif-sc text-foreground">每日分类</span>
             </div>
-            <div className="h-[180px]">
+            <div className="h-[120px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stackedDailyData} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
-                  <XAxis dataKey="date" tick={{ fontSize: 8, fill: "hsl(30 12% 37%)" }} />
-                  <YAxis tick={{ fontSize: 8, fill: "hsl(30 12% 37%)" }} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{ background: "hsl(30 25% 8%)", border: "1px solid hsl(30 28% 11%)", borderRadius: "8px", fontSize: "10px" }}
-                    labelStyle={{ color: "hsl(30 14% 78%)" }}
-                  />
+                <BarChart data={stackedDailyData} margin={{ top: 2, right: 2, bottom: 2, left: -25 }}>
+                  <XAxis dataKey="date" tick={{ fontSize: 7, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis tick={{ fontSize: 7, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
+                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 10 }} />
                   {activeCats.map(cat => (
                     <Bar key={cat} dataKey={cat} stackId="a" fill={CATEGORY_COLORS[cat] || CATEGORY_COLORS["其他"]} radius={0} />
                   ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 justify-center">
-              {activeCats.map(cat => (
-                <div key={cat} className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-sm" style={{ background: CATEGORY_COLORS[cat] }} />
-                  <span className="text-[8px] text-muted-foreground">{cat}</span>
-                </div>
-              ))}
-            </div>
           </div>
         )}
 
-        {/* ─── Emotion Wave (link to InsightsPage for deeper analysis) ─── */}
+        {/* Emotion mini-bar */}
         {emotionTrend.length > 1 && (
-          <div className="bg-card border border-border rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-3">
+          <div className="bg-card border border-border rounded-2xl p-3">
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm">💫</span>
-                <span className="text-xs font-serif-sc text-foreground">情绪波动</span>
+                <span className="text-[11px] font-serif-sc text-foreground">情绪波动</span>
               </div>
-              <button onClick={() => navigate("/insights")} className="text-[9px] text-primary hover:text-primary/80 transition">
-                查看详细分析 →
-              </button>
+              <button onClick={() => navigate("/insights")} className="text-[9px] text-primary">详细 →</button>
             </div>
-            <div className="flex items-end gap-[3px] h-[50px]">
+            <div className="flex items-end gap-[2px] h-[36px]">
               {emotionTrend.slice(-14).map((d, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative">
-                  <div
-                    className="w-full rounded-t transition-all"
+                <div key={i} className="flex-1">
+                  <div className="w-full rounded-t transition-all"
                     style={{
-                      height: `${(d.score / 10) * 40}px`,
-                      background: d.score >= 7 ? "hsl(var(--los-green))" : d.score >= 4 ? "hsl(var(--gold))" : "hsl(var(--los-red))",
+                      height: `${(d.score / 10) * 32}px`,
+                      background: d.score >= 7 ? "hsl(var(--los-green))" : d.score >= 4 ? "hsl(var(--primary))" : "hsl(var(--destructive))",
                       minHeight: "2px",
-                    }}
-                  />
+                    }} />
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* ─── Smart Insight ─── */}
+        {/* Smart Insight */}
         {stats.topCategory !== "无数据" && (
-          <div className="bg-card border border-primary/20 rounded-2xl p-4 space-y-1">
+          <div className="bg-card border border-primary/20 rounded-2xl p-3">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm">📊</span>
-              <span className="text-xs font-serif-sc text-foreground">洞察</span>
+              <span className="text-[11px] font-serif-sc text-foreground">洞察</span>
             </div>
-            <p className="text-xs text-foreground/90 leading-relaxed">
+            <p className="text-[11px] text-foreground/90 leading-relaxed">
               这{range === "today" ? "天" : range === "week" ? "周" : "月"}你在「{stats.topCategory}」上花了最多精力
               {stats.done > 0 && `，完成了 ${stats.done} 项任务`}。
-              {productivityScore >= 70 && " 效率非常棒，继续保持！🎯"}
-              {productivityScore >= 40 && productivityScore < 70 && " 节奏还不错，可以再聚焦一些。"}
-              {productivityScore < 40 && " 试试把精力集中在最重要的事上？"}
+              {productivityScore >= 70 && " 效率非常棒！🎯"}
+              {productivityScore >= 40 && productivityScore < 70 && " 节奏不错，可以再聚焦一些。"}
+              {productivityScore < 40 && " 试试集中精力在最重要的事上？"}
             </p>
-            {Number(stats.avgEmotion) > 0 && Number(stats.avgEmotion) < 5 && (
-              <p className="text-[10px] text-muted-foreground">
-                情绪均值偏低，试试在日记里聊聊感受？
-              </p>
-            )}
-            {streak >= 7 && (
-              <p className="text-[10px] text-primary">
-                🔥 已连续记录 {streak} 天，太棒了！
-              </p>
-            )}
           </div>
         )}
 
-        {/* ─── AI Deep Analysis ─── */}
+        {/* AI Analysis */}
         <AiAnalysis categoryData={categoryData} stats={stats} emotionTrend={emotionTrend} dailyData={dailyData} range={range} />
       </div>
     </div>
   );
 }
 
-/* ─── Diary Timeline Component ─── */
+/* ─── Diary Timeline - auto-extracted with editable blocks ─── */
 function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
   const { allTodos, updateTodo, todayKey } = useLifeOs();
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
@@ -764,15 +544,15 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
   const [extracted, setExtracted] = useState(false);
   const [summary, setSummary] = useState("");
   const [matchedCount, setMatchedCount] = useState(0);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editBlock, setEditBlock] = useState<TimeBlock | null>(null);
 
-  const todayEntry = entries.find(e => e.date === today);
+  const todayEntry = entries.find((e: any) => e.date === today);
   const hasMessages = todayEntry && todayEntry.messages.length > 0;
 
-  // Auto-match time blocks to todos and update their notes
   const matchBlocksToTodos = (blocks: TimeBlock[]) => {
     let matched = 0;
     blocks.forEach(block => {
-      // Find matching todo by fuzzy text match
       const matchingTodo = allTodos.find(t => {
         const text = t.text.toLowerCase();
         const activity = block.activity.toLowerCase();
@@ -799,25 +579,19 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
     try {
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
         body: JSON.stringify({
           messages: todayEntry.messages.map((m: any) => ({ role: m.role, content: m.content })),
           mode: "time-extract",
         }),
       });
-      if (!resp.ok) throw new Error("提取失败");
+      if (!resp.ok) throw new Error();
       const data = await resp.json();
       const blocks = data.timeBlocks || [];
       setTimeBlocks(blocks);
       setSummary(data.summary || "");
       setExtracted(true);
-      // Auto-match to todos
-      if (blocks.length > 0) {
-        matchBlocksToTodos(blocks);
-      }
+      if (blocks.length > 0) matchBlocksToTodos(blocks);
     } catch {
       setTimeBlocks([]);
     } finally {
@@ -825,98 +599,100 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
     }
   };
 
-  if (!hasMessages) return null;
+  // Auto-extract on mount if today has messages
+  useMemo(() => {
+    if (hasMessages && !extracted && !loading) {
+      extractTimeline();
+    }
+  }, [hasMessages]);
 
-  if (!extracted && !loading) {
-    return (
-      <button
-        onClick={extractTimeline}
-        className="w-full bg-card border border-border rounded-2xl p-4 flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition"
-      >
-        <CalendarClock size={14} />
-        <span className="font-serif-sc">从今日日记提取时间线</span>
-      </button>
-    );
-  }
+  const saveEdit = (idx: number) => {
+    if (!editBlock) return;
+    const newBlocks = [...timeBlocks];
+    // Recalculate duration
+    const [sh, sm] = editBlock.startTime.split(":").map(Number);
+    const [eh, em] = editBlock.endTime.split(":").map(Number);
+    const dur = (eh * 60 + em) - (sh * 60 + sm);
+    newBlocks[idx] = { ...editBlock, durationMinutes: Math.max(dur, 1) };
+    setTimeBlocks(newBlocks);
+    setEditingIdx(null);
+    setEditBlock(null);
+  };
+
+  if (!hasMessages) return null;
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-2xl p-6 flex items-center justify-center gap-2">
+      <div className="bg-card border border-border rounded-2xl p-4 flex items-center justify-center gap-2">
         <Loader2 size={14} className="animate-spin text-primary" />
-        <span className="text-xs text-muted-foreground">正在从日记中提取时间线…</span>
+        <span className="text-[11px] text-muted-foreground">提取时间线…</span>
       </div>
     );
   }
 
-  if (timeBlocks.length === 0) {
+  if (timeBlocks.length === 0 && extracted) {
     return (
-      <div className="bg-card border border-border rounded-2xl p-4 text-center">
-        <p className="text-xs text-muted-foreground/50">日记中未发现可提取的时间信息</p>
+      <div className="bg-card border border-border rounded-2xl p-3 text-center">
+        <p className="text-[11px] text-muted-foreground/50">日记中未发现时间信息</p>
+        <button onClick={extractTimeline} className="text-[10px] text-primary mt-1">重新提取</button>
       </div>
     );
   }
+
+  if (timeBlocks.length === 0) return null;
 
   const totalMinutes = timeBlocks.reduce((s, b) => s + b.durationMinutes, 0);
   const totalHours = (totalMinutes / 60).toFixed(1);
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-4">
+    <div className="bg-card border border-primary/20 rounded-2xl p-3">
       <div className="flex items-center gap-2 mb-1">
-        <CalendarClock size={14} className="text-primary" />
-        <span className="text-xs font-serif-sc text-foreground">今日时间线</span>
+        <CalendarClock size={12} className="text-primary" />
+        <span className="text-[11px] font-serif-sc text-foreground">今日时间线</span>
         <span className="ml-auto text-[9px] text-muted-foreground font-mono-jb">{totalHours}h</span>
         <button onClick={extractTimeline} className="text-[9px] text-muted-foreground/50 hover:text-primary">刷新</button>
       </div>
-      {summary && <p className="text-[10px] text-muted-foreground mb-3">{summary}</p>}
-      {matchedCount > 0 && (
-        <p className="text-[10px] text-los-green mb-2">✅ 已自动匹配 {matchedCount} 条待办的用时</p>
-      )}
-      {/* Horizontal stacked bar overview */}
-      <div className="h-[6px] rounded-full bg-secondary mb-3 flex overflow-hidden">
+      {summary && <p className="text-[10px] text-muted-foreground mb-2">{summary}</p>}
+      {matchedCount > 0 && <p className="text-[9px] text-los-green mb-2">✅ 已匹配 {matchedCount} 条待办用时</p>}
+
+      {/* Compact stacked bar */}
+      <div className="h-[4px] rounded-full bg-muted mb-2 flex overflow-hidden">
         {timeBlocks.map((block, i) => (
-          <div
-            key={i}
-            className="h-full transition-all"
-            style={{
-              width: `${(block.durationMinutes / totalMinutes) * 100}%`,
-              background: CATEGORY_COLORS[block.category] || CATEGORY_COLORS["其他"],
-            }}
-            title={`${block.activity} ${block.durationMinutes}min`}
-          />
+          <div key={i} className="h-full"
+            style={{ width: `${(block.durationMinutes / totalMinutes) * 100}%`, background: CATEGORY_COLORS[block.category] || CATEGORY_COLORS["其他"] }}
+            title={`${block.activity} ${block.durationMinutes}min`} />
         ))}
       </div>
 
-      <div className="relative pl-6 space-y-0">
+      {/* Editable timeline entries */}
+      <div className="space-y-1">
         {timeBlocks.map((block, i) => (
-          <div key={i} className="relative flex gap-3 pb-3 last:pb-0">
-            {i < timeBlocks.length - 1 && (
-              <div className="absolute left-[-14px] top-[14px] w-[1px] bg-border" style={{ height: "calc(100%)" }} />
+          <div key={i} className="flex items-center gap-2 group">
+            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              style={{ background: CATEGORY_COLORS[block.category] || CATEGORY_COLORS["其他"] }} />
+            {editingIdx === i && editBlock ? (
+              <div className="flex-1 flex items-center gap-1">
+                <input value={editBlock.startTime} onChange={e => setEditBlock({ ...editBlock, startTime: e.target.value })}
+                  className="w-12 bg-muted border border-border rounded px-1 py-0.5 text-[9px] text-foreground font-mono-jb" />
+                <span className="text-[9px] text-muted-foreground">-</span>
+                <input value={editBlock.endTime} onChange={e => setEditBlock({ ...editBlock, endTime: e.target.value })}
+                  className="w-12 bg-muted border border-border rounded px-1 py-0.5 text-[9px] text-foreground font-mono-jb" />
+                <input value={editBlock.activity} onChange={e => setEditBlock({ ...editBlock, activity: e.target.value })}
+                  className="flex-1 bg-muted border border-border rounded px-1 py-0.5 text-[9px] text-foreground" />
+                <button onClick={() => saveEdit(i)} className="text-los-green"><Check size={12} /></button>
+                <button onClick={() => { setEditingIdx(null); setEditBlock(null); }} className="text-muted-foreground"><X size={12} /></button>
+              </div>
+            ) : (
+              <>
+                <span className="text-[9px] font-mono-jb text-muted-foreground w-[72px] flex-shrink-0">{block.startTime}-{block.endTime}</span>
+                <span className="text-[10px] text-foreground flex-1 truncate">{block.activity}</span>
+                <span className="text-[8px] text-muted-foreground font-mono-jb">{block.durationMinutes}m</span>
+                <button onClick={() => { setEditingIdx(i); setEditBlock({ ...block }); }}
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-opacity">
+                  <Pencil size={10} />
+                </button>
+              </>
             )}
-            <div
-              className="absolute left-[-17px] top-[4px] w-[7px] h-[7px] rounded-full border-2 border-background"
-              style={{ background: CATEGORY_COLORS[block.category] || CATEGORY_COLORS["其他"] }}
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono-jb text-muted-foreground whitespace-nowrap">
-                  {block.startTime}-{block.endTime}
-                </span>
-                <span className="text-[10px] text-foreground truncate">{block.activity}</span>
-              </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span
-                  className="text-[8px] px-1.5 py-0.5 rounded-full"
-                  style={{
-                    background: `${CATEGORY_COLORS[block.category] || CATEGORY_COLORS["其他"]}20`,
-                    color: CATEGORY_COLORS[block.category] || CATEGORY_COLORS["其他"],
-                  }}
-                >
-                  {block.category}
-                </span>
-                <span className="text-[8px] text-muted-foreground/50 font-mono-jb">{block.durationMinutes}min</span>
-                {block.note && <span className="text-[8px] text-muted-foreground/40 truncate">{block.note}</span>}
-              </div>
-            </div>
           </div>
         ))}
       </div>
@@ -924,7 +700,7 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
   );
 }
 
-/* ─── AI Analysis Component ─── */
+/* ─── AI Analysis ─── */
 function AiAnalysis({
   categoryData, stats, emotionTrend, dailyData, range,
 }: {
@@ -945,8 +721,7 @@ function AiAnalysis({
     const emotionInfo = emotionTrend.filter(e => e.score > 0);
     const avgEmotion = emotionInfo.length > 0
       ? (emotionInfo.reduce((s, e) => s + e.score, 0) / emotionInfo.length).toFixed(1) : "无数据";
-    const dailySummary = dailyData.filter(d => d.total > 0).map(d => `${d.date}: 完成${d.done}/${d.total}`).join("；");
-    return `时间范围：${rangeName}\n任务总数：${stats.total}，已完成：${stats.done}，完成率：${completionRate}%\n分类分布：${catBreakdown || "暂无数据"}\n情绪均值：${avgEmotion}\n活跃天数：${stats.activeDays}\n每日明细：${dailySummary || "暂无"}`;
+    return `时间范围：${rangeName}\n任务总数：${stats.total}，已完成：${stats.done}，完成率：${completionRate}%\n分类分布：${catBreakdown || "暂无"}\n情绪均值：${avgEmotion}\n活跃天数：${stats.activeDays}`;
   };
 
   const runAnalysis = async () => {
@@ -955,87 +730,68 @@ function AiAnalysis({
     try {
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
         body: JSON.stringify({ messages: [{ role: "user", content: buildContext() }], mode: "time-analysis" }),
       });
-      if (!resp.ok) throw new Error("分析失败");
-      const data = await resp.json();
-      setAnalysis(data);
-    } catch {
-      setError("AI 分析暂时不可用，请稍后再试");
-    } finally {
-      setLoading(false);
-    }
+      if (!resp.ok) throw new Error();
+      setAnalysis(await resp.json());
+    } catch { setError("AI 分析暂不可用"); } finally { setLoading(false); }
   };
 
   if (!analysis && !loading) {
     return (
-      <button
-        onClick={runAnalysis}
-        className="w-full bg-card border border-border rounded-2xl p-4 flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition"
-      >
-        <Sparkles size={14} />
-        <span className="font-serif-sc">AI 深度分析我的时间</span>
+      <button onClick={runAnalysis}
+        className="w-full bg-card border border-border rounded-2xl p-3 flex items-center justify-center gap-2 text-[11px] text-muted-foreground hover:text-primary hover:border-primary/30 transition">
+        <Sparkles size={13} />
+        <span className="font-serif-sc">AI 深度分析</span>
       </button>
     );
   }
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-2xl p-6 flex items-center justify-center gap-2">
+      <div className="bg-card border border-border rounded-2xl p-4 flex items-center justify-center gap-2">
         <Loader2 size={14} className="animate-spin text-primary" />
-        <span className="text-xs text-muted-foreground">罗盘正在分析你的时间分布…</span>
+        <span className="text-[11px] text-muted-foreground">分析中…</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-2xl p-4">
-        <p className="text-xs text-destructive text-center">{error}</p>
-        <button onClick={runAnalysis} className="text-[10px] text-primary mt-2 mx-auto block">重试</button>
+      <div className="bg-card border border-border rounded-2xl p-3 text-center">
+        <p className="text-[11px] text-destructive">{error}</p>
+        <button onClick={runAnalysis} className="text-[10px] text-primary mt-1">重试</button>
       </div>
     );
   }
 
   return (
-    <div className="bg-card border border-primary/20 rounded-2xl p-4 space-y-3">
+    <div className="bg-card border border-primary/20 rounded-2xl p-3 space-y-2">
       <div className="flex items-center gap-2">
-        <Sparkles size={14} className="text-primary" />
-        <span className="text-xs font-serif-sc text-foreground">罗盘分析</span>
+        <Sparkles size={12} className="text-primary" />
+        <span className="text-[11px] font-serif-sc text-foreground">罗盘分析</span>
         <button onClick={runAnalysis} className="ml-auto text-[9px] text-muted-foreground/50 hover:text-primary">刷新</button>
       </div>
-      {analysis.summary && <p className="text-xs text-foreground/90 leading-relaxed">{analysis.summary}</p>}
-      {analysis.insights?.length > 0 && (
-        <div className="space-y-2">
-          {analysis.insights.map((ins: any, i: number) => (
-            <div key={i} className="flex gap-2">
-              <span className="text-sm flex-shrink-0">{ins.icon}</span>
-              <div>
-                <span className="text-[11px] text-foreground font-medium">{ins.title}</span>
-                <p className="text-[10px] text-muted-foreground leading-relaxed">{ins.detail}</p>
-              </div>
-            </div>
-          ))}
+      {analysis.summary && <p className="text-[11px] text-foreground/90 leading-relaxed">{analysis.summary}</p>}
+      {analysis.insights?.map((ins: any, i: number) => (
+        <div key={i} className="flex gap-2">
+          <span className="text-sm flex-shrink-0">{ins.icon}</span>
+          <div>
+            <span className="text-[10px] text-foreground font-medium">{ins.title}</span>
+            <p className="text-[9px] text-muted-foreground leading-relaxed">{ins.detail}</p>
+          </div>
         </div>
-      )}
+      ))}
       {analysis.suggestions?.length > 0 && (
-        <div className="border-t border-border pt-2 space-y-1.5">
-          <span className="text-[10px] text-muted-foreground">💡 建议</span>
+        <div className="border-t border-border pt-2 space-y-1">
+          <span className="text-[9px] text-muted-foreground">💡 建议</span>
           {analysis.suggestions.map((s: any, i: number) => (
-            <div key={i} className="pl-4">
-              <p className="text-[11px] text-foreground">{s.action}</p>
-              <p className="text-[9px] text-muted-foreground/60">{s.reason}</p>
-            </div>
+            <p key={i} className="text-[10px] text-foreground pl-3">{s.action}</p>
           ))}
         </div>
       )}
-      {analysis.encouragement && (
-        <p className="text-[10px] text-primary/80 text-center pt-1">✨ {analysis.encouragement}</p>
-      )}
+      {analysis.encouragement && <p className="text-[9px] text-primary/80 text-center">✨ {analysis.encouragement}</p>}
     </div>
   );
 }

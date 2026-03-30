@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Sun, Moon, LogOut, BookOpen, Info, ChevronRight, Globe, Download, Bot, User, Search } from "lucide-react";
+import { ArrowLeft, Sun, Moon, LogOut, BookOpen, Info, ChevronRight, Globe, Download, Bot, Search, Check } from "lucide-react";
 import { useTheme, ACCENT_OPTIONS, type ThemeMode } from "@/contexts/ThemeContext";
 import { useLanguage, LANGUAGES } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,7 +8,7 @@ import { useState, useEffect } from "react";
 import DataExport from "@/components/DataExport";
 import GlobalSearch from "@/components/GlobalSearch";
 
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "2.1.0";
 
 const CURRENCY_OPTIONS = [
   { key: "CNY", symbol: "¥", label: "人民币 (CNY)" },
@@ -17,6 +17,8 @@ const CURRENCY_OPTIONS = [
   { key: "EUR", symbol: "€", label: "欧元 (EUR)" },
   { key: "GBP", symbol: "£", label: "英镑 (GBP)" },
   { key: "JPY", symbol: "¥", label: "日元 (JPY)" },
+  { key: "KRW", symbol: "₩", label: "韩元 (KRW)" },
+  { key: "RUB", symbol: "₽", label: "卢布 (RUB)" },
 ];
 
 export default function SettingsPage() {
@@ -41,8 +43,9 @@ export default function SettingsPage() {
   // Profile
   const [displayName, setDisplayName] = useState("");
   const [showProfile, setShowProfile] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
 
-  // Load profile settings
+  // Load profile
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("ai_base_url, ai_model, ai_api_key_encrypted, currency, display_name").eq("id", user.id).single()
@@ -74,14 +77,6 @@ export default function SettingsPage() {
     setAiSaving(false);
   };
 
-  const clearAiConfig = async () => {
-    if (!user) return;
-    setAiBaseUrl(""); setAiModel(""); setAiApiKey("");
-    await supabase.from("profiles").update({
-      ai_base_url: null, ai_model: null, ai_api_key_encrypted: null,
-    }).eq("id", user.id);
-  };
-
   const saveCurrency = async (c: string) => {
     setCurrency(c);
     setShowCurrencyPicker(false);
@@ -92,6 +87,8 @@ export default function SettingsPage() {
     if (!user) return;
     await supabase.from("profiles").update({ display_name: displayName || null }).eq("id", user.id);
     setShowProfile(false);
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 2000);
   };
 
   const currentLang = LANGUAGES.find(l => l.key === lang);
@@ -103,197 +100,183 @@ export default function SettingsPage() {
     <div className="flex flex-col h-full max-w-[600px] mx-auto">
       <div className="flex items-center gap-3 px-4 py-3">
         <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground transition"><ArrowLeft size={18} /></button>
-        <span className="font-serif-sc text-lg text-foreground">{t("settings.title")}</span>
+        <span className="font-serif-sc text-base text-foreground">{t("settings.title")}</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24 space-y-4">
-        {/* Global Search */}
-        <section>
-          <button onClick={() => setShowSearch(true)}
-            className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-surface-3 transition">
-            <Search size={14} className="text-muted-foreground" />
-            <span className="text-xs text-muted-foreground flex-1 text-left">搜索日记、待办...</span>
-          </button>
-        </section>
+      <div className="flex-1 overflow-y-auto px-4 pb-24 space-y-3">
+        {/* Search */}
+        <button onClick={() => setShowSearch(true)}
+          className="w-full bg-muted border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 hover:bg-accent transition">
+          <Search size={14} className="text-muted-foreground" />
+          <span className="text-xs text-muted-foreground flex-1 text-left">{t("settings.search_placeholder") || "搜索日记、待办..."}</span>
+        </button>
 
         {/* Account */}
         <section>
-          <p className="text-[10px] text-muted-foreground mb-2 font-mono-jb">{t("settings.account")}</p>
-          <div className="bg-surface-2 border border-border rounded-xl overflow-hidden">
-            <button onClick={() => setShowProfile(!showProfile)} className="w-full flex items-center gap-3 px-4 py-3 border-b border-border hover:bg-surface-3 transition">
-              <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center text-sm text-gold">
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{t("settings.account")}</p>
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <button onClick={() => setShowProfile(!showProfile)} className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-border hover:bg-accent transition">
+              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm text-primary">
                 {displayName?.charAt(0) || user?.email?.charAt(0).toUpperCase() || "U"}
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <p className="text-xs text-foreground truncate">{displayName || user?.email || t("settings.not_logged_in")}</p>
                 <p className="text-[9px] text-muted-foreground">{t("settings.logged_in")}</p>
               </div>
+              {profileSaved && <Check size={14} className="text-los-green" />}
               <ChevronRight size={14} className="text-muted-foreground" />
             </button>
             {showProfile && (
-              <div className="p-4 border-b border-border space-y-3">
+              <div className="p-3 border-b border-border space-y-2">
                 <div>
-                  <p className="text-[10px] text-muted-foreground mb-1">昵称</p>
+                  <p className="text-[10px] text-muted-foreground mb-1">{t("settings.nickname") || "昵称"}</p>
                   <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="输入昵称"
-                    className="w-full bg-surface-3 border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-gold-border" />
+                    className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary" />
                 </div>
-                <button onClick={saveProfile} className="text-xs bg-gold text-background px-4 py-1.5 rounded-lg">保存</button>
+                <button onClick={saveProfile} className="text-xs bg-primary text-primary-foreground px-4 py-1.5 rounded-lg">{t("settings.save") || "保存"}</button>
               </div>
             )}
-            <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-surface-3 transition">
+            <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent transition">
               <LogOut size={14} className="text-destructive" />
               <span className="text-xs text-destructive">{t("settings.logout")}</span>
             </button>
           </div>
         </section>
 
-        {/* Language */}
+        {/* Language & Currency - combined row */}
         <section>
-          <p className="text-[10px] text-muted-foreground mb-2 font-mono-jb">{t("settings.language")}</p>
-          <div className="bg-surface-2 border border-border rounded-xl overflow-hidden relative">
-            <button onClick={() => setShowLangPicker(!showLangPicker)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-3 transition">
-              <Globe size={14} className="text-muted-foreground" />
-              <span className="text-xs text-foreground flex-1">{currentLang?.flag} {currentLang?.label}</span>
-              <ChevronRight size={14} className="text-muted-foreground" />
-            </button>
-            {showLangPicker && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowLangPicker(false)} />
-                <div className="absolute left-0 right-0 top-full bg-surface-1 border border-border rounded-xl shadow-lg z-50 max-h-[280px] overflow-y-auto">
-                  {LANGUAGES.map(l => (
-                    <button key={l.key} onClick={() => { setLang(l.key); setShowLangPicker(false); }}
-                      className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-surface-2 ${lang === l.key ? "text-primary bg-surface-2" : "text-foreground"}`}>
-                      <span className="text-base">{l.flag}</span><span>{l.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </section>
-
-        {/* Currency */}
-        <section>
-          <p className="text-[10px] text-muted-foreground mb-2 font-mono-jb">💰 货币单位</p>
-          <div className="bg-surface-2 border border-border rounded-xl overflow-hidden relative">
-            <button onClick={() => setShowCurrencyPicker(!showCurrencyPicker)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-3 transition">
-              <span className="text-sm">{currentCurrency?.symbol}</span>
-              <span className="text-xs text-foreground flex-1">{currentCurrency?.label}</span>
-              <ChevronRight size={14} className="text-muted-foreground" />
-            </button>
-            {showCurrencyPicker && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowCurrencyPicker(false)} />
-                <div className="absolute left-0 right-0 top-full bg-surface-1 border border-border rounded-xl shadow-lg z-50">
-                  {CURRENCY_OPTIONS.map(c => (
-                    <button key={c.key} onClick={() => saveCurrency(c.key)}
-                      className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-surface-2 ${currency === c.key ? "text-primary bg-surface-2" : "text-foreground"}`}>
-                      <span className="text-sm">{c.symbol}</span><span>{c.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{t("settings.regional") || "地区与语言"}</p>
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            {/* Language */}
+            <div className="relative">
+              <button onClick={() => { setShowLangPicker(!showLangPicker); setShowCurrencyPicker(false); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-border hover:bg-accent transition">
+                <Globe size={14} className="text-muted-foreground" />
+                <span className="text-xs text-foreground flex-1">{currentLang?.flag} {currentLang?.label}</span>
+                <ChevronRight size={14} className="text-muted-foreground" />
+              </button>
+              {showLangPicker && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowLangPicker(false)} />
+                  <div className="absolute left-0 right-0 top-full bg-popover border border-border rounded-xl shadow-lg z-50 max-h-[240px] overflow-y-auto">
+                    {LANGUAGES.map(l => (
+                      <button key={l.key} onClick={() => { setLang(l.key); setShowLangPicker(false); }}
+                        className={`w-full flex items-center gap-2 px-4 py-2 text-xs transition hover:bg-accent ${lang === l.key ? "text-primary bg-accent" : "text-foreground"}`}>
+                        <span className="text-base">{l.flag}</span><span>{l.label}</span>
+                        {lang === l.key && <Check size={12} className="ml-auto text-primary" />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            {/* Currency */}
+            <div className="relative">
+              <button onClick={() => { setShowCurrencyPicker(!showCurrencyPicker); setShowLangPicker(false); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition">
+                <span className="text-sm w-[14px] text-center">{currentCurrency?.symbol}</span>
+                <span className="text-xs text-foreground flex-1">{currentCurrency?.label}</span>
+                <ChevronRight size={14} className="text-muted-foreground" />
+              </button>
+              {showCurrencyPicker && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowCurrencyPicker(false)} />
+                  <div className="absolute left-0 right-0 top-full bg-popover border border-border rounded-xl shadow-lg z-50 max-h-[240px] overflow-y-auto">
+                    {CURRENCY_OPTIONS.map(c => (
+                      <button key={c.key} onClick={() => saveCurrency(c.key)}
+                        className={`w-full flex items-center gap-2 px-4 py-2 text-xs transition hover:bg-accent ${currency === c.key ? "text-primary bg-accent" : "text-foreground"}`}>
+                        <span className="text-sm w-5 text-center">{c.symbol}</span><span>{c.label}</span>
+                        {currency === c.key && <Check size={12} className="ml-auto text-primary" />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </section>
 
         {/* Theme */}
         <section>
-          <p className="text-[10px] text-muted-foreground mb-2 font-mono-jb">{t("settings.appearance")}</p>
-          <div className="bg-surface-2 border border-border rounded-xl p-4 space-y-4">
-            <div>
-              <p className="text-[10px] text-muted-foreground mb-2">{t("settings.mode")}</p>
-              <div className="flex gap-2">
-                {([
-                  { key: "dark" as ThemeMode, icon: <Moon size={14} />, labelKey: "settings.mode.dark" },
-                  { key: "light" as ThemeMode, icon: <Sun size={14} />, labelKey: "settings.mode.light" },
-                ]).map(m => (
-                  <button key={m.key} onClick={() => setMode(m.key)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs transition ${mode === m.key ? "bg-gold text-background" : "bg-surface-3 text-muted-foreground hover:text-foreground"}`}>
-                    {m.icon} {t(m.labelKey)}
-                  </button>
-                ))}
-              </div>
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{t("settings.appearance")}</p>
+          <div className="bg-card border border-border rounded-xl p-3 space-y-3">
+            <div className="flex gap-2">
+              {([
+                { key: "dark" as ThemeMode, icon: <Moon size={13} />, labelKey: "settings.mode.dark" },
+                { key: "light" as ThemeMode, icon: <Sun size={13} />, labelKey: "settings.mode.light" },
+              ]).map(m => (
+                <button key={m.key} onClick={() => setMode(m.key)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs transition ${mode === m.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+                  {m.icon} {t(m.labelKey)}
+                </button>
+              ))}
             </div>
-            <div>
-              <p className="text-[10px] text-muted-foreground mb-2">{t("settings.accent")}</p>
-              <div className="grid grid-cols-3 gap-2">
-                {ACCENT_OPTIONS.map(a => (
-                  <button key={a.key} onClick={() => setAccent(a.key)}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs transition ${accent === a.key ? "ring-2 ring-gold bg-surface-3" : "bg-surface-3 hover:bg-background"}`}>
-                    <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ background: a.color }} />
-                    <span className="text-foreground">{a.label}</span>
-                  </button>
-                ))}
-              </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {ACCENT_OPTIONS.map(a => (
+                <button key={a.key} onClick={() => setAccent(a.key)}
+                  className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs transition ${accent === a.key ? "ring-2 ring-primary bg-accent" : "bg-muted hover:bg-accent"}`}>
+                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: a.color }} />
+                  <span className="text-foreground">{a.label}</span>
+                </button>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* AI Model Config */}
+        {/* AI Config */}
         <section>
-          <p className="text-[10px] text-muted-foreground mb-2 font-mono-jb">🤖 AI 模型配置</p>
-          <div className="bg-surface-2 border border-border rounded-xl overflow-hidden">
-            <button onClick={() => setShowAiConfig(!showAiConfig)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-3 transition">
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">🤖 AI 模型</p>
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <button onClick={() => setShowAiConfig(!showAiConfig)} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition">
               <Bot size={14} className="text-muted-foreground" />
-              <span className="text-xs text-foreground flex-1">{aiBaseUrl ? "已配置自定义模型" : "使用默认模型"}</span>
+              <span className="text-xs text-foreground flex-1">{aiBaseUrl ? "自定义模型" : "默认模型"}</span>
               <ChevronRight size={14} className="text-muted-foreground" />
             </button>
             {showAiConfig && (
-              <div className="p-4 border-t border-border space-y-3">
+              <div className="p-3 border-t border-border space-y-2">
+                {[
+                  { label: "Base URL", value: aiBaseUrl, set: setAiBaseUrl, placeholder: "https://api.openclaw.ai/v1" },
+                  { label: "模型", value: aiModel, set: setAiModel, placeholder: "gpt-4o" },
+                ].map(f => (
+                  <div key={f.label}>
+                    <p className="text-[9px] text-muted-foreground mb-0.5">{f.label}</p>
+                    <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder}
+                      className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary" />
+                  </div>
+                ))}
                 <div>
-                  <p className="text-[10px] text-muted-foreground mb-1">Base URL</p>
-                  <input value={aiBaseUrl} onChange={e => setAiBaseUrl(e.target.value)}
-                    placeholder="https://api.openclaw.ai/v1"
-                    className="w-full bg-surface-3 border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-gold-border" />
+                  <p className="text-[9px] text-muted-foreground mb-0.5">API Key</p>
+                  <input type="password" value={aiApiKey} onChange={e => setAiApiKey(e.target.value)} placeholder="sk-..."
+                    className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary" />
                 </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground mb-1">模型名称</p>
-                  <input value={aiModel} onChange={e => setAiModel(e.target.value)}
-                    placeholder="gpt-4o"
-                    className="w-full bg-surface-3 border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-gold-border" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground mb-1">API Key</p>
-                  <input type="password" value={aiApiKey} onChange={e => setAiApiKey(e.target.value)}
-                    placeholder="sk-..."
-                    className="w-full bg-surface-3 border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-gold-border" />
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={saveAiConfig} disabled={aiSaving}
-                    className="flex-1 bg-gold text-background text-xs py-2 rounded-lg disabled:opacity-50">
-                    {aiSaving ? "保存中..." : "保存配置"}
-                  </button>
-                  <button onClick={clearAiConfig} className="text-xs text-muted-foreground hover:text-destructive px-3 py-2 rounded-lg bg-surface-3">
-                    清除
-                  </button>
-                </div>
-                <p className="text-[9px] text-muted-foreground/60">
-                  支持 OpenAI 兼容格式的 API（OpenClaw、Ollama 等）。清除后使用默认模型。
-                </p>
+                <button onClick={saveAiConfig} disabled={aiSaving}
+                  className="w-full bg-primary text-primary-foreground text-xs py-2 rounded-lg disabled:opacity-50">
+                  {aiSaving ? "保存中..." : "保存"}
+                </button>
+                <p className="text-[8px] text-muted-foreground/60">支持 OpenAI 兼容格式 API（OpenClaw、Ollama 等）</p>
               </div>
             )}
           </div>
         </section>
 
-        {/* Data Export */}
+        {/* Data */}
         <section>
-          <p className="text-[10px] text-muted-foreground mb-2 font-mono-jb">📦 数据管理</p>
-          <div className="bg-surface-2 border border-border rounded-xl overflow-hidden">
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">📦 数据管理</p>
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
             <DataExport />
           </div>
         </section>
 
-        {/* Navigation links */}
+        {/* More */}
         <section>
-          <p className="text-[10px] text-muted-foreground mb-2 font-mono-jb">{t("settings.more")}</p>
-          <div className="bg-surface-2 border border-border rounded-xl overflow-hidden">
-            <button onClick={() => navigate("/guide")} className="w-full flex items-center gap-3 px-4 py-3 border-b border-border hover:bg-surface-3 transition text-left">
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{t("settings.more")}</p>
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <button onClick={() => navigate("/guide")} className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-border hover:bg-accent transition text-left">
               <BookOpen size={14} className="text-muted-foreground" />
               <span className="text-xs text-foreground flex-1">{t("settings.guide")}</span>
               <ChevronRight size={14} className="text-muted-foreground" />
             </button>
-            <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex items-center gap-3 px-4 py-2.5">
               <Info size={14} className="text-muted-foreground" />
               <span className="text-xs text-foreground flex-1">{t("settings.version")}</span>
               <span className="text-[10px] text-muted-foreground font-mono-jb">v{APP_VERSION}</span>
@@ -301,8 +284,8 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <div className="text-center pt-4 pb-8">
-          <p className="text-xs text-foreground font-serif-sc mb-1">{t("app.name")}</p>
+        <div className="text-center pt-3 pb-6">
+          <p className="text-xs text-foreground font-serif-sc mb-0.5">{t("app.name")}</p>
           <p className="text-[9px] text-muted-foreground">{t("settings.app_desc")}</p>
         </div>
       </div>

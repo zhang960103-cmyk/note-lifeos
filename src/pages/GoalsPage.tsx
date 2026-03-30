@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Trash2, ChevronDown, ChevronUp, Target, Loader2, Wand2 } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronUp, Target } from "lucide-react";
 import { CardSkeleton } from "@/components/SkeletonLoaders";
 
 interface KeyResult {
@@ -26,6 +26,42 @@ const getCurrentQuarter = () => {
   return `${now.getFullYear()}-Q${q}`;
 };
 
+// Export for use in HomePage auto-link
+export async function updateKRProgressFromGoalHints(
+  goalHints: Array<{ krText: string; todoText: string }>,
+  userId: string
+) {
+  if (!goalHints || goalHints.length === 0) return;
+  
+  const { data: goals } = await supabase
+    .from("goals")
+    .select("*")
+    .eq("user_id", userId);
+  
+  if (!goals) return;
+
+  for (const goal of goals) {
+    const krs = (goal.key_results as any[]) || [];
+    let updated = false;
+    
+    const newKrs = krs.map((kr: any) => {
+      const matched = goalHints.filter(hint => {
+        const krWords = kr.text.split(/[，,、\s]/).filter((w: string) => w.length >= 2);
+        return krWords.some((w: string) => hint.krText.includes(w) || hint.todoText.includes(w));
+      });
+      if (matched.length > 0) {
+        updated = true;
+        return { ...kr, linkedTodoCount: (kr.linkedTodoCount || 0) + matched.length };
+      }
+      return kr;
+    });
+
+    if (updated) {
+      await supabase.from("goals").update({ key_results: newKrs as any }).eq("id", goal.id);
+    }
+  }
+}
+
 const GoalsPage = () => {
   const { allTodos } = useLifeOs();
   const { user } = useAuth();
@@ -36,7 +72,6 @@ const GoalsPage = () => {
   const [newTitle, setNewTitle] = useState("");
   const [newKRs, setNewKRs] = useState(["", "", ""]);
 
-  // Load from Supabase
   useEffect(() => {
     if (!user) return;
     const load = async () => {
@@ -132,19 +167,19 @@ const GoalsPage = () => {
         </div>
         <button
           onClick={() => setShowCreate(!showCreate)}
-          className="bg-gold text-background text-xs px-3 py-1.5 rounded-full flex items-center gap-1"
+          className="bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-full flex items-center gap-1"
         >
           <Plus size={12} /> 新目标
         </button>
       </div>
 
       {showCreate && (
-        <div className="bg-surface-2 border border-gold-border rounded-xl p-4 mb-4 animate-in fade-in">
+        <div className="bg-card border border-border rounded-xl p-4 mb-4 animate-in fade-in">
           <input
             value={newTitle}
             onChange={e => setNewTitle(e.target.value)}
             placeholder="目标名称（如：建立内容创作系统）"
-            className="w-full bg-surface-3 border border-border rounded-lg px-3 py-2 text-sm text-foreground mb-3 focus:outline-none focus:border-gold-border"
+            className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground mb-3 focus:outline-none focus:border-primary"
           />
           <p className="text-[10px] text-muted-foreground mb-2">关键结果（KR）</p>
           {newKRs.map((kr, i) => (
@@ -153,10 +188,10 @@ const GoalsPage = () => {
               value={kr}
               onChange={e => { const next = [...newKRs]; next[i] = e.target.value; setNewKRs(next); }}
               placeholder={`KR${i + 1}（如：每周发布2篇文章）`}
-              className="w-full bg-surface-3 border border-border rounded-lg px-3 py-1.5 text-xs text-foreground mb-1.5 focus:outline-none focus:border-gold-border"
+              className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-xs text-foreground mb-1.5 focus:outline-none focus:border-primary"
             />
           ))}
-          <button onClick={createGoal} className="w-full bg-gold text-background text-xs py-2 rounded-lg mt-2">
+          <button onClick={createGoal} className="w-full bg-primary text-primary-foreground text-xs py-2 rounded-lg mt-2">
             创建目标
           </button>
         </div>
@@ -176,7 +211,7 @@ const GoalsPage = () => {
               ? Math.round(goal.keyResults.reduce((s, kr) => s + kr.progress, 0) / goal.keyResults.length)
               : 0;
             return (
-              <div key={goal.id} className="bg-surface-2 border border-border rounded-xl overflow-hidden">
+              <div key={goal.id} className="bg-card border border-border rounded-xl overflow-hidden">
                 <button onClick={() => setExpandedId(isExpanded ? null : goal.id)} className="w-full flex items-center gap-3 px-4 py-3 text-left">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -184,10 +219,10 @@ const GoalsPage = () => {
                       <span className="text-[9px] text-muted-foreground font-mono-jb">{goal.quarter}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                        <div className="h-full bg-gold rounded-full transition-all" style={{ width: `${totalProgress}%` }} />
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${totalProgress}%` }} />
                       </div>
-                      <span className="text-[10px] text-gold font-mono-jb">{totalProgress}%</span>
+                      <span className="text-[10px] text-primary font-mono-jb">{totalProgress}%</span>
                     </div>
                   </div>
                   {isExpanded ? <ChevronUp size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
@@ -203,8 +238,8 @@ const GoalsPage = () => {
                         <div className="flex items-center gap-2">
                           <input type="range" min={0} max={100} value={kr.progress}
                             onChange={e => updateKRProgress(goal.id, kr.id, +e.target.value)}
-                            className="flex-1 accent-gold h-1" />
-                          <span className="text-[10px] text-gold font-mono-jb w-8 text-right">{kr.progress}%</span>
+                            className="flex-1 accent-primary h-1" />
+                          <span className="text-[10px] text-primary font-mono-jb w-8 text-right">{kr.progress}%</span>
                         </div>
                       </div>
                     ))}
