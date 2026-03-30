@@ -306,6 +306,9 @@ const HomePage = () => {
               setTodoToast(`💰 已自动记录${types} ¥${total}`);
               setTimeout(() => { setFinanceToast(false); setTodoToast(null); }, 3000);
             }
+
+            // Auto-extract time blocks from diary and create time-tagged todos
+            autoExtractTimeBlocks(msgsForExtract);
           });
         },
         signal: controller.signal,
