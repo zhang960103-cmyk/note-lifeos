@@ -466,6 +466,7 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
   editing: boolean; onEdit: () => void; onUpdate: (u: Partial<TodoItem>) => void; onDelete: () => void;
   onPomodoro: () => void; isTracking: boolean; trackingTime?: string; onStartTracking: () => void;
 }) {
+  const { t } = useLanguage();
   const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
   const isDone = todo.status === "done";
   const isDoing = todo.status === "doing";
