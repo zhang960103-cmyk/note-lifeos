@@ -648,4 +648,191 @@ function TemplatesPanel({ addTodoToDate, todayKey }: { addTodoToDate: (d: string
   );
 }
 
+/* ─── Inline Timeline (diary-extracted, editable) ─── */
+const CATEGORY_COLORS: Record<string, string> = {
+  "工作": "hsl(39 58% 53%)", "学习": "hsl(211 55% 60%)", "生活": "hsl(152 41% 49%)",
+  "运动": "hsl(26 78% 57%)", "社交": "hsl(268 48% 63%)", "娱乐": "hsl(340 65% 65%)",
+  "休息": "hsl(174 40% 51%)", "其他": "hsl(30 12% 37%)",
+};
+
+type TimeBlock = { activity: string; category: string; startTime: string; endTime: string; durationMinutes: number; };
+
+function InlineTimeline({ entries, allTodos, todayKey, updateTodo }: {
+  entries: any[]; allTodos: TodoItem[]; todayKey: string;
+  updateTodo: (date: string, id: string, u: Partial<TodoItem>) => void;
+}) {
+  const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [extracted, setExtracted] = useState(false);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editBlock, setEditBlock] = useState<TimeBlock | null>(null);
+
+  const todayEntry = entries.find((e: any) => e.date === todayKey);
+  const hasMessages = todayEntry && todayEntry.messages.length > 0;
+
+  // Also build timeline from completed todos with time notes
+  const todoTimeline = useMemo(() => {
+    return allTodos
+      .filter(t => t.status === "done" && t.note?.includes("⏱"))
+      .map(t => {
+        const match = t.note?.match(/⏱\s*(\d{1,2}:\d{2})-(\d{1,2}:\d{2})\s*\((\d+)分钟\)/);
+        if (!match) return null;
+        return { activity: t.text, category: "工作", startTime: match[1], endTime: match[2], durationMinutes: parseInt(match[3]) };
+      })
+      .filter(Boolean) as TimeBlock[];
+  }, [allTodos]);
+
+  const extractTimeline = async () => {
+    if (!todayEntry) return;
+    setLoading(true);
+    try {
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({
+          messages: todayEntry.messages.map((m: any) => ({ role: m.role, content: m.content })),
+          mode: "time-extract",
+        }),
+      });
+      if (!resp.ok) throw new Error();
+      const data = await resp.json();
+      setTimeBlocks(data.timeBlocks || []);
+      setExtracted(true);
+      // Auto-match to todos
+      (data.timeBlocks || []).forEach((block: TimeBlock) => {
+        const match = allTodos.find(t => {
+          const a = block.activity.toLowerCase(), txt = t.text.toLowerCase();
+          return a.includes(txt) || txt.includes(a);
+        });
+        if (match && !match.note?.includes("⏱")) {
+          updateTodo(match.sourceDate || todayKey, match.id, {
+            note: `${match.note || ""}\n⏱ ${block.startTime}-${block.endTime} (${block.durationMinutes}分钟)`.trim()
+          });
+        }
+      });
+    } catch {} finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    if (hasMessages && !extracted && !loading) extractTimeline();
+  }, [hasMessages]);
+
+  const saveEdit = (idx: number) => {
+    if (!editBlock) return;
+    const [sh, sm] = editBlock.startTime.split(":").map(Number);
+    const [eh, em] = editBlock.endTime.split(":").map(Number);
+    const dur = (eh * 60 + em) - (sh * 60 + sm);
+    const newBlocks = [...timeBlocks];
+    newBlocks[idx] = { ...editBlock, durationMinutes: Math.max(dur, 1) };
+    setTimeBlocks(newBlocks);
+    setEditingIdx(null); setEditBlock(null);
+  };
+
+  const allBlocks = [...timeBlocks, ...todoTimeline].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  // Deduplicate by startTime
+  const blocks = allBlocks.filter((b, i, arr) => i === 0 || b.startTime !== arr[i - 1].startTime);
+  const totalMinutes = blocks.reduce((s, b) => s + b.durationMinutes, 0);
+
+  return (
+    <div className="space-y-3">
+      {/* Visual timeline bar */}
+      {blocks.length > 0 && (
+        <div className="bg-card border border-primary/20 rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <CalendarClock size={13} className="text-primary" />
+              <span className="text-[11px] font-serif-sc text-foreground">今日时间线</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-mono text-muted-foreground">{(totalMinutes / 60).toFixed(1)}h</span>
+              <button onClick={extractTimeline} className="text-[9px] text-muted-foreground hover:text-primary">刷新</button>
+            </div>
+          </div>
+          {/* Stacked bar */}
+          <div className="h-[6px] rounded-full bg-muted mb-3 flex overflow-hidden">
+            {blocks.map((b, i) => (
+              <div key={i} className="h-full" style={{
+                width: `${(b.durationMinutes / totalMinutes) * 100}%`,
+                background: CATEGORY_COLORS[b.category] || CATEGORY_COLORS["其他"]
+              }} title={`${b.activity} ${b.durationMinutes}m`} />
+            ))}
+          </div>
+          {/* Timeline items */}
+          <div className="space-y-1.5">
+            {blocks.map((block, i) => (
+              <div key={i} className="flex items-center gap-2 group">
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: CATEGORY_COLORS[block.category] || CATEGORY_COLORS["其他"] }} />
+                {editingIdx === i && editBlock ? (
+                  <div className="flex-1 flex items-center gap-1">
+                    <input value={editBlock.startTime} onChange={e => setEditBlock({ ...editBlock, startTime: e.target.value })}
+                      className="w-12 bg-muted border border-border rounded px-1 py-0.5 text-[9px] text-foreground font-mono" />
+                    <span className="text-[9px] text-muted-foreground">-</span>
+                    <input value={editBlock.endTime} onChange={e => setEditBlock({ ...editBlock, endTime: e.target.value })}
+                      className="w-12 bg-muted border border-border rounded px-1 py-0.5 text-[9px] text-foreground font-mono" />
+                    <input value={editBlock.activity} onChange={e => setEditBlock({ ...editBlock, activity: e.target.value })}
+                      className="flex-1 bg-muted border border-border rounded px-1 py-0.5 text-[9px] text-foreground" />
+                    <button onClick={() => saveEdit(i)} className="text-primary"><Check size={12} /></button>
+                    <button onClick={() => { setEditingIdx(null); setEditBlock(null); }} className="text-muted-foreground"><X size={12} /></button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-[9px] font-mono text-muted-foreground w-[72px] flex-shrink-0">{block.startTime}-{block.endTime}</span>
+                    <span className="text-[10px] text-foreground flex-1 truncate">{block.activity}</span>
+                    <span className="text-[8px] text-muted-foreground font-mono">{block.durationMinutes}m</span>
+                    <button onClick={() => { setEditingIdx(i); setEditBlock({ ...block }); }}
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-opacity">
+                      <Pencil size={10} />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {loading && (
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-center gap-2">
+          <Loader2 size={14} className="animate-spin text-primary" />
+          <span className="text-[11px] text-muted-foreground">提取时间线…</span>
+        </div>
+      )}
+
+      {!loading && blocks.length === 0 && (
+        <div className="bg-card border border-border rounded-xl p-6 text-center space-y-2">
+          <CalendarClock size={24} className="text-muted-foreground/30 mx-auto" />
+          <p className="text-xs text-muted-foreground">在首页记日记，时间线自动生成</p>
+          <p className="text-[10px] text-muted-foreground/50">或完成带时间标注的任务后这里也会显示</p>
+          {hasMessages && (
+            <button onClick={extractTimeline} className="text-[10px] text-primary mt-1">从日记提取 →</button>
+          )}
+        </div>
+      )}
+
+      {/* Today's completed tasks with time */}
+      {allTodos.filter(t => t.status === "done" && (t.completedAt?.split("T")[0] === todayKey || t.sourceDate === todayKey)).length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Check size={12} className="text-primary" />
+            <span className="text-[11px] font-serif-sc text-foreground">今日已完成</span>
+          </div>
+          <div className="space-y-1">
+            {allTodos
+              .filter(t => t.status === "done" && (t.completedAt?.split("T")[0] === todayKey || t.sourceDate === todayKey))
+              .map(t => (
+                <div key={t.id} className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                  <span className="text-[10px] text-muted-foreground line-through flex-1 truncate">{t.text}</span>
+                  {t.note?.includes("⏱") && (
+                    <span className="text-[8px] font-mono text-primary/60">{t.note.match(/⏱\s*(\S+)/)?.[1]}</span>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default TodoPage;
