@@ -245,7 +245,7 @@ const HomePage = () => {
       await streamChat({
         messages: allMsgs,
         mode: "default",
-        memoryContext,
+        memoryContext: fullMemoryContext,
         patterns,
         onDelta: (chunk) => {
           full += chunk;
