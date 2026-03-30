@@ -97,7 +97,7 @@ const HomePage = () => {
 
     // Priority 1: Yesterday low emotion
     if (yesterdayEntry && yesterdayEntry.emotionScore <= 4) {
-      return { emoji: "🌧️", text: "昨天有点难熬，今天怎么样？" };
+      return { emoji: "🌧️", text: t("home.greeting.yesterday_low") };
     }
 
     // Priority 2: Habit streak 3+ days
