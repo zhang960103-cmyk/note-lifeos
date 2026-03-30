@@ -265,7 +265,7 @@ const TodoPage = () => {
             {/* Doing section */}
             {smartGroups.doing.length > 0 && (
               <SmartSection
-                title="进行中" emoji="⚡" count={smartGroups.doing.length}
+                title={t("todo.column.doing")} emoji="⚡" count={smartGroups.doing.length}
                 borderColor="border-los-orange/30"
                 collapsed={collapsedSections.has("doing")}
                 onToggle={() => toggleSection("doing")}
