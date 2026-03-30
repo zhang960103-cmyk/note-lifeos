@@ -324,7 +324,7 @@ const TodoPage = () => {
             {/* Done section - collapsed by default */}
             {smartGroups.done.length > 0 && (
               <SmartSection
-                title="已完成" emoji="✅" count={smartGroups.done.length}
+                title={t("todo.column.done")} emoji="✅" count={smartGroups.done.length}
                 borderColor="border-los-green/30"
                 collapsed={collapsedSections.has("done")}
                 onToggle={() => toggleSection("done")}
