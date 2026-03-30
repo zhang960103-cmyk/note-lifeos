@@ -425,8 +425,8 @@ const TodoPage = () => {
               {(["urgent", "high", "normal", "low"] as Priority[]).map(p => (
                 <button key={p} onClick={() => setNewPriority(p)}
                   className={`text-[10px] px-3 py-1.5 rounded-full transition flex items-center gap-1 ${newPriority === p ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                  <span className={`w-2 h-2 rounded-full ${PRIORITY_CONFIG[p].dot}`} />
-                  {PRIORITY_CONFIG[p].label}
+                  <span className={`w-2 h-2 rounded-full ${PRIORITY_KEYS[p].dot}`} />
+                  {t(PRIORITY_KEYS[p].labelKey)}
                 </button>
               ))}
             </div>
