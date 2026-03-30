@@ -27,6 +27,7 @@ const TodoPage = () => {
     allTodos, todayKey, toggleTodo, updateTodo, addTodoToDate, deleteTodo,
     habits, addHabit, checkInHabit, deleteHabit,
   } = useLifeOs();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>("smart");
   const [expandedId, setExpandedId] = useState<string | null>(null);
