@@ -418,6 +418,14 @@ const TodoPage = () => {
             </button>
           </div>
         )}
+
+        {/* Plan Templates tab */}
+        {tab === "templates" && (
+          <PlanTemplates addTodoToDate={addTodoToDate} todayKey={todayKey} />
+        )}
+
+        {/* Streak & Reward bar */}
+        <StreakReward allTodos={allTodos} />
       </div>
 
       {/* Habit Create */}
