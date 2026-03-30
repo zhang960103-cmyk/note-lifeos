@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { format, parseISO, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isWithinInterval } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from "recharts";
-import { TrendingUp, TrendingDown, Wallet, BookOpen, Trash2, Pencil, Check, X } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, BookOpen, Trash2, Pencil, Check, X, Zap } from "lucide-react";
 
 const COLORS = ["hsl(39,58%,53%)", "hsl(0,65%,55%)", "hsl(142,60%,45%)", "hsl(210,60%,50%)", "hsl(280,55%,55%)", "hsl(30,50%,45%)"];
 
