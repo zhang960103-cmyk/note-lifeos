@@ -29,6 +29,10 @@ interface LifeOsContextType {
   addHabit: (h: Omit<HabitItem, 'id' | 'createdAt' | 'checkIns'>) => void;
   checkInHabit: (id: string, date: string) => void;
   deleteHabit: (id: string) => void;
+  energyLogs: EnergyLog[];
+  addEnergyLog: (level: EnergyLog['level'], note?: string) => Promise<any>;
+  energySummary: string;
+  consecutiveLowDays: number;
 }
 
 const LifeOsContext = createContext<LifeOsContextType | null>(null);
