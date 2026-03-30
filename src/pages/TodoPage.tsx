@@ -93,7 +93,7 @@ const TodoPage = () => {
         const minutes = Math.round(trackingElapsed / 60);
         const timeNote = `⏱ ${startStr}-${endStr} (${minutes}分钟)`;
         const newNote = todo.note ? `${todo.note}\n${timeNote}` : timeNote;
-        updateTodo(trackingTodoId, { note: newNote });
+        updateTodo(todayKey, trackingTodoId, { note: newNote });
       }
     }
     setTrackingTodoId(null); setTrackingStart(null); setTrackingElapsed(0);
