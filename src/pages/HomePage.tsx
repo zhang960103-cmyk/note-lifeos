@@ -527,7 +527,7 @@ const HomePage = () => {
                     onClick={() => handleGoDeeper(msg.content)}
                     className="text-[10px] text-muted-foreground/40 hover:text-gold cursor-pointer px-1 mt-0.5 transition-colors"
                   >
-                    ↓ 深探
+                    {t("home.go_deeper")}
                   </button>
                 )}
               </div>
