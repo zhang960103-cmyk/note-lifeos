@@ -516,6 +516,27 @@ serve(async (req) => {
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
+    // T10: Decompose mode — AI 任务拆解
+    if (mode === "decompose") {
+      const taskText = messages[messages.length - 1]?.content || "";
+      if (!taskText.trim()) {
+        return new Response(JSON.stringify({ subTasks: [], error: "任务内容为空" }), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+      }
+      const DECOMPOSE_PROMPT = `你是一个任务拆解专家。用户会给你一个任务描述，你需要将其拆解为3-5个具体可执行的子步骤。
+要求：
+- 每个子步骤必须是今天或近期可以独立完成的具体行动（不是方向，是行动）
+- 子步骤之间有逻辑顺序
+- 每条不超过30字
+返回格式（仅返回JSON，不返回其他任何内容）：
+{"subTasks": [{"text": "..."}, {"text": "..."}, ...]}`;
+      try {
+        const parsed = await aiCall("google/gemini-2.5-flash", DECOMPOSE_PROMPT, taskText);
+        return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+      } catch {
+        return new Response(JSON.stringify({ subTasks: [], error: "解析失败" }), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+      }
+    }
+
     // Brain dump mode
     if (mode === "brain-dump") {
       const userText = messages[messages.length - 1]?.content || "";
