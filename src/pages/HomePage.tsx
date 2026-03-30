@@ -587,6 +587,40 @@ const HomePage = () => {
         </div>
       )}
 
+      {/* T02: extractMeta retry */}
+      {extractFailed && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-destructive/90 text-destructive-foreground text-xs px-4 py-2 rounded-xl flex items-center gap-2 z-50 animate-in fade-in">
+          <span>⚠️ AI 分析失败</span>
+          <button
+            onClick={() => {
+              if (!retryMsgs) return;
+              setExtractFailed(false);
+              const existingTodosForAI = allTodos
+                .filter(t => t.status !== "dropped")
+                .map(t => ({ id: t.id, text: t.text, status: t.status, priority: t.priority }));
+              extractMeta(retryMsgs, existingTodosForAI).then(meta => {
+                if (meta.emotionTags.length || meta.topicTags.length || meta.todos?.length) {
+                  updateDayMeta(todayKey, {
+                    emotionTags: meta.emotionTags,
+                    topicTags: meta.topicTags,
+                    todos: meta.todos?.length ? meta.todos.map(t => createTodoFromExtract(t, todayKey)) : undefined,
+                    emotionScore: meta.emotionScore || undefined,
+                  });
+                  setTodoToast("重试成功 ✓");
+                  setTimeout(() => setTodoToast(null), 3000);
+                }
+              }).catch(() => setExtractFailed(true));
+            }}
+            className="underline font-medium hover:text-white"
+          >
+            重试
+          </button>
+          <button onClick={() => setExtractFailed(false)} className="ml-1 opacity-60 hover:opacity-100">
+            <X size={12} />
+          </button>
+        </div>
+      )}
+
       {/* Toasts */}
       {financeToast && (
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-los-green text-background text-xs px-4 py-1.5 rounded-full animate-pulse z-50">
