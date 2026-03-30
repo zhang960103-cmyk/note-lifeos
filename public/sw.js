@@ -1,12 +1,12 @@
 // Service Worker for Life OS PWA — offline-first for static assets
-const CACHE_NAME = 'lifeos-v2';
+const CACHE_NAME = 'lifeos-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
 ];
 
-// Install: cache shell
+// Install: cache shell + force activate immediately
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
@@ -14,14 +14,20 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate: clean old caches
+// Activate: clean ALL old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
+});
+
+// Listen for skip-waiting message from client
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Fetch strategy
