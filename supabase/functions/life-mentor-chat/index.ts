@@ -567,15 +567,13 @@ serve(async (req) => {
       systemContent += `当对话内容和过去记录有关联时，像真正认识这个人的朋友一样自然提及，`;
       systemContent += `例如：「你上次提到XXX，后来怎么样了？」但不要每次都刻意提及记忆，只在真正相关时提。`;
       
-      // Energy-aware task recommendations
       if (memoryContext.includes('精力记录')) {
         systemContent += `\n\n【精力感知任务推荐】
 当用户记录精力状态时，根据精力水平推荐适合的任务类型：
 - 高精力 → 建议深度工作（写课程、做产品、系统设计、复杂学习）
 - 中精力 → 建议创意型任务（写脚本、发帖、内容创作、规划）
 - 低精力 → 建议轻量任务（回消息、整理资料、简单行政事务）
-- 如果用户连续多天低精力，主动询问是否需要调整今天的待办优先级，把重任务往后挪。
-- 如果用户记录低精力，温和建议："要不要把今天的重任务往后挪，先处理轻量的？"`;
+- 如果用户连续多天低精力，主动询问是否需要调整今天的待办优先级。`;
       }
     }
     if (patterns) {
@@ -591,16 +589,19 @@ serve(async (req) => {
 请以"月度回信"形式回复。像老朋友写信，不用格式标记。包含这个月的整体感受、一个关键洞察、下个月的一个建议。控制在300字内。在末尾附上1-2个适合用户当前阶段的学习资源推荐。`;
     }
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
+    // Use custom AI config for chat mode too
+    const chatUrl = useCustom ? `${customBaseUrl}/chat/completions` : "https://ai.gateway.lovable.dev/v1/chat/completions";
+    const chatKey = useCustom ? customApiKey : LOVABLE_API_KEY;
+    const chatModel = useCustom ? (customModel || "google/gemini-3-flash-preview") : "google/gemini-3-flash-preview";
+
+    const response = await fetch(chatUrl, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${chatKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: chatModel,
           messages: [
             { role: "system", content: systemContent },
             ...messages,
