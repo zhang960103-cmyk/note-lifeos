@@ -333,15 +333,25 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, mode, scores: inputScores, existingTodos, memoryContext, patterns } = await req.json();
+    const { messages, mode, scores: inputScores, existingTodos, memoryContext, patterns, userAiConfig } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const aiCall = async (model: string, systemPrompt: string, userContent: string) => {
-      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // T06: 多模型动态路由 — 用户自定义 AI 配置优先，否则回退默认
+    const customBaseUrl = userAiConfig?.base_url || "";
+    const customApiKey = userAiConfig?.api_key || "";
+    const customModel = userAiConfig?.model || "";
+    const useCustom = customBaseUrl && customApiKey;
+
+    const aiCall = async (defaultModel: string, systemPrompt: string, userContent: string) => {
+      const url = useCustom ? `${customBaseUrl}/chat/completions` : "https://ai.gateway.lovable.dev/v1/chat/completions";
+      const key = useCustom ? customApiKey : LOVABLE_API_KEY;
+      const model = useCustom ? (customModel || defaultModel) : defaultModel;
+
+      const resp = await fetch(url, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
