@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback, useMemo, type ChangeEvent } f
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Send, Loader2, DollarSign, X, Clock, Settings, Zap, Brain, Mic } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
-import { streamChat, extractMeta, type ChatMsg } from "@/lib/streamChat";
+import { streamChat, extractMeta, type ChatMsg, type ExtractResult } from "@/lib/streamChat";
+import { updateKRProgressFromGoalHints } from "@/pages/GoalsPage";
 import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { useLanguage } from "@/contexts/LanguageContext";
