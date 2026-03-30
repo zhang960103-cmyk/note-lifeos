@@ -33,6 +33,7 @@ const HomePage = () => {
     todayEntry, todayKey, addMessage, updateDayMeta,
     addFinanceEntry, todayFinanceStats, wheelScores, entries, allTodos, toggleTodo,
     habits, setFocusTodo, addTodoToDate,
+    energyLogs, addEnergyLog, energySummary, consecutiveLowDays,
   } = useLifeOs();
   const [dailyQuestion, setDailyQuestion] = useState<{ question: string; domain: string } | null>(null);
   const [input, setInput] = useState("");
