@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Sun, Moon, LogOut, BookOpen, Info, ChevronRight, Globe, Download, Bot, Search, Check, Plus, Trash2, ChevronDown, ChevronUp, Sparkles, Zap, Shield, Pencil } from "lucide-react";
+import { ArrowLeft, Sun, Moon, LogOut, BookOpen, Info, ChevronRight, Globe, Download, Bot, Search, Check, Plus, Trash2, ChevronDown, ChevronUp, Sparkles, Zap, Shield, Pencil, FlaskConical, RotateCcw, ArrowUpCircle, Archive } from "lucide-react";
 import { useTheme, ACCENT_OPTIONS, type ThemeMode } from "@/contexts/ThemeContext";
 import { useLanguage, LANGUAGES } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
