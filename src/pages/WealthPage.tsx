@@ -14,7 +14,7 @@ const FINANCE_TIPS = [
 ];
 
 const WealthPage = () => {
-  const { financeEntries, monthFinanceStats, deleteFinanceEntry, updateFinanceEntry } = useLifeOs();
+  const { financeEntries, monthFinanceStats, deleteFinanceEntry, updateFinanceEntry, energyLogs } = useLifeOs();
   const [period, setPeriod] = useState<"week" | "month" | "all">("month");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState("");
