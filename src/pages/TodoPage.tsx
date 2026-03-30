@@ -82,7 +82,22 @@ const TodoPage = () => {
   }, [trackingTodoId, trackingStart]);
 
   const startTracking = (id: string) => { setTrackingTodoId(id); setTrackingStart(Date.now()); setTrackingElapsed(0); };
-  const stopTracking = () => { setTrackingTodoId(null); setTrackingStart(null); setTrackingElapsed(0); };
+  const stopTracking = () => {
+    if (trackingTodoId && trackingStart && trackingElapsed > 0) {
+      const todo = allTodos.find(t => t.id === trackingTodoId);
+      if (todo) {
+        const startDate = new Date(trackingStart);
+        const endDate = new Date();
+        const startStr = format(startDate, "HH:mm");
+        const endStr = format(endDate, "HH:mm");
+        const minutes = Math.round(trackingElapsed / 60);
+        const timeNote = `⏱ ${startStr}-${endStr} (${minutes}分钟)`;
+        const newNote = todo.note ? `${todo.note}\n${timeNote}` : timeNote;
+        updateTodo(todayKey, trackingTodoId, { note: newNote });
+      }
+    }
+    setTrackingTodoId(null); setTrackingStart(null); setTrackingElapsed(0);
+  };
   const fmtTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
   // Data
