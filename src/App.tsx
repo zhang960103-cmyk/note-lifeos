@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { LifeOsProvider } from "@/contexts/LifeOsContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
 import HomePage from "@/pages/HomePage";
 import TodoPage from "@/pages/TodoPage";
@@ -97,14 +98,16 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <ThemeProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <Routes>
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="*" element={<AuthGate />} />
-            </Routes>
-          </TooltipProvider>
+          <ErrorBoundary>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <Routes>
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="*" element={<AuthGate />} />
+              </Routes>
+            </TooltipProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </LanguageProvider>
     </QueryClientProvider>

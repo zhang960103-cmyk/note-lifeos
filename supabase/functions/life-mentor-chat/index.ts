@@ -333,15 +333,25 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, mode, scores: inputScores, existingTodos, memoryContext, patterns } = await req.json();
+    const { messages, mode, scores: inputScores, existingTodos, memoryContext, patterns, userAiConfig } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const aiCall = async (model: string, systemPrompt: string, userContent: string) => {
-      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // T06: 多模型动态路由 — 用户自定义 AI 配置优先，否则回退默认
+    const customBaseUrl = userAiConfig?.base_url || "";
+    const customApiKey = userAiConfig?.api_key || "";
+    const customModel = userAiConfig?.model || "";
+    const useCustom = customBaseUrl && customApiKey;
+
+    const aiCall = async (defaultModel: string, systemPrompt: string, userContent: string) => {
+      const url = useCustom ? `${customBaseUrl}/chat/completions` : "https://ai.gateway.lovable.dev/v1/chat/completions";
+      const key = useCustom ? customApiKey : LOVABLE_API_KEY;
+      const model = useCustom ? (customModel || defaultModel) : defaultModel;
+
+      const resp = await fetch(url, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -504,6 +514,27 @@ serve(async (req) => {
 只返回JSON。`;
       const parsed = await aiCall("google/gemini-2.5-flash", timeExtractPrompt, userText);
       return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+    }
+
+    // T10: Decompose mode — AI 任务拆解
+    if (mode === "decompose") {
+      const taskText = messages[messages.length - 1]?.content || "";
+      if (!taskText.trim()) {
+        return new Response(JSON.stringify({ subTasks: [], error: "任务内容为空" }), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+      }
+      const DECOMPOSE_PROMPT = `你是一个任务拆解专家。用户会给你一个任务描述，你需要将其拆解为3-5个具体可执行的子步骤。
+要求：
+- 每个子步骤必须是今天或近期可以独立完成的具体行动（不是方向，是行动）
+- 子步骤之间有逻辑顺序
+- 每条不超过30字
+返回格式（仅返回JSON，不返回其他任何内容）：
+{"subTasks": [{"text": "..."}, {"text": "..."}, ...]}`;
+      try {
+        const parsed = await aiCall("google/gemini-2.5-flash", DECOMPOSE_PROMPT, taskText);
+        return new Response(JSON.stringify(parsed), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+      } catch {
+        return new Response(JSON.stringify({ subTasks: [], error: "解析失败" }), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+      }
     }
 
     // Brain dump mode
