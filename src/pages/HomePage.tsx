@@ -114,7 +114,7 @@ const HomePage = () => {
             else break;
           }
           if (streak >= 3) {
-            return { emoji: "⚡", text: `我注意到你已经坚持了 ${streak} 天了` };
+            return { emoji: "⚡", text: t("home.greeting.streak", { days: streak }) };
           }
         }
       }
