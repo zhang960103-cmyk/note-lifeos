@@ -292,7 +292,7 @@ const TodoPage = () => {
 
             {/* Todo section */}
             <SmartSection
-              title="待办" emoji="📋" count={smartGroups.todo.length}
+              title={t("todo.column.todo")} emoji="📋" count={smartGroups.todo.length}
               borderColor="border-gold/30"
               collapsed={collapsedSections.has("todo")}
               onToggle={() => toggleSection("todo")}
