@@ -677,6 +677,7 @@ function InlineTimeline({ entries, allTodos, todayKey, updateTodo }: {
   entries: any[]; allTodos: TodoItem[]; todayKey: string;
   updateTodo: (date: string, id: string, u: Partial<TodoItem>) => void;
 }) {
+  const { t } = useLanguage();
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [loading, setLoading] = useState(false);
   const [extracted, setExtracted] = useState(false);
