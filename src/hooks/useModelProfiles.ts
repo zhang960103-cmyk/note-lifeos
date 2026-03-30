@@ -12,6 +12,8 @@ export interface ModelProfile {
   usage_tag: string;
   is_default: boolean;
   is_system: boolean;
+  version: string;
+  status: string; // 'active' | 'canary' | 'deprecated'
 }
 
 export function useModelProfiles() {
@@ -37,6 +39,8 @@ export function useModelProfiles() {
       usage_tag: d.usage_tag || "chat",
       is_default: d.is_default || false,
       is_system: d.is_system || false,
+      version: d.version || "1.0",
+      status: d.status || "active",
     })));
     setLoading(false);
   }, [user]);
@@ -44,14 +48,12 @@ export function useModelProfiles() {
   useEffect(() => { fetchProfiles(); }, [fetchProfiles]);
 
   const getDefault = useCallback((): ModelProfile | null => {
-    return profiles.find(p => p.is_default) || profiles[0] || null;
+    return profiles.find(p => p.is_default && p.status === 'active') || profiles.find(p => p.is_default) || profiles[0] || null;
   }, [profiles]);
 
   const setDefault = useCallback(async (id: string) => {
     if (!user) return;
-    // Unset all defaults first
     await supabase.from("ai_model_profiles" as any).update({ is_default: false } as any).eq("user_id", user.id);
-    // Set new default
     await supabase.from("ai_model_profiles" as any).update({ is_default: true } as any).eq("id", id);
     setProfiles(prev => prev.map(p => ({ ...p, is_default: p.id === id })));
   }, [user]);
@@ -65,6 +67,8 @@ export function useModelProfiles() {
     if (updates.model !== undefined) dbUpdates.model = updates.model;
     if (updates.api_key_encrypted !== undefined) dbUpdates.api_key_encrypted = updates.api_key_encrypted;
     if (updates.usage_tag !== undefined) dbUpdates.usage_tag = updates.usage_tag;
+    if (updates.version !== undefined) dbUpdates.version = updates.version;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
     dbUpdates.updated_at = new Date().toISOString();
     await supabase.from("ai_model_profiles" as any).update(dbUpdates).eq("id", id);
     setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
@@ -82,6 +86,8 @@ export function useModelProfiles() {
       usage_tag: profile.usage_tag,
       is_default: profile.is_default,
       is_system: false,
+      version: profile.version || "1.0",
+      status: profile.status || "active",
     } as any).select().single();
     if (data) {
       await fetchProfiles();
@@ -94,5 +100,32 @@ export function useModelProfiles() {
     setProfiles(prev => prev.filter(p => p.id !== id));
   }, [user]);
 
-  return { profiles, loading, getDefault, setDefault, updateProfile, addProfile, deleteProfile, refresh: fetchProfiles };
+  // Promote a canary to active+default, deprecate old default
+  const promoteCanary = useCallback(async (canaryId: string) => {
+    if (!user) return;
+    const oldDefault = profiles.find(p => p.is_default && p.status === 'active');
+    if (oldDefault) {
+      await supabase.from("ai_model_profiles" as any).update({ is_default: false, status: 'deprecated' } as any).eq("id", oldDefault.id);
+    }
+    await supabase.from("ai_model_profiles" as any).update({ is_default: true, status: 'active' } as any).eq("id", canaryId);
+    await fetchProfiles();
+  }, [user, profiles, fetchProfiles]);
+
+  // Rollback: reactivate a deprecated profile as default
+  const rollback = useCallback(async (profileId: string) => {
+    if (!user) return;
+    await supabase.from("ai_model_profiles" as any).update({ is_default: false } as any).eq("user_id", user.id);
+    await supabase.from("ai_model_profiles" as any).update({ is_default: true, status: 'active' } as any).eq("id", profileId);
+    await fetchProfiles();
+  }, [user, fetchProfiles]);
+
+  const activeProfiles = profiles.filter(p => p.status === 'active');
+  const canaryProfiles = profiles.filter(p => p.status === 'canary');
+  const deprecatedProfiles = profiles.filter(p => p.status === 'deprecated');
+
+  return { 
+    profiles, activeProfiles, canaryProfiles, deprecatedProfiles,
+    loading, getDefault, setDefault, updateProfile, addProfile, deleteProfile, 
+    promoteCanary, rollback, refresh: fetchProfiles 
+  };
 }
