@@ -735,7 +735,7 @@ const HomePage = () => {
           </div>
           <div className="flex-1 overflow-y-auto space-y-1">
             {todayUndoneTodos.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-4">暂无待办任务</p>
+              <p className="text-xs text-muted-foreground text-center py-4">{t("home.focus.empty")}</p>
             ) : (
               todayUndoneTodos.map(todo => (
                 <button
