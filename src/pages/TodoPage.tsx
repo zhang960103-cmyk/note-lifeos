@@ -582,6 +582,11 @@ function TodoCard({ todo, onToggle, expanded, onExpand, celebrating, onStartPomo
           <button onClick={onEdit} className="text-muted-foreground hover:text-gold transition p-1">
             <Pencil size={12} />
           </button>
+          {!isDone && (
+            <button onClick={handleDecompose} disabled={decomposing} className="text-muted-foreground hover:text-primary transition p-1" title="AI 拆解">
+              {decomposing ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+            </button>
+          )}
         </div>
       </div>
 
