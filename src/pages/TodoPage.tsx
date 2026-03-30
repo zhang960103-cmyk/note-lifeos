@@ -757,11 +757,11 @@ function InlineTimeline({ entries, allTodos, todayKey, updateTodo }: {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <CalendarClock size={13} className="text-primary" />
-              <span className="text-[11px] font-serif-sc text-foreground">今日时间线</span>
+              <span className="text-[11px] font-serif-sc text-foreground">{t("timestats.title")}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[9px] font-mono text-muted-foreground">{(totalMinutes / 60).toFixed(1)}h</span>
-              <button onClick={extractTimeline} className="text-[9px] text-muted-foreground hover:text-primary">刷新</button>
+              <button onClick={extractTimeline} className="text-[9px] text-muted-foreground hover:text-primary">↻</button>
             </div>
           </div>
           {/* Stacked bar */}
