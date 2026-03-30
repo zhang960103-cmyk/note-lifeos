@@ -655,7 +655,7 @@ const HomePage = () => {
       {showFinance && (
         <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl p-5 z-50 animate-in slide-in-from-bottom">
           <div className="flex justify-between items-center mb-4">
-            <span className="text-xs text-foreground font-serif-sc">记账</span>
+            <span className="text-xs text-foreground font-serif-sc">{t("home.finance.title")}</span>
             <button onClick={() => setShowFinance(false)} className="text-muted-foreground">
               <X size={16} />
             </button>
