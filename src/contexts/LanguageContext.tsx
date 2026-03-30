@@ -57,10 +57,13 @@ const zh: Record<string, string> = {
   "auth.error.otp_fail": "发送验证码失败",
   "auth.error.verify_fail": "验证失败",
   "auth.confirm_logout": "确定要退出登录吗？",
+  "auth.guest": "访客模式体验",
+  "auth.guest.hint": "无需注册，数据仅保存在本地",
 
   // Tab bar
   "tab.today": "今天",
   "tab.todo": "待办",
+  "tab.time": "时间",
   "tab.compass": "罗盘",
   "tab.wealth": "财富",
 
