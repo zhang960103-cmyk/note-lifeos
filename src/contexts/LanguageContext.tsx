@@ -171,7 +171,7 @@ const zh: Record<string, string> = {
   "wealth.trend": "收支趋势",
   "wealth.records": "最近记录",
   "wealth.no_records": "在对话中提到收支会自动记录",
-  "wealth.no_records_example": "例如："今天上课赚了500" "买了本书花了40"",
+  "wealth.no_records_example": '例如："今天上课赚了500" "买了本书花了40"',
   "wealth.tips": "理财建议",
   "wealth.passive_ratio": "被动收入占比",
   "wealth.passive_none": "还没有被动收入记录，在对话中提到投资/分红/版税等会自动标记",
