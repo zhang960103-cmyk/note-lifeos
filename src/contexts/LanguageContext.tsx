@@ -239,9 +239,12 @@ const en: Record<string, string> = {
   "auth.error.otp_fail": "Failed to send code",
   "auth.error.verify_fail": "Verification failed",
   "auth.confirm_logout": "Are you sure you want to sign out?",
+  "auth.guest": "Try as Guest",
+  "auth.guest.hint": "No signup needed, data stored locally",
 
   "tab.today": "Today",
   "tab.todo": "Todos",
+  "tab.time": "Time",
   "tab.compass": "Compass",
   "tab.wealth": "Wealth",
 
