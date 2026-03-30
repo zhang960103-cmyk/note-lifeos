@@ -728,7 +728,7 @@ const HomePage = () => {
       {showFocusPicker && (
         <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl p-5 z-50 animate-in slide-in-from-bottom max-h-[50vh] flex flex-col">
           <div className="flex justify-between items-center mb-3">
-            <span className="text-xs text-foreground font-serif-sc">选择聚焦任务</span>
+            <span className="text-xs text-foreground font-serif-sc">{t("home.focus.title")}</span>
             <button onClick={() => setShowFocusPicker(false)} className="text-muted-foreground">
               <X size={16} />
             </button>
