@@ -312,6 +312,8 @@ const HomePage = () => {
 
             // Auto-extract time blocks from diary and create time-tagged todos
             autoExtractTimeBlocks(msgsForExtract);
+          }).catch(() => {
+            setExtractFailed(true);
           });
         },
         signal: controller.signal,
