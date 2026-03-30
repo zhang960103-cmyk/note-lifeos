@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
-import { format, startOfWeek, addDays, isToday } from "date-fns";
+import { format, startOfWeek, addDays, isToday, subDays } from "date-fns";
 import { Play, Pause, X, Check, Trash2, Pencil, MessageCircle, ArrowRight, Clock, BarChart3, Grid3X3, ChevronDown, ChevronRight } from "lucide-react";
 import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
 import { useNavigate } from "react-router-dom";
