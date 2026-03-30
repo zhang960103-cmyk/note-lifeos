@@ -214,6 +214,8 @@ const en: Record<string, string> = {
   "auth.password.placeholder": "Password (min 6 chars)",
   "auth.login": "Sign In",
   "auth.signup": "Sign Up",
+  "auth.or": "or",
+  "auth.google": "Sign in with Google",
   "auth.no_account": "No account? Sign up",
   "auth.has_account": "Have an account? Sign in",
   "auth.forgot": "Forgot password?",
