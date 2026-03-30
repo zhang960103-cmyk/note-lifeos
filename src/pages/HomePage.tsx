@@ -487,7 +487,7 @@ const HomePage = () => {
                     key={mood.tag}
                     onClick={() => handleQuickMood(mood)}
                     className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center text-lg hover:scale-110 hover:bg-surface-3 transition-all"
-                    title={mood.label}
+                    title={t(mood.labelKey)}
                   >
                     {mood.emoji}
                   </button>
