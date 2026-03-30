@@ -636,7 +636,7 @@ const HomePage = () => {
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder="说点什么..."
+            placeholder={t("home.input.placeholder")}
             rows={3}
             className="flex-1 bg-surface-2 border border-border rounded-2xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:border-gold-border transition-colors leading-[1.8]"
             style={{ minHeight: "72px", maxHeight: "160px" }}
