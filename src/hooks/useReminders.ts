@@ -3,12 +3,20 @@ import { useLifeOs } from "@/contexts/LifeOsContext";
 import { format } from "date-fns";
 
 export function useReminders() {
-  const { allTodos } = useLifeOs();
+  const { allTodos, habits } = useLifeOs();
   const notifiedRef = useRef<Set<string>>(new Set());
 
+  // Request notification permission on mount
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Todo reminders
   useEffect(() => {
     const interval = setInterval(() => {
-      if (Notification.permission !== "granted") return;
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
 
       const now = new Date();
       const todayStr = format(now, "yyyy-MM-dd");
@@ -38,11 +46,35 @@ export function useReminders() {
     return () => clearInterval(interval);
   }, [allTodos]);
 
+  // Habit check-in reminder at 21:00
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+      const now = new Date();
+      const h = now.getHours();
+      const m = now.getMinutes();
+      const todayStr = format(now, "yyyy-MM-dd");
+
+      if (h === 21 && m === 0) {
+        const unchecked = habits.filter(habit => !habit.checkIns.includes(todayStr));
+        if (unchecked.length > 0 && !notifiedRef.current.has(`habit-${todayStr}`)) {
+          new Notification("💪 习惯提醒", {
+            body: `还有 ${unchecked.length} 个习惯今天未打卡：${unchecked.map(h => h.name).join("、")}`,
+            icon: "/pwa-192.png",
+          });
+          notifiedRef.current.add(`habit-${todayStr}`);
+        }
+      }
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [habits]);
+
   // Check overdue todos when app becomes visible
   useEffect(() => {
     const checkOnFocus = () => {
       if (document.visibilityState !== "visible") return;
-      if (Notification.permission !== "granted") return;
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
       const now = new Date();
       const todayStr = format(now, "yyyy-MM-dd");
       const nowMinutes = now.getHours() * 60 + now.getMinutes();
