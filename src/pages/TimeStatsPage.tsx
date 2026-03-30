@@ -138,18 +138,19 @@ export default function TimeStatsPage() {
     return Math.round((completionRate * 0.7 + emotionBonus + diversityBonus) * 100);
   }, [stats, categoryData]);
 
-  // Streak calculation
+  // Streak calculation - reuse from entries activity (shared with TodoPage)
   const streak = useMemo(() => {
     let count = 0;
     const now = new Date();
     for (let i = 0; i < 60; i++) {
       const d = format(subDays(now, i), "yyyy-MM-dd");
-      const hasActivity = entries.some(e => e.date === d && e.messages.length > 0);
+      const hasActivity = entries.some(e => e.date === d && e.messages.length > 0) ||
+        allTodos.some(t => t.completedAt?.split("T")[0] === d);
       if (hasActivity) count++;
       else if (i > 0) break;
     }
     return count;
-  }, [entries]);
+  }, [entries, allTodos]);
 
   // Heatmap data (last 12 weeks)
   const heatmapData = useMemo(() => {
