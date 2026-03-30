@@ -699,7 +699,7 @@ const HomePage = () => {
       {showBrainDump && (
         <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl z-50 animate-in slide-in-from-bottom flex flex-col" style={{ height: "50vh" }}>
           <div className="flex justify-between items-center p-4 pb-2">
-            <span className="text-xs text-foreground font-serif-sc">🧠 脑清空</span>
+            <span className="text-xs text-foreground font-serif-sc">{t("home.braindump.title")}</span>
             <button onClick={() => setShowBrainDump(false)} className="text-muted-foreground">
               <X size={16} />
             </button>
