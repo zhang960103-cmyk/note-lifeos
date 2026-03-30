@@ -488,6 +488,85 @@ export function useFinance(userId: string | undefined) {
   return { entries, addEntry, deleteEntry, updateEntry, todayStats, monthStats };
 }
 
+export interface EnergyLog {
+  id: string;
+  level: '高' | '中' | '低' | '透支';
+  timestamp: string;
+  note: string;
+}
+
+export function useEnergyLogs(userId: string | undefined) {
+  const [logs, setLogs] = useState<EnergyLog[]>([]);
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from("energy_logs").select("*").eq("user_id", userId)
+      .order("timestamp", { ascending: false })
+      .limit(100)
+      .then(({ data }) => {
+        if (data) setLogs(data.map(d => ({
+          id: d.id,
+          level: d.level as EnergyLog['level'],
+          timestamp: d.timestamp,
+          note: d.note || '',
+        })));
+      });
+  }, [userId]);
+
+  const addLog = useCallback(async (level: EnergyLog['level'], note: string = '') => {
+    if (!userId) return;
+    const { data } = await supabase.from("energy_logs").insert({
+      user_id: userId,
+      level,
+      note,
+    }).select().single();
+
+    if (data) {
+      setLogs(prev => [{
+        id: data.id,
+        level: data.level as EnergyLog['level'],
+        timestamp: data.timestamp,
+        note: data.note || '',
+      }, ...prev]);
+    }
+    return data;
+  }, [userId]);
+
+  // Get recent 7 days summary for AI context
+  const recentSummary = useMemo(() => {
+    const sevenDaysAgo = subDays(new Date(), 7);
+    const recent = logs.filter(l => new Date(l.timestamp) >= sevenDaysAgo);
+    if (recent.length === 0) return '';
+    const levels = recent.map(l => l.level).join('/');
+    const lowCount = recent.filter(l => l.level === '低' || l.level === '透支').length;
+    let summary = `用户过去7天精力记录：${levels}`;
+    if (lowCount >= 3) {
+      summary += `（⚠️ 连续低能量${lowCount}天）`;
+    }
+    return summary;
+  }, [logs]);
+
+  // Check consecutive low energy days
+  const consecutiveLowDays = useMemo(() => {
+    let count = 0;
+    const sorted = [...logs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    // Group by date, take latest per day
+    const byDate = new Map<string, string>();
+    for (const l of sorted) {
+      const d = format(new Date(l.timestamp), 'yyyy-MM-dd');
+      if (!byDate.has(d)) byDate.set(d, l.level);
+    }
+    const dates = [...byDate.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+    for (const [, level] of dates) {
+      if (level === '低' || level === '透支') count++;
+      else break;
+    }
+    return count;
+  }, [logs]);
+
+  return { logs, addLog, recentSummary, consecutiveLowDays };
+}
+
 export function useHabits(userId: string | undefined) {
   const [habits, setHabits] = useState<HabitItem[]>([]);
 

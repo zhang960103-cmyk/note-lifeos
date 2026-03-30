@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode } from "react";
-import { useDayEntries, useWheelScores, useOnboarding, useFinance, useHabits } from "@/hooks/useLifeOs";
+import { useDayEntries, useWheelScores, useOnboarding, useFinance, useHabits, useEnergyLogs, type EnergyLog } from "@/hooks/useLifeOs";
 import type { DayEntry, WheelScore, ChatMessage, TodoItem, FinanceEntry, HabitItem } from "@/types/lifeOs";
 
 interface LifeOsContextType {
@@ -29,6 +29,10 @@ interface LifeOsContextType {
   addHabit: (h: Omit<HabitItem, 'id' | 'createdAt' | 'checkIns'>) => void;
   checkInHabit: (id: string, date: string) => void;
   deleteHabit: (id: string) => void;
+  energyLogs: EnergyLog[];
+  addEnergyLog: (level: EnergyLog['level'], note?: string) => Promise<any>;
+  energySummary: string;
+  consecutiveLowDays: number;
 }
 
 const LifeOsContext = createContext<LifeOsContextType | null>(null);
@@ -42,6 +46,7 @@ export function LifeOsProvider({ children, userId }: { children: ReactNode; user
   const { onboarded, completeOnboarding } = useOnboarding(userId);
   const { entries: financeEntries, addEntry: addFinanceEntry, deleteEntry: deleteFinanceEntry, updateEntry: updateFinanceEntry, todayStats: todayFinanceStats, monthStats: monthFinanceStats } = useFinance(userId);
   const { habits, addHabit, checkIn: checkInHabit, deleteHabit } = useHabits(userId);
+  const { logs: energyLogs, addLog: addEnergyLog, recentSummary: energySummary, consecutiveLowDays } = useEnergyLogs(userId);
 
   return (
     <LifeOsContext.Provider value={{
@@ -50,6 +55,7 @@ export function LifeOsProvider({ children, userId }: { children: ReactNode; user
       wheelScores, addWheelScore, onboarded, completeOnboarding,
       financeEntries, addFinanceEntry, deleteFinanceEntry, updateFinanceEntry, todayFinanceStats, monthFinanceStats,
       habits, addHabit, checkInHabit, deleteHabit,
+      energyLogs, addEnergyLog, energySummary, consecutiveLowDays,
     }}>
       {children}
     </LifeOsContext.Provider>

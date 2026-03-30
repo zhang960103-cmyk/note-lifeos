@@ -33,6 +33,7 @@ const HomePage = () => {
     todayEntry, todayKey, addMessage, updateDayMeta,
     addFinanceEntry, todayFinanceStats, wheelScores, entries, allTodos, toggleTodo,
     habits, setFocusTodo, addTodoToDate,
+    energyLogs, addEnergyLog, energySummary, consecutiveLowDays,
   } = useLifeOs();
   const [dailyQuestion, setDailyQuestion] = useState<{ question: string; domain: string } | null>(null);
   const [input, setInput] = useState("");
@@ -207,10 +208,13 @@ const HomePage = () => {
     setInput(ta.value);
   };
 
-  const handleEnergyLog = (level: string) => {
+  const handleEnergyLog = async (level: string) => {
     setShowEnergyPicker(false);
     const emoji = ENERGY_LEVELS.find(e => e.value === level)?.emoji || "⚡";
-    const text = `[精力记录] ${emoji} 当前精力：${level === "high" ? "高" : level === "medium" ? "中" : "低"}`;
+    const cnLevel = level === "high" ? "高" : level === "medium" ? "中" : "低";
+    // Save to Supabase
+    await addEnergyLog(cnLevel as any);
+    const text = `[精力记录] ${emoji} 当前精力：${cnLevel}`;
     sendMessage(text);
   };
 
@@ -234,12 +238,14 @@ const HomePage = () => {
 
     const memoryContext = buildMemoryContext(entries, 14);
     const patterns = getKeyPatterns(entries);
+    // Inject energy summary into memory context
+    const fullMemoryContext = [memoryContext, energySummary].filter(Boolean).join('\n');
 
     try {
       await streamChat({
         messages: allMsgs,
         mode: "default",
-        memoryContext,
+        memoryContext: fullMemoryContext,
         patterns,
         onDelta: (chunk) => {
           full += chunk;
@@ -418,6 +424,17 @@ const HomePage = () => {
                   <p className="text-xs text-gold font-serif-sc mb-1">📨 罗盘的来信</p>
                   <p className="text-[11px] text-foreground leading-[1.8]">本周有一封信在等你</p>
                   <span className="text-[10px] text-gold mt-1 inline-block">打开信件 →</span>
+                </button>
+              )}
+              {/* Energy debt warning */}
+              {consecutiveLowDays >= 3 && (
+                <button
+                  onClick={() => sendMessage("我已经连续低能量好几天了，帮我分析一下可能的原因？")}
+                  className="w-full bg-los-red/10 border border-los-red/30 rounded-xl px-4 py-3 mb-3 text-left hover:bg-los-red/20 transition"
+                >
+                  <p className="text-xs text-los-red font-serif-sc mb-1">⚠️ 能量预警</p>
+                  <p className="text-[11px] text-foreground leading-[1.8]">你已经连续{consecutiveLowDays}天低能量了</p>
+                  <span className="text-[10px] text-los-red mt-1 inline-block">聊聊怎么回事 →</span>
                 </button>
               )}
               {/* Feature 4: Sunset card */}

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { format, parseISO, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isWithinInterval } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from "recharts";
-import { TrendingUp, TrendingDown, Wallet, BookOpen, Trash2, Pencil, Check, X } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, BookOpen, Trash2, Pencil, Check, X, Zap } from "lucide-react";
 
 const COLORS = ["hsl(39,58%,53%)", "hsl(0,65%,55%)", "hsl(142,60%,45%)", "hsl(210,60%,50%)", "hsl(280,55%,55%)", "hsl(30,50%,45%)"];
 
@@ -14,7 +14,7 @@ const FINANCE_TIPS = [
 ];
 
 const WealthPage = () => {
-  const { financeEntries, monthFinanceStats, deleteFinanceEntry, updateFinanceEntry } = useLifeOs();
+  const { financeEntries, monthFinanceStats, deleteFinanceEntry, updateFinanceEntry, energyLogs } = useLifeOs();
   const [period, setPeriod] = useState<"week" | "month" | "all">("month");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState("");
@@ -97,6 +97,37 @@ const WealthPage = () => {
     if (totalIncome === 0) return 0;
     return Math.round((passive.reduce((s, e) => s + e.amount, 0) / totalIncome) * 100);
   }, [filtered, stats.income]);
+
+  // Energy × Income correlation
+  const energyIncomeCorrelation = useMemo(() => {
+    if (energyLogs.length === 0 || financeEntries.length === 0) return null;
+    const byLevel: Record<string, { income: number; days: Set<string> }> = {
+      '高': { income: 0, days: new Set() },
+      '中': { income: 0, days: new Set() },
+      '低': { income: 0, days: new Set() },
+    };
+    
+    energyLogs.forEach(log => {
+      const date = format(new Date(log.timestamp), 'yyyy-MM-dd');
+      if (byLevel[log.level]) byLevel[log.level].days.add(date);
+    });
+
+    financeEntries.filter(e => e.type === 'income').forEach(entry => {
+      for (const [level, data] of Object.entries(byLevel)) {
+        if (data.days.has(entry.date)) {
+          byLevel[level].income += entry.amount;
+        }
+      }
+    });
+
+    return Object.entries(byLevel)
+      .filter(([, d]) => d.days.size > 0)
+      .map(([level, d]) => ({
+        level,
+        avgIncome: Math.round(d.income / d.days.size),
+        days: d.days.size,
+      }));
+  }, [energyLogs, financeEntries]);
 
   return (
     <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4">
@@ -276,6 +307,34 @@ const WealthPage = () => {
           </div>
         )}
       </div>
+
+      {/* Energy × Income Correlation */}
+      {energyIncomeCorrelation && energyIncomeCorrelation.length > 0 && (
+        <div className="bg-surface-2 border border-border rounded-xl p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap size={14} className="text-gold" />
+            <span className="text-xs text-muted-foreground font-mono-jb">精力 × 收入关联</span>
+          </div>
+          <div className="space-y-2">
+            {energyIncomeCorrelation.map(d => (
+              <div key={d.level} className="flex items-center gap-3">
+                <span className="text-sm w-6">{d.level === '高' ? '🔥' : d.level === '中' ? '⚡' : '🔋'}</span>
+                <span className="text-[10px] text-muted-foreground w-12">{d.level}精力</span>
+                <div className="flex-1 h-4 bg-surface-3 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gold rounded-full transition-all"
+                    style={{ width: `${Math.min((d.avgIncome / Math.max(...energyIncomeCorrelation.map(x => x.avgIncome), 1)) * 100, 100)}%` }}
+                  />
+                </div>
+                <span className="text-xs font-mono-jb text-foreground w-16 text-right">¥{d.avgIncome}/天</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[9px] text-muted-foreground mt-2">
+            基于{energyIncomeCorrelation.reduce((s, d) => s + d.days, 0)}天数据 · 高精力日通常产出更高价值
+          </p>
+        </div>
+      )}
 
       {/* Financial literacy tip */}
       <div className="bg-surface-2 border border-gold-border rounded-xl p-4 mb-4">

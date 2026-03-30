@@ -2,8 +2,8 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
-import { ArrowLeft, Clock, TrendingUp, Sparkles, Loader2, CalendarClock, Flame, Target, Zap } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line, CartesianGrid } from "recharts";
+import { ArrowLeft, Clock, TrendingUp, Sparkles, Loader2, CalendarClock, Flame, Target, Zap, Battery } from "lucide-react";
 
 const CATEGORY_COLORS: Record<string, string> = {
   "工作": "hsl(39 58% 53%)",
@@ -40,7 +40,7 @@ type TimeBlock = {
 
 export default function TimeStatsPage() {
   const navigate = useNavigate();
-  const { entries, allTodos } = useLifeOs();
+  const { entries, allTodos, energyLogs } = useLifeOs();
   const [range, setRange] = useState<TimeRange>("week");
   const [touchStart, setTouchStart] = useState(0);
 
@@ -339,6 +339,48 @@ export default function TimeStatsPage() {
             <span className="text-[7px] text-muted-foreground">多</span>
           </div>
         </div>
+
+        {/* ─── Energy Curve Chart ─── */}
+        {energyLogs.length > 0 && (
+          <div className="bg-card border border-border rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Battery size={14} className="text-los-green" />
+              <span className="text-xs font-serif-sc text-foreground">精力曲线</span>
+              <span className="ml-auto text-[8px] text-muted-foreground">近 7 天</span>
+            </div>
+            <ResponsiveContainer width="100%" height={160}>
+              <LineChart data={(() => {
+                const levelToNum = (l: string) => l === '高' ? 3 : l === '中' ? 2 : l === '低' ? 1 : 0;
+                const sevenDaysAgo = subDays(new Date(), 7);
+                return energyLogs
+                  .filter(l => new Date(l.timestamp) >= sevenDaysAgo)
+                  .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                  .map(l => ({
+                    time: format(new Date(l.timestamp), "M/d HH:mm"),
+                    level: levelToNum(l.level),
+                    label: l.level,
+                  }));
+              })()}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="time" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} axisLine={false} tickLine={false} />
+                <YAxis
+                  domain={[0, 3]}
+                  ticks={[0, 1, 2, 3]}
+                  tickFormatter={(v: number) => ['透支', '低', '中', '高'][v] || ''}
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={30}
+                />
+                <Tooltip
+                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }}
+                  formatter={(value: number) => [['透支', '低', '中', '高'][value] || '', '精力']}
+                />
+                <Line type="monotone" dataKey="level" stroke="hsl(39 58% 53%)" strokeWidth={2} dot={{ fill: "hsl(39 58% 53%)", r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
 
         {/* ─── Diary Timeline ─── */}
         <DiaryTimeline entries={entries} today={today} />
