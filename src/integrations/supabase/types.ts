@@ -79,6 +79,33 @@ export type Database = {
         }
         Relationships: []
       }
+      energy_logs: {
+        Row: {
+          created_at: string
+          id: string
+          level: string
+          note: string | null
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          level: string
+          note?: string | null
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          level?: string
+          note?: string | null
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       finance_entries: {
         Row: {
           amount: number
