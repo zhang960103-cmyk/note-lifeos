@@ -246,20 +246,18 @@ export default function TimeStatsPage() {
 
   return (
     <div className="flex flex-col h-full max-w-[700px] mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3">
-        <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft size={18} />
-        </button>
-        <span className="font-serif-sc text-base text-foreground">时间都去哪了</span>
-        <div className="ml-auto flex gap-1">
+      {/* Header - compact, no back button (tab nav) */}
+      <div className="flex items-center gap-2 px-4 py-3">
+        <Clock size={16} className="text-primary" />
+        <span className="font-serif-sc text-base text-foreground flex-1">时间都去哪了</span>
+        <div className="flex gap-0.5">
           <button onClick={() => setShowSearch(!showSearch)}
-            className={`p-1.5 rounded-lg transition ${showSearch ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>
-            <Search size={15} />
+            className={`p-2 rounded-lg transition ${showSearch ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>
+            <Search size={16} />
           </button>
           <button onClick={() => setShowQuickEntry(!showQuickEntry)}
-            className={`p-1.5 rounded-lg transition ${showQuickEntry ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>
-            <Timer size={15} />
+            className={`p-2 rounded-lg transition ${showQuickEntry ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>
+            <Timer size={16} />
           </button>
         </div>
       </div>
@@ -270,13 +268,13 @@ export default function TimeStatsPage() {
           <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
             placeholder="搜索活动、备注、标签..."
             autoFocus
-            className="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary" />
+            className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary" />
           {searchResults.length > 0 && (
-            <div className="mt-2 bg-card border border-border rounded-xl max-h-[160px] overflow-y-auto">
+            <div className="mt-2 bg-card border border-border rounded-xl max-h-[200px] overflow-y-auto">
               {searchResults.map(t => (
-                <div key={t.id} className="px-3 py-1.5 border-b border-border last:border-0">
-                  <p className="text-[11px] text-foreground">{t.text}</p>
-                  <span className="text-[9px] text-muted-foreground">{t.sourceDate || t.completedAt?.split("T")[0]}</span>
+                <div key={t.id} className="px-3 py-2 border-b border-border last:border-0 active:bg-muted">
+                  <p className="text-xs text-foreground">{t.text}</p>
+                  <span className="text-[10px] text-muted-foreground">{t.sourceDate || t.completedAt?.split("T")[0]}</span>
                 </div>
               ))}
             </div>
@@ -284,25 +282,25 @@ export default function TimeStatsPage() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 px-4 mb-3 justify-between">
-        <div className="flex gap-1">
+      {/* Tabs - larger touch targets */}
+      <div className="flex gap-1.5 px-4 mb-3 justify-between items-center">
+        <div className="flex gap-1 bg-muted rounded-lg p-0.5">
           {(["today", "week", "month"] as TimeRange[]).map(key => (
             <button key={key} onClick={() => setRange(key)}
-              className={`text-[11px] px-3 py-1 rounded-full transition ${range === key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+              className={`text-xs px-3 py-1.5 rounded-md transition ${range === key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>
               {key === "today" ? "今天" : key === "week" ? "本周" : "本月"}
             </button>
           ))}
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 bg-muted rounded-lg p-0.5">
           <button onClick={() => setViewMode("overview")}
-            className={`text-[10px] px-2 py-1 rounded-full transition ${viewMode === "overview" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>概览</button>
+            className={`text-[10px] px-2 py-1.5 rounded-md transition ${viewMode === "overview" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>概览</button>
           <button onClick={() => setViewMode("week")}
-            className={`text-[10px] px-2 py-1 rounded-full transition ${viewMode === "week" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>周视图</button>
+            className={`text-[10px] px-2 py-1.5 rounded-md transition ${viewMode === "week" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>周视图</button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 pb-20 space-y-3">
         {showQuickEntry && <QuickTimeEntry onClose={() => setShowQuickEntry(false)} />}
 
         {/* Week View */}
