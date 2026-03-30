@@ -47,8 +47,6 @@ const HomePage = () => {
   const [showEnergyPicker, setShowEnergyPicker] = useState(false);
   const [showBrainDump, setShowBrainDump] = useState(false);
   const [brainDumpText, setBrainDumpText] = useState("");
-  const [brainDumpLoading, setBrainDumpLoading] = useState(false);
-  const [brainDumpResult, setBrainDumpResult] = useState<{ todos: any[]; summary: string } | null>(null);
   const [showFocusPicker, setShowFocusPicker] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const canUseVoice = typeof window !== "undefined"
@@ -306,6 +304,9 @@ const HomePage = () => {
               setTodoToast(`💰 已自动记录${types} ¥${total}`);
               setTimeout(() => { setFinanceToast(false); setTodoToast(null); }, 3000);
             }
+
+            // Auto-extract time blocks from diary and create time-tagged todos
+            autoExtractTimeBlocks(msgsForExtract);
           });
         },
         signal: controller.signal,
@@ -358,36 +359,63 @@ const HomePage = () => {
     setFinanceNLLoading(false);
   };
 
-  // Feature 2: Brain dump
+  // Feature 2: Brain dump - simplified to send as chat message (chat already extracts todos)
   const handleBrainDump = async () => {
-    if (!brainDumpText.trim() || brainDumpLoading) return;
-    setBrainDumpLoading(true);
+    if (!brainDumpText.trim()) return;
+    const text = `🧠 脑清空：\n${brainDumpText}`;
+    setShowBrainDump(false);
+    setBrainDumpText("");
+    sendMessage(text);
+  };
+
+  // Auto-extract time blocks from diary conversation and create time-tagged todos
+  const autoExtractTimeBlocks = useCallback(async (msgs: ChatMsg[]) => {
     try {
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ mode: "brain-dump", messages: [{ role: "user", content: brainDumpText }] }),
+        body: JSON.stringify({ messages: msgs, mode: "time-extract" }),
       });
-      if (resp.ok) {
-        const data = await resp.json();
-        setBrainDumpResult(data);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const blocks = data.timeBlocks || [];
+      if (blocks.length === 0) return;
+
+      // Create time-tagged todos for each block so TimeStats can visualize them
+      let created = 0;
+      blocks.forEach((block: any) => {
+        // Check if a matching todo already exists (avoid duplicates)
+        const exists = allTodos.some(t => {
+          const noteMatch = t.note?.includes(`⏱ ${block.startTime}-${block.endTime}`);
+          const textMatch = t.text.toLowerCase().includes(block.activity.toLowerCase().slice(0, 6));
+          return noteMatch || (textMatch && t.note?.includes("⏱"));
+        });
+        if (exists) return;
+
+        const todo: TodoItem = {
+          id: crypto.randomUUID(),
+          text: block.activity,
+          status: "done" as const,
+          priority: "normal" as const,
+          tags: [block.category || "其他"],
+          subTasks: [],
+          recur: "none" as const,
+          note: `⏱ ${block.startTime}-${block.endTime} (${block.durationMinutes}分钟)${block.note ? `\n${block.note}` : ""}`,
+          completedAt: new Date().toISOString(),
+          sourceDate: todayKey,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        addTodoToDate(todayKey, todo);
+        created++;
+      });
+
+      if (created > 0) {
+        setTodoToast(`⏱ 已自动记录 ${created} 个时间段`);
+        setTimeout(() => setTodoToast(null), 3000);
       }
     } catch {}
-    setBrainDumpLoading(false);
-  };
-
-  const confirmBrainDump = () => {
-    if (!brainDumpResult) return;
-    const todoItems: TodoItem[] = brainDumpResult.todos.map(t => createTodoFromExtract(t, todayKey));
-    if (todoItems.length > 0) {
-      updateDayMeta(todayKey, { todos: todoItems });
-      setTodoToast(`已添加 ${todoItems.length} 条待办`);
-      setTimeout(() => setTodoToast(null), 3000);
-    }
-    setBrainDumpText("");
-    setBrainDumpResult(null);
-    setShowBrainDump(false);
-  };
+  }, [allTodos, todayKey, addTodoToDate]);
 
   // Feature 1: Go deeper
   const handleGoDeeper = (msgContent: string) => {
@@ -666,63 +694,32 @@ const HomePage = () => {
         </div>
       )}
 
-      {/* Feature 2: Brain Dump Sheet */}
+      {/* Feature 2: Brain Dump Sheet - simplified (sends to chat for auto-extraction) */}
       {showBrainDump && (
-        <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl z-50 animate-in slide-in-from-bottom flex flex-col" style={{ height: "70vh" }}>
+        <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl z-50 animate-in slide-in-from-bottom flex flex-col" style={{ height: "50vh" }}>
           <div className="flex justify-between items-center p-4 pb-2">
             <span className="text-xs text-foreground font-serif-sc">🧠 脑清空</span>
-            <button onClick={() => { setShowBrainDump(false); setBrainDumpResult(null); }} className="text-muted-foreground">
+            <button onClick={() => setShowBrainDump(false)} className="text-muted-foreground">
               <X size={16} />
             </button>
           </div>
-
-          {!brainDumpResult ? (
-            <>
-              <textarea
-                value={brainDumpText}
-                onChange={e => setBrainDumpText(e.target.value)}
-                placeholder="把脑子里所有想法随便倒出来，不用整理，不用分类..."
-                className="flex-1 mx-4 bg-surface-2 border border-border rounded-xl px-4 py-3 text-sm text-foreground resize-none focus:outline-none focus:border-gold-border leading-[1.8]"
-              />
-              <div className="p-4 pt-2">
-                <button
-                  onClick={handleBrainDump}
-                  disabled={!brainDumpText.trim() || brainDumpLoading}
-                  className="w-full bg-gold text-background py-3 rounded-xl text-sm disabled:opacity-30 hover:bg-gold/90 transition flex items-center justify-center gap-2"
-                >
-                  {brainDumpLoading ? <Loader2 size={14} className="animate-spin" /> : null}
-                  🧹 整理成计划
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 overflow-y-auto px-4">
-              {brainDumpResult.summary && (
-                <p className="text-xs text-muted-foreground mb-3 leading-[1.8]">{brainDumpResult.summary}</p>
-              )}
-              <div className="space-y-2 mb-4">
-                {brainDumpResult.todos.map((t, i) => (
-                  <div key={i} className="bg-surface-2 rounded-xl px-3 py-2 flex items-start gap-2">
-                    <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded ${
-                      t.priority === "high" || t.priority === "urgent" ? "bg-los-red/20 text-los-red" : "bg-surface-3 text-muted-foreground"
-                    }`}>{t.priority === "urgent" ? "紧急" : t.priority === "high" ? "重要" : "普通"}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-foreground">{t.text}</p>
-                      {t.estimatedMinutes && <p className="text-[10px] text-muted-foreground">≈ {t.estimatedMinutes}分钟</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="pb-4">
-                <button
-                  onClick={confirmBrainDump}
-                  className="w-full bg-gold text-background py-3 rounded-xl text-sm hover:bg-gold/90 transition"
-                >
-                  ✅ 确认添加 {brainDumpResult.todos.length} 条待办
-                </button>
-              </div>
-            </div>
-          )}
+          <p className="px-4 text-[10px] text-muted-foreground mb-2">随便倒，罗盘会自动整理成待办、记录时间和财务</p>
+          <textarea
+            value={brainDumpText}
+            onChange={e => setBrainDumpText(e.target.value)}
+            placeholder="把脑子里所有想法随便倒出来..."
+            className="flex-1 mx-4 bg-surface-2 border border-border rounded-xl px-4 py-3 text-sm text-foreground resize-none focus:outline-none focus:border-gold-border leading-[1.8]"
+            autoFocus
+          />
+          <div className="p-4 pt-2">
+            <button
+              onClick={handleBrainDump}
+              disabled={!brainDumpText.trim() || isLoading}
+              className="w-full bg-gold text-background py-3 rounded-xl text-sm disabled:opacity-30 hover:bg-gold/90 transition flex items-center justify-center gap-2"
+            >
+              📤 发给罗盘整理
+            </button>
+          </div>
         </div>
       )}
 
