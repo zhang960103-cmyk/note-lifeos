@@ -670,7 +670,7 @@ const HomePage = () => {
               <div className="text-sm text-los-orange font-mono-jb">¥{todayFinanceStats.expense}</div>
             </div>
             <div className="flex-1 bg-surface-2 rounded-lg py-2">
-              <div className="text-[10px] text-muted-foreground">净值</div>
+              <div className="text-[10px] text-muted-foreground">{t("home.finance.net")}</div>
               <div className="text-sm text-gold font-mono-jb">¥{todayFinanceStats.net}</div>
             </div>
           </div>
