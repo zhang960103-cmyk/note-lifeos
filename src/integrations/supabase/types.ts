@@ -25,9 +25,11 @@ export type Database = {
           is_system: boolean
           model: string
           name: string
+          status: string
           updated_at: string
           usage_tag: string
           user_id: string
+          version: string
         }
         Insert: {
           api_key_encrypted?: string | null
@@ -39,9 +41,11 @@ export type Database = {
           is_system?: boolean
           model?: string
           name: string
+          status?: string
           updated_at?: string
           usage_tag?: string
           user_id: string
+          version?: string
         }
         Update: {
           api_key_encrypted?: string | null
@@ -53,9 +57,11 @@ export type Database = {
           is_system?: boolean
           model?: string
           name?: string
+          status?: string
           updated_at?: string
           usage_tag?: string
           user_id?: string
+          version?: string
         }
         Relationships: []
       }
