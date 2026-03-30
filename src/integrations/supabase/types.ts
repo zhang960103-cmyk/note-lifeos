@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_model_profiles: {
+        Row: {
+          api_key_encrypted: string | null
+          base_url: string
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean
+          is_system: boolean
+          model: string
+          name: string
+          updated_at: string
+          usage_tag: string
+          user_id: string
+        }
+        Insert: {
+          api_key_encrypted?: string | null
+          base_url?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          is_system?: boolean
+          model?: string
+          name: string
+          updated_at?: string
+          usage_tag?: string
+          user_id: string
+        }
+        Update: {
+          api_key_encrypted?: string | null
+          base_url?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          is_system?: boolean
+          model?: string
+          name?: string
+          updated_at?: string
+          usage_tag?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           content: string
