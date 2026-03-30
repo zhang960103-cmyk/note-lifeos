@@ -18,6 +18,7 @@ import InsightsPage from "@/pages/InsightsPage";
 import GoalsPage from "@/pages/GoalsPage";
 import TimeStatsPage from "@/pages/TimeStatsPage";
 import AuthPage from "@/pages/AuthPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import NotFound from "@/pages/NotFound";
 import Onboarding from "@/components/Onboarding";
 import InstallBanner from "@/components/InstallBanner";
