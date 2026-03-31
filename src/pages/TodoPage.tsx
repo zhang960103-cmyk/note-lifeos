@@ -451,7 +451,6 @@ const [isProcessing, setIsProcessing] = useState(false);
       )}
     </div>
   );
-};
 
 /* --- Sub-components --- */
 
