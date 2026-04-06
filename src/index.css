@@ -1,0 +1,120 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 24 33% 4%;
+    --foreground: 30 14% 78%;
+
+    --card: 30 25% 8%;
+    --card-foreground: 30 14% 78%;
+
+    --popover: 30 25% 8%;
+    --popover-foreground: 30 14% 78%;
+
+    --primary: 39 58% 53%;
+    --primary-foreground: 24 33% 4%;
+
+    --secondary: 30 20% 10%;
+    --secondary-foreground: 30 14% 78%;
+
+    --muted: 30 12% 37%;
+    --muted-foreground: 30 12% 37%;
+
+    --accent: 39 58% 53%;
+    --accent-foreground: 24 33% 4%;
+
+    --destructive: 5 71% 53%;
+    --destructive-foreground: 30 14% 78%;
+
+    --border: 30 28% 11%;
+    --input: 30 28% 11%;
+    --ring: 39 58% 53%;
+
+    --radius: 0.625rem;
+
+    --gold: 39 58% 53%;
+    --gold-light: 39 58% 53% / 0.1;
+    --gold-border: 39 58% 53% / 0.25;
+
+    --los-red: 5 71% 53%;
+    --los-red-light: 5 71% 53% / 0.08;
+
+    --los-green: 152 41% 49%;
+    --los-green-light: 152 41% 49% / 0.08;
+
+    --los-blue: 211 55% 60%;
+    --los-blue-light: 211 55% 60% / 0.08;
+
+    --los-purple: 268 48% 63%;
+    --los-purple-light: 268 48% 63% / 0.08;
+
+    --los-teal: 174 40% 51%;
+    --los-teal-light: 174 40% 51% / 0.08;
+
+    --los-orange: 26 78% 57%;
+    --los-orange-light: 26 78% 57% / 0.08;
+
+    --surface-1: 30 33% 5%;
+    --surface-2: 30 25% 8%;
+    --surface-3: 30 25% 10%;
+    --code-bg: 24 33% 2%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    line-height: 1.8;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top, rgba(197, 148, 58, 0.12), transparent 32%),
+      linear-gradient(180deg, #100d0a 0%, #0b0907 100%);
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .font-serif-sc {
+    font-family: 'Noto Serif SC', serif;
+  }
+
+  .font-mono-jb {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s infinite;
+}
