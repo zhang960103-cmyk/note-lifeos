@@ -1,0 +1,214 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 24 33% 4%;
+    --foreground: 30 14% 82%;
+
+    --card: 30 25% 8%;
+    --card-foreground: 30 14% 82%;
+
+    --popover: 30 25% 8%;
+    --popover-foreground: 30 14% 82%;
+
+    --primary: 39 58% 53%;
+    --primary-foreground: 24 33% 4%;
+
+    --secondary: 30 20% 10%;
+    --secondary-foreground: 30 14% 82%;
+
+    /* #3: muted-foreground 从 37% 提升到 52%，满足 WCAG AA */
+    --muted: 30 12% 20%;
+    --muted-foreground: 30 10% 52%;
+
+    --accent: 39 58% 53%;
+    --accent-foreground: 24 33% 4%;
+
+    --destructive: 5 71% 53%;
+    --destructive-foreground: 30 14% 82%;
+
+    --border: 30 20% 13%;
+    --input: 30 20% 13%;
+    --ring: 39 58% 53%;
+
+    --radius: 0.625rem;
+
+    --gold: 39 58% 53%;
+    --gold-light: 39 58% 53% / 0.1;
+    --gold-border: 39 58% 53% / 0.25;
+
+    --los-red: 5 71% 53%;
+    --los-red-light: 5 71% 53% / 0.08;
+
+    --los-green: 152 41% 49%;
+    --los-green-light: 152 41% 49% / 0.08;
+
+    --los-blue: 211 55% 60%;
+    --los-blue-light: 211 55% 60% / 0.08;
+
+    --los-purple: 268 48% 63%;
+    --los-purple-light: 268 48% 63% / 0.08;
+
+    --los-teal: 174 40% 51%;
+    --los-teal-light: 174 40% 51% / 0.08;
+
+    --los-orange: 26 78% 57%;
+    --los-orange-light: 26 78% 57% / 0.08;
+
+    --surface-1: 30 33% 5%;
+    --surface-2: 30 22% 9%;
+    --surface-3: 30 22% 11%;
+    --code-bg: 24 33% 2%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* #4: 字体栈统一，中英文混排 */
+    font-family: 'DM Sans', 'Noto Sans SC', system-ui, sans-serif;
+    font-weight: 300;
+    /* #14: 全局行高统一为 1.7，兼顾中文可读性 */
+    line-height: 1.7;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    /* #8: background 改为不随滚动消失的固定渐变 */
+    background-color: hsl(24 33% 4%);
+  }
+
+  /* #8: 固定渐变背景层，不被内容覆盖 */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(circle at top, rgba(197, 148, 58, 0.13) 0%, transparent 38%),
+      linear-gradient(180deg, #100d0a 0%, #0b0907 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #root {
+    min-height: 100vh;
+    position: relative;
+    z-index: 1;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .font-serif-sc {
+    font-family: 'Noto Serif SC', serif;
+  }
+
+  .font-mono-jb {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* #4: 字号规范化工具类
+     所有 text-[8px] / text-[9px] 场景改用这些 */
+  .text-label {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .text-caption {
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  /* ─── 统一卡片样式（3套，不多不少）─────────────────────────────────
+     card-base:   普通信息展示
+     card-accent: 主题色强调（AI/导师相关、主要操作）
+     card-warn:   警告/提醒（逾期、超支、预警）
+  ─────────────────────────────────────────────────────────────────── */
+  .card-base {
+    @apply bg-card border border-border rounded-xl;
+  }
+  .card-accent {
+    @apply bg-primary/10 border border-primary/30 rounded-xl;
+  }
+  .card-warn {
+    @apply bg-los-orange/10 border border-los-orange/30 rounded-xl;
+  }
+
+  /* ─── 金色（gold）语义限定：仅用于 AI/导师相关内容 ─────────────────
+     Tab激活态改用 text-primary（白色），不用金色
+     金色保留：AI回复气泡、周信卡片、导师相关标注
+  ─────────────────────────────────────────────────────────────────── */
+
+  /* #1: 标准触控热区 44×44 */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* #6: 底部 Toast 样式覆盖 — 出现在 TabBar 上方 */
+  [data-sonner-toaster] {
+    bottom: 68px !important;
+    top: auto !important;
+  }
+  [data-radix-toast-viewport] {
+    bottom: 68px !important;
+    top: auto !important;
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s infinite;
+}
+
+/* #9: VoiceInput 音量波形动画 */
+@keyframes wave-bar {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+.wave-bar {
+  animation: wave-bar 0.6s ease-in-out infinite;
+  transform-origin: bottom;
+}
+.wave-bar:nth-child(1) { animation-delay: 0s; }
+.wave-bar:nth-child(2) { animation-delay: 0.1s; }
+.wave-bar:nth-child(3) { animation-delay: 0.2s; }
+.wave-bar:nth-child(4) { animation-delay: 0.1s; }
+.wave-bar:nth-child(5) { animation-delay: 0s; }
+
+/* Android keyboard fix */
+:root {
+  --keyboard-offset: 0px;
+}
+.keyboard-aware {
+  padding-bottom: var(--keyboard-offset);
+  transition: padding-bottom 0.15s ease;
+}
+
+/* #4: 强制所有极小字不低于 11px（兜底规则）*/
+.text-\[8px\] { font-size: 11px !important; }
+.text-\[9px\] { font-size: 11px !important; }
