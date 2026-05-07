@@ -4,6 +4,7 @@ import { Send, Loader2, X, Clock, Settings, Mic, Plus, Zap, CalendarDays, AlertC
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat, extractMeta, type ChatMsg, type ExtractResult } from "@/lib/streamChat";
 import { recognizeIntent, detectPlanGaps, generateDayPlan, formatDayPlan } from "@/lib/intentEngine";
+import { extractTimeBlocks, hasTimeHints } from "@/lib/timeExtractor"; // 本地快速时间提取
 import { updateKRProgressFromGoalHints } from "@/pages/GoalsPage";
 import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
 import { useLifeOs } from "@/contexts/LifeOsContext";
@@ -515,7 +516,7 @@ const HomePage = () => {
             // 只有对话里含时间信息时才发起时间块提取，节省 API 额度
             const combinedText = text + full;
             const hasTimeHints = /\d{1,2}[:：点时]\d{0,2}|上午|下午|凌晨|小时|分钟|半天|整天/.test(combinedText);
-            if (hasTimeHints) autoExtractTimeBlocks(msgsForExtract);
+            autoExtractTimeBlocks(msgsForExtract);
           }).catch(() => {
             setExtractFailed(true);
             setIsProcessing(false);
@@ -544,66 +545,35 @@ const HomePage = () => {
     }
   };
 
-  // Auto-extract time blocks from diary conversation and create time-tagged todos
-  const autoExtractTimeBlocks = useCallback(async (msgs: ChatMsg[]) => {
-    // 15秒超时，移动端弱网保护
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 15000);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ messages: msgs, mode: "time-extract" }),
-        signal: ctrl.signal,
-      });
-      clearTimeout(timer);
-      if (!resp.ok) return;
-      const data = await resp.json();
-      const blocks = data.timeBlocks || [];
-      if (blocks.length === 0) return;
-
-      // Create time-tagged todos for each block so TimeStats can visualize them
-      let created = 0;
-      blocks.forEach((block: any) => {
-        // Check if a matching todo already exists (avoid duplicates)
-        const exists = allTodos.some(t => {
-          const noteMatch = t.note?.includes(`⏱ ${block.startTime}-${block.endTime}`);
-          const textMatch = t.text.toLowerCase().includes(block.activity.toLowerCase().slice(0, 6));
-          return noteMatch || (textMatch && t.note?.includes("⏱"));
-        });
-        if (exists) return;
-
-        const todo: TodoItem = {
-          id: crypto.randomUUID(),
-          text: block.activity,
-          status: "done" as const,
-          priority: "normal" as const,
-          tags: [block.category || "其他"],
-          subTasks: [],
-          recur: "none" as const,
-          note: `⏱ ${block.startTime}-${block.endTime} (${block.durationMinutes}分钟)${block.note ? `\n${block.note}` : ""}`,
-          completedAt: new Date().toISOString(),
-          sourceDate: todayKey,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        addTodoToDate(todayKey, todo);
-        created++;
-      });
-
-      if (created > 0) {
-        setTodoToast(`⏱ 已自动记录 ${created} 个时间段`);
-        setTimeout(() => setTodoToast(null), 3000);
-      }
-    } catch (e: any) {
-      clearTimeout(timer);
-      if (e?.name !== "AbortError") console.warn("[autoExtractTimeBlocks]", e);
+  // 本地快速时间提取（毫秒级，无AI调用）
+  const autoExtractTimeBlocks = useCallback((msgs: ChatMsg[]) => {
+    const userText = msgs.filter(m => m.role === "user").map(m => m.content).join(" ");
+    if (!hasTimeHints(userText)) return;
+    const blocks = extractTimeBlocks(userText);
+    if (blocks.length === 0) return;
+    let created = 0;
+    blocks.forEach(block => {
+      if (block.durationMin <= 0 || block.durationMin > 480) return;
+      const noteKey = `⏱ ${block.startTime}-${block.endTime}`;
+      const exists = allTodos.some(t => t.note?.includes(noteKey));
+      if (exists) return;
+      const todo: TodoItem = {
+        id: crypto.randomUUID(), text: block.label,
+        status: "done" as const, priority: "normal" as const,
+        tags: ["时间记录"], subTasks: [], recur: "none" as const,
+        note: `${noteKey} (${block.durationMin}分钟)`,
+        completedAt: new Date().toISOString(), sourceDate: todayKey,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+      addTodoToDate(todayKey, todo); created++;
+    });
+    if (created > 0) {
+      setTodoToast(`⏱ 自动记录了 ${created} 个时间段`);
+      setTimeout(() => setTodoToast(null), 3000);
     }
   }, [allTodos, todayKey, addTodoToDate]);
 
-  // Feature 1: Go deeper
+    // Feature 1: Go deeper
   const handleGoDeeper = (msgContent: string) => {
     const lastSentence = msgContent.split(/[。？！.?!\n]/).filter(Boolean).pop() || msgContent.slice(-30);
     sendMessage(`请针对你刚才说的「${lastSentence}」，再往深处挖一层。`);

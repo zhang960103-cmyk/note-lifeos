@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { ALL_DOMAINS } from "@/types/lifeOs";
 import { Mail, Loader2, RotateCcw, Copy, Check } from "lucide-react";
-import { subDays, isAfter, subMonths, format, parseISO } from "date-fns";
+import { subDays, isAfter, subMonths, format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { streamChat, type ChatMsg } from "@/lib/streamChat";
 
 const LETTER_CACHE_KEY = (type: string) => `review_letter_${type}_${format(new Date(), "yyyy-MM")}`;
@@ -11,13 +13,15 @@ const LETTER_CACHE_KEY = (type: string) => `review_letter_${type}_${format(new D
 const ReviewPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { entries, wheelScores, allTodos, monthFinanceStats } = useLifeOs();
+  const { entries, wheelScores, allTodos, monthFinanceStats, habits, energyLogs } = useLifeOs();
+  const { user } = useAuth();
   const [letter, setLetter] = useState<string | null>(null);
   const [letterType, setLetterType] = useState<"weekly" | "monthly" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [touchStart, setTouchStart] = useState(0);
   const [autoTriggered, setAutoTriggered] = useState(false);
+  const [goals, setGoals] = useState<any[]>([]);
 
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -30,6 +34,13 @@ const ReviewPage = () => {
     const cutoff = subMonths(new Date(), 1);
     return entries.filter(e => isAfter(parseISO(e.date), cutoff));
   }, [entries]);
+
+  // Fetch goals from Supabase for OKR progress in review
+  useEffect(() => {
+    if (!user || !supabase) return;
+    supabase.from("goals").select("*").eq("user_id", user.id)
+      .then(({ data }) => { if (data) setGoals(data); });
+  }, [user]);
 
   // Restore saved letter on mount
   useEffect(() => {
@@ -79,6 +90,43 @@ const ReviewPage = () => {
     const doneTodos = data.flatMap(e => e.todos).filter(t => t.status === "done").map(t => t.text).slice(0, 10).join("、");
     const pendingTodos = data.flatMap(e => e.todos).filter(t => t.status !== "done" && t.status !== "dropped").map(t => t.text).slice(0, 5).join("、");
 
+    // Habits completion this week/month
+    const periodStart = type === "weekly" ? subDays(new Date(), 7) : subMonths(new Date(), 1);
+    const periodStartStr = format(periodStart, "yyyy-MM-dd");
+    const habitSummary = habits.length > 0 ? habits.map(h => {
+      const checkins = h.checkIns.filter(c => c >= periodStartStr);
+      return `${h.emoji}${h.name}打卡${checkins.length}次`;
+    }).join("、") : "";
+
+    // OKR goals progress
+    const goalSummary = goals.length > 0 ? goals.slice(0, 3).map((g: any) => {
+      const krs = g.key_results || [];
+      const avgProgress = krs.length > 0
+        ? Math.round(krs.reduce((s: number, kr: any) => s + (kr.progress || 0), 0) / krs.length)
+        : 0;
+      return `${g.title}(进度${avgProgress}%)`;
+    }).join("、") : "";
+
+    // Energy summary
+    const recentEnergy = energyLogs.slice(0, 7);
+    const energySummary = recentEnergy.length > 0
+      ? `精力分布：高${recentEnergy.filter(l => l.level === "高").length}次、中${recentEnergy.filter(l => l.level === "中").length}次、低${recentEnergy.filter(l => l.level === "低").length}次`
+      : "";
+
+    // Budget data from localStorage (not in Supabase)
+    let budgetSummary = "";
+    try {
+      const uid = user?.id || "";
+      const budgets = JSON.parse(localStorage.getItem(`budgets_${uid}`) || "[]");
+      const subs = JSON.parse(localStorage.getItem(`subscriptions_${uid}`) || "[]");
+      if (budgets.length > 0) budgetSummary += `设有${budgets.length}个预算类别`;
+      if (subs.filter((s: any) => s.active).length > 0) {
+        const monthlyFixed = subs.filter((s: any) => s.active)
+          .reduce((sum: number, s: any) => sum + (s.billingCycle === "yearly" ? s.amount/12 : s.amount), 0);
+        budgetSummary += `，每月固定订阅支出约¥${Math.round(monthlyFixed)}`;
+      }
+    } catch {}
+
     const contextMsg = `以下是我${type === "weekly" ? "这周" : "这个月"}的完整记录：
 
 【数据摘要】
@@ -87,15 +135,24 @@ const ReviewPage = () => {
 - 常见情绪：${stats.topTags.map(([t]) => t).join("、") || "无"}
 - 常见话题：${stats.topTopics.map(([t]) => t).join("、") || "无"}
 - 任务完成：${stats.todoDone}/${stats.todoTotal}（${stats.overdueTodos.length}个逾期）
-${doneTodos ? `- 已完成事项：${doneTodos}` : ""}
-${pendingTodos ? `- 未完成事项：${pendingTodos}` : ""}
-${monthFinanceStats.count > 0 ? `- 本月收入：¥${monthFinanceStats.income}，支出：¥${monthFinanceStats.expense}，净值：¥${monthFinanceStats.net}` : ""}
-${wheelScores[0] ? `- 生命之轮：${ALL_DOMAINS.map(d => `${d}${wheelScores[0].scores[d]}`).join("、")}` : ""}
+${doneTodos ? `- 已完成：${doneTodos}` : ""}
+${pendingTodos ? `- 未完成：${pendingTodos}` : ""}
+${monthFinanceStats.count > 0 ? `- 本月财务：收入¥${monthFinanceStats.income}，支出¥${monthFinanceStats.expense}，净值¥${monthFinanceStats.net}` : ""}
+${budgetSummary ? `- 固定支出：${budgetSummary}` : ""}
+${wheelScores[0] ? `- 生命之轮最新：${ALL_DOMAINS.map(d => `${d}${wheelScores[0].scores[d]}`).join("、")}` : ""}
+${wheelScores.length > 1 ? `- 上次轮子：${ALL_DOMAINS.map(d => `${d}${wheelScores[1].scores[d]}`).join("、")}` : ""}
+${habitSummary ? `- 习惯打卡：${habitSummary}` : ""}
+${goalSummary ? `- 目标进度：${goalSummary}` : ""}
+${energySummary ? `- ${energySummary}` : ""}
 
 【日记原文】
 ${recentContent}
 
-请作为我的私人导师，给我写一封深度${type === "weekly" ? "周" : "月"}回顾信。要结合我的具体内容，不要泛泛而谈。信的结构：① 看见我这段时间的状态和成长 ② 指出我可能忽略的模式或盲点 ③ 给出1-2个具体的下周行动建议 ④ 推荐1个适合我当前阶段的资源。`;
+请作为我的私人导师，给我写一封深度${type === "weekly" ? "周" : "月"}回顾信。要结合我的具体内容，不要泛泛而谈。信的结构：
+① 看见我这段时间的状态和成长
+② 指出我可能忽略的模式或盲点（结合习惯/目标/精力数据）
+③ 给出1-2个具体的下周行动建议
+④ 推荐1个适合我当前阶段的资源`;
 
     const msgs: ChatMsg[] = [{ role: "user", content: contextMsg }];
     let full = "";

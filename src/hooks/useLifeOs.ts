@@ -14,6 +14,26 @@ function resolveDueDate(hint?: string): string | undefined {
   return undefined;
 }
 
+// 关键词自动分类标签（解决时间统计"其他"占比过高）
+const AUTO_TAG_RULES: Array<{ keywords: string[]; tag: string }> = [
+  { keywords: ["开会","会议","讨论","汇报","报告","演讲","培训","面试"], tag: "工作" },
+  { keywords: ["学习","阅读","读书","课程","笔记","复习","练习","作业"], tag: "学习" },
+  { keywords: ["运动","健身","跑步","锻炼","瑜伽","游泳","骑车"], tag: "运动" },
+  { keywords: ["吃饭","午饭","晚饭","早饭","外卖","聚餐","咖啡"], tag: "生活" },
+  { keywords: ["打电话","联系","拜访","朋友","家人","社交"], tag: "社交" },
+  { keywords: ["娱乐","电影","游戏","刷视频","看剧","听音乐"], tag: "娱乐" },
+  { keywords: ["写作","创作","设计","画图","拍照","剪辑"], tag: "创作" },
+  { keywords: ["采购","买","购物","快递","整理","打扫","家务"], tag: "生活" },
+];
+
+function autoTag(text: string, existingTags: string[]): string[] {
+  if (existingTags.length > 0) return existingTags;
+  for (const rule of AUTO_TAG_RULES) {
+    if (rule.keywords.some(kw => text.includes(kw))) return [rule.tag];
+  }
+  return [];
+}
+
 export function createTodoFromExtract(
   raw: { text: string; priority?: string; dueDate?: string; dueTime?: string; tags?: string[]; subTasks?: Array<{text: string}>; note?: string },
   sourceDate: string
@@ -26,7 +46,7 @@ export function createTodoFromExtract(
     priority: (raw.priority as any) || "normal",
     dueDate: resolveDueDate(raw.dueDate),
     dueTime: raw.dueTime,
-    tags: raw.tags || [],
+    tags: autoTag(raw.text, raw.tags || []),  // 自动打标签
     subTasks: (raw.subTasks || []).map(s => ({ id: crypto.randomUUID(), text: s.text, done: false })),
     recur: "none",
     note: raw.note,
