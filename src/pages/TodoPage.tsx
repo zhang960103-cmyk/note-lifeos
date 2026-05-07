@@ -1,11 +1,14 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { useAuth } from "@/hooks/useAuth";
+import { useProjects, PROJECT_COLORS } from "@/hooks/useProjects";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { format, startOfWeek, addDays, isToday, subDays } from "date-fns";
 import {
   Play, Pause, X, Check, Trash2, Pencil, Clock, ChevronDown,
   ChevronRight, Wand2, Loader2, Plus, Timer, Flame,
-  LayoutGrid, List, Zap, Calendar, CalendarClock
+  LayoutGrid, List, Zap, Calendar, CalendarClock, Folder
 } from "lucide-react";
 import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +28,8 @@ const TodoPage = () => {
     allTodos, todayKey, toggleTodo, updateTodo, addTodoToDate, deleteTodo,
     habits, addHabit, checkInHabit, deleteHabit, entries,
   } = useLifeOs();
+  const { user } = useAuth();
+  const { activeProjects } = useProjects(user?.id);
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -35,6 +40,7 @@ const TodoPage = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [newText, setNewText] = useState("");
   const [newPriority, setNewPriority] = useState<Priority>("normal");
+  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
   const [showHabits, setShowHabits] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
 
@@ -109,15 +115,22 @@ const TodoPage = () => {
   const fmtTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
   // Data
+  const filteredByProject = useMemo(() =>
+    selectedProjectFilter
+      ? allTodos.filter(t => t.projectId === selectedProjectFilter)
+      : allTodos,
+    [allTodos, selectedProjectFilter]
+  );
+
   const smartGroups = useMemo(() => {
     const priorityOrder: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
     const sort = (arr: TodoItem[]) => [...arr].sort((a, b) => (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2));
     return {
-      doing: sort(allTodos.filter(t => t.status === "doing")),
-      todo: sort(allTodos.filter(t => t.status === "todo" || (t.status !== "done" && t.status !== "dropped" && t.status !== "doing"))),
-      done: sort(allTodos.filter(t => t.status === "done")),
+      doing: sort(filteredByProject.filter(t => t.status === "doing")),
+      todo: sort(filteredByProject.filter(t => t.status === "todo" || (t.status !== "done" && t.status !== "dropped" && t.status !== "doing"))),
+      done: sort(filteredByProject.filter(t => t.status === "done")),
     };
-  }, [allTodos]);
+  }, [filteredByProject]);
 
   const stats = useMemo(() => {
     const total = allTodos.filter(t => t.status !== "dropped").length;
@@ -258,15 +271,34 @@ const TodoPage = () => {
       </div>
 
       {/* Quick access row */}
-      <div className="px-4 flex gap-2 mb-3">
+      <div className="px-4 flex gap-2 mb-3 overflow-x-auto scrollbar-none">
         <button onClick={() => setShowHabits(!showHabits)}
-          className={`text-[11px] px-3 py-1.5 rounded-full border transition flex items-center gap-1 ${showHabits ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
+          className={`text-[11px] px-3 py-1.5 rounded-full border transition flex items-center gap-1 flex-shrink-0 ${showHabits ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
           <Zap size={12} /> 习惯
         </button>
         <button onClick={() => setShowTemplates(!showTemplates)}
-          className={`text-[11px] px-3 py-1.5 rounded-full border transition flex items-center gap-1 ${showTemplates ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
+          className={`text-[11px] px-3 py-1.5 rounded-full border transition flex items-center gap-1 flex-shrink-0 ${showTemplates ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
           <Calendar size={12} /> 模板
         </button>
+        {/* Project filter pills */}
+        {activeProjects.map(p => {
+          const c = PROJECT_COLORS[p.color];
+          const isActive = selectedProjectFilter === p.id;
+          return (
+            <button key={p.id}
+              onClick={() => setSelectedProjectFilter(isActive ? null : p.id)}
+              className={`text-[11px] px-3 py-1.5 rounded-full border transition flex items-center gap-1 flex-shrink-0
+                ${isActive ? `${c.bg} ${c.border} ${c.text}` : "border-border text-muted-foreground hover:text-foreground"}`}>
+              {p.emoji} {p.name}
+            </button>
+          );
+        })}
+        {activeProjects.length > 0 && (
+          <button onClick={() => navigate("/projects")}
+            className="text-[11px] px-3 py-1.5 rounded-full border border-border text-muted-foreground hover:text-foreground transition flex items-center gap-1 flex-shrink-0">
+            <Folder size={12} /> 管理
+          </button>
+        )}
       </div>
 
       {/* Habits inline panel */}

@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { MoreHorizontal, X, BookOpen, Target, Clock, History, Star, CalendarDays, BarChart2 } from "lucide-react";
+import { MoreHorizontal, X, BookOpen, Target, Clock, History, Star, CalendarDays, BarChart2, Briefcase, Search, Heart, Map } from "lucide-react";
 
 // 主Tab：今日/待办/日历/复盘/财富
 // 日历 = 时间入口（直觉），时间统计进入分析页

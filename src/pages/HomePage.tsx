@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type ChangeEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Send, Loader2, X, Clock, Settings, Mic, Plus, Zap, CalendarDays, AlertCircle, Search, Flame } from "lucide-react";
+import { Send, Loader2, X, Clock, Settings, Mic, Plus, Zap, CalendarDays, AlertCircle, Search, Flame, FileText } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
+import JournalEditor from "@/components/JournalEditor";
 import { streamChat, extractMeta, type ChatMsg, type ExtractResult } from "@/lib/streamChat";
 import { recognizeIntent, detectPlanGaps, generateDayPlan, formatDayPlan } from "@/lib/intentEngine";
 import { extractTimeBlocks, hasTimeHints } from "@/lib/timeExtractor"; // 本地快速时间提取
@@ -39,7 +40,7 @@ const HomePage = () => {
   const {
     todayEntry, todayKey, addMessage, updateDayMeta,
     addFinanceEntry, todayFinanceStats, wheelScores, entries, allTodos, toggleTodo,
-    habits, setFocusTodo, addTodoToDate,
+    habits, checkInHabit, setFocusTodo, addTodoToDate,
     energyLogs, addEnergyLog, energySummary, consecutiveLowDays,
   } = useLifeOs();
   const [dailyQuestion, setDailyQuestion] = useState<{ question: string; domain: string } | null>(null);
@@ -65,6 +66,8 @@ const HomePage = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevTagCountRef = useRef(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [journalMode, setJournalMode] = useState(false); // TipTap 富文本模式
+  const [journalContent, setJournalContent] = useState("");
 
   // #2: Long-press for message actions (mobile-friendly)
   const longPressTimer = useRef<number | null>(null);
@@ -592,7 +595,7 @@ const HomePage = () => {
           )}
         </div>
         <div className="flex gap-0">
-          <button onClick={() => navigate("/history?search=1")} className="touch-target text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-surface-2" title="搜索日记">
+          <button onClick={() => navigate("/search")} className="touch-target text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-surface-2" title="搜索日记">
             <Search size={17} />
           </button>
           <button onClick={() => navigate("/history")} className="touch-target text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-surface-2">
@@ -692,6 +695,39 @@ const HomePage = () => {
                   </button>
                 ))}
               </div>
+
+              {/* 今日习惯打卡（主页可见）*/}
+              {habits.length > 0 && (() => {
+                const todayDow = new Date().getDay();
+                const todayHabits = habits.filter(h => h.targetDays.includes(todayDow));
+                if (todayHabits.length === 0) return null;
+                return (
+                  <div className="mt-4 bg-surface-2 border border-border rounded-xl px-4 py-3 text-left">
+                    <p className="text-caption text-muted-foreground mb-2">今日习惯</p>
+                    <div className="flex flex-wrap gap-2">
+                      {todayHabits.map(habit => {
+                        const checked = habit.checkIns.includes(todayKey);
+                        return (
+                          <button key={habit.id}
+                            onClick={() => { if (!checked) checkInHabit(habit.id, todayKey); }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all
+                              ${checked
+                                ? "bg-los-green/20 border border-los-green/40 text-los-green"
+                                : "bg-muted border border-border text-muted-foreground hover:border-primary hover:text-foreground"
+                              }`}>
+                            <span>{habit.emoji}</span>
+                            <span>{habit.name}</span>
+                            {checked && <span className="text-[9px] opacity-70">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {todayHabits.every(h => h.checkIns.includes(todayKey)) && (
+                      <p className="text-caption text-los-green mt-2">🎉 今天的习惯全部完成了！</p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* 今日一问 */}
               {dailyQuestion && (
@@ -880,23 +916,50 @@ const HomePage = () => {
               </button>
             </div>
           )}
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={handleInput}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            placeholder={planMode ? `已记录 ${planTasks.length} 件，继续说，或说"好了"生成计划…` : t("home.input.placeholder")}
-            rows={2}
-            className={`flex-1 bg-muted border rounded-2xl px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none transition-colors leading-relaxed ${planMode ? "border-primary/50 bg-primary/5" : "border-border focus:border-primary"}`}
-            style={{ minHeight: "44px", maxHeight: "120px" }}
-          />
-          {canUseVoice && (
+
+          {/* 日记模式切换 — TipTap 富文本 */}
+          {journalMode ? (
+            <div className="mb-2">
+              <JournalEditor
+                content={journalContent}
+                onChange={setJournalContent}
+                onSave={(html) => {
+                  const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+                  if (text) sendMessage(`[日记] ${text}`);
+                  setJournalContent(""); setJournalMode(false);
+                }}
+                placeholder="今天想写什么…支持 **加粗**、# 标题、[ ] 任务清单"
+              />
+              <button onClick={() => setJournalMode(false)} className="mt-1 text-caption text-muted-foreground hover:text-foreground">
+                返回对话模式
+              </button>
+            </div>
+          ) : (
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={handleInput}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              placeholder={planMode ? `已记录 ${planTasks.length} 件，继续说，或说"好了"生成计划…` : t("home.input.placeholder")}
+              rows={2}
+              className={`flex-1 bg-muted border rounded-2xl px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none transition-colors leading-relaxed ${planMode ? "border-primary/50 bg-primary/5" : "border-border focus:border-primary"}`}
+              style={{ minHeight: "44px", maxHeight: "120px" }}
+            />
+          )}
+          {canUseVoice && !journalMode && (
             <button
               onClick={() => setShowVoice(true)}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition flex-shrink-0"
             >
               <Mic size={18} />
+            </button>
+          )}
+          {!journalMode && (
+            <button onClick={() => setJournalMode(true)}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition flex-shrink-0"
+              title="切换到日记模式（富文本）">
+              <FileText size={18} />
             </button>
           )}
           <button

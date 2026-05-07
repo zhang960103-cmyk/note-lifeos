@@ -61,6 +61,10 @@ import SettingsPage from "@/pages/SettingsPage";
 import GoalsPage from "@/pages/GoalsPage";
 import TimeStatsPage from "@/pages/TimeStatsPage";
 import CalendarPage from "@/pages/CalendarPage";
+import ProjectsPage from "@/pages/ProjectsPage";
+import SearchPage from "@/pages/SearchPage";
+import HealthPage from "@/pages/HealthPage";
+import MapPage from "@/pages/MapPage";
 import AuthPage from "@/pages/AuthPage";
 import PrivacyPage from "@/pages/PrivacyPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
@@ -113,6 +117,10 @@ const AppInner = () => {
             <Route path="/goals" element={<GoalsPage />} />
             <Route path="/time-stats" element={<TimeStatsPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/health" element={<HealthPage />} />
+            <Route path="/map" element={<MapPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

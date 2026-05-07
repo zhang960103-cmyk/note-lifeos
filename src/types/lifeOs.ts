@@ -53,6 +53,7 @@ export interface TodoItem {
   reminderMinutes?: number;
   note?: string;
   emotionTag?: string;
+  projectId?: string;   // 关联项目（可选）
   sourceDate?: string;
   completedAt?: string;
   createdAt: string;
@@ -120,6 +121,19 @@ export interface IouItem {
   dueDate?: string;
   status: 'pending' | 'paid';
   createdAt: string;
+}
+
+// === Project System ===
+export type ProjectColor = 'gold' | 'blue' | 'green' | 'red' | 'purple' | 'orange' | 'teal';
+export interface Project {
+  id: string;
+  name: string;
+  emoji: string;
+  color: ProjectColor;
+  description?: string;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ResourceRecommendation {
