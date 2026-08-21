@@ -11,7 +11,6 @@ import {
   LayoutGrid, List, Zap, Calendar, CalendarClock, Folder
 } from "lucide-react";
 import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
-import { useNavigate } from "react-router-dom";
 
 const PRIORITY_KEYS: Record<string, { labelKey: string; dot: string; ring: string }> = {
   urgent: { labelKey: "todo.priority.urgent", dot: "bg-destructive", ring: "ring-destructive/30" },
