@@ -4,15 +4,18 @@ export type ChatMsg = {
   timestamp?: string;
 };
 
-export type ChatMode = 
-  | "default" 
-  | "weekly-review" 
-  | "monthly-review" 
-  | "extract" 
-  | "parse-todo" 
-  | "wheel-eval" 
-  | "time-analysis" 
-  | "time-extract";
+export type ChatMode =
+  | "default"
+  | "weekly-review"
+  | "monthly-review"
+  | "extract"
+  | "parse-todo"
+  | "wheel-eval"
+  | "wheel-inference"
+  | "wheel-insight"
+  | "time-analysis"
+  | "time-extract"
+  | "decompose";
 
 export interface ExtractResult {
   emotionTags: string[];
@@ -388,6 +391,78 @@ export async function extractMeta(
   }
 
   return validateExtractResult(null);
+}
+
+// ════════════════════════════════════════
+// Generic JSON Call (non-streaming modes)
+// ════════════════════════════════════════
+// Some edge-function modes (wheel-inference, wheel-insight, time-extract,
+// time-analysis, decompose, ...) return one JSON object, not an SSE stream.
+// streamChat()'s processStream() only understands "data: ..." SSE framing,
+// so these modes must NOT be routed through streamChat() — doing so would
+// silently produce empty output. This helper reuses the same auth-token
+// fallback, retry and timeout logic without the SSE parsing.
+export async function callLifeMentorJSON<T = any>(
+  mode: ChatMode | string,
+  messages: ChatMsg[],
+  extra?: Record<string, unknown>,
+  accessToken?: string,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
+): Promise<T> {
+  validateEnvironment();
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= DEFAULT_MAX_RETRIES; attempt++) {
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+
+    try {
+      const authToken = getPreferredAuthToken(accessToken);
+
+      let resp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: buildFunctionHeaders(authToken),
+        body: JSON.stringify({ messages, mode, ...extra, version: "4.1" }),
+        signal: timeoutController.signal,
+      });
+
+      if (resp.status === 401 && authToken !== SUPABASE_PUBLISHABLE_KEY) {
+        resp = await fetch(CHAT_URL, {
+          method: "POST",
+          headers: buildFunctionHeaders(),
+          body: JSON.stringify({ messages, mode, ...extra, version: "4.1" }),
+          signal: timeoutController.signal,
+        });
+      }
+
+      clearTimeout(timeoutId);
+
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        throw new StreamChatError(
+          `HTTP_${resp.status}`, errorData.error || `HTTP ${resp.status}`,
+          resp.status, resp.status >= 500 || resp.status === 429
+        );
+      }
+
+      return await resp.json();
+    } catch (err) {
+      clearTimeout(timeoutId);
+      lastError = err as Error;
+
+      if (attempt < DEFAULT_MAX_RETRIES && isRetryableError(err)) {
+        const delayMs = getRetryDelay(attempt);
+        console.warn(`[callLifeMentorJSON:${mode}] Attempt ${attempt + 1} failed, retrying in ${delayMs}ms:`, lastError.message);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      } else {
+        console.error(`[callLifeMentorJSON:${mode}] Failed:`, lastError);
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError || new StreamChatError("UNKNOWN", "Request failed after all retries", undefined, false);
 }
 
 export async function parseTodoNL(text: string): Promise<any> {

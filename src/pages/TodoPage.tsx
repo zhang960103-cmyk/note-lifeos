@@ -11,6 +11,8 @@ import {
   LayoutGrid, List, Zap, Calendar, CalendarClock, Folder
 } from "lucide-react";
 import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
+import { callLifeMentorJSON } from "@/lib/streamChat";
+import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
 
 const PRIORITY_KEYS: Record<string, { labelKey: string; dot: string; ring: string }> = {
   urgent: { labelKey: "todo.priority.urgent", dot: "bg-destructive", ring: "ring-destructive/30" },
@@ -515,7 +517,6 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
   onPomodoro: () => void; isTracking: boolean; trackingTime?: string; onStartTracking: () => void;
 }) {
   const { t } = useLanguage();
-  const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
   const isDone = todo.status === "done";
   const isDoing = todo.status === "doing";
   const [editText, setEditText] = useState(todo.text);
@@ -527,13 +528,7 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
   const handleDecompose = useCallback(async () => {
     setDecomposing(true);
     try {
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ messages: [{ role: "user", content: todo.text }], mode: "decompose" }),
-      });
-      if (!resp.ok) throw new Error();
-      const data = await resp.json();
+      const data = await callLifeMentorJSON("decompose", [{ role: "user", content: todo.text }]);
       if (data.subTasks?.length) {
         onUpdate({ subTasks: [...(todo.subTasks || []), ...data.subTasks.map((s: any) => ({ id: crypto.randomUUID(), text: s.text, done: false }))] });
       }
@@ -751,16 +746,13 @@ function InlineTimeline({ entries, allTodos, todayKey, updateTodo }: {
     if (!todayEntry) return;
     setLoading(true);
     try {
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({
-          messages: todayEntry.messages.map((m: any) => ({ role: m.role, content: m.content })),
-          mode: "time-extract",
-        }),
-      });
-      if (!resp.ok) throw new Error();
-      const data = await resp.json();
+      const memoryContext = buildMemoryContext(entries, 14);
+      const patterns = getKeyPatterns(entries);
+      const data = await callLifeMentorJSON(
+        "time-extract",
+        todayEntry.messages.map((m: any) => ({ role: m.role, content: m.content })),
+        { memoryContext, patterns }
+      );
       setTimeBlocks(data.timeBlocks || []);
       setExtracted(true);
       // Auto-match to todos

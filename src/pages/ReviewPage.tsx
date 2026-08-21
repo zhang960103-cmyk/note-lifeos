@@ -42,7 +42,9 @@ const ReviewPage = () => {
       .then(({ data }) => { if (data) setGoals(data); });
   }, [user]);
 
-  // Restore saved letter on mount
+  // Restore saved letter on mount: show the local cache immediately (fast,
+  // works offline), then let the Supabase copy (synced across devices)
+  // override it once it comes back, if it's present.
   useEffect(() => {
     const saved = localStorage.getItem(LETTER_CACHE_KEY("weekly"));
     if (saved) {
@@ -50,6 +52,22 @@ const ReviewPage = () => {
       setLetterType("weekly");
     }
   }, []);
+
+  useEffect(() => {
+    if (!user || !supabase) return;
+    const period = format(new Date(), "yyyy-MM");
+    supabase.from("review_letters").select("content, type")
+      .eq("user_id", user.id).eq("period", period).eq("type", "weekly")
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) { console.error("Failed to load review letter from Supabase:", error); return; }
+        if (data?.content) {
+          setLetter(data.content);
+          setLetterType("weekly");
+          localStorage.setItem(LETTER_CACHE_KEY("weekly"), data.content);
+        }
+      });
+  }, [user]);
 
   const buildSummary = useCallback((data: typeof entries) => {
     const count = data.length;
@@ -167,15 +185,27 @@ ${recentContent}
         },
         onDone: () => {
           setIsGenerating(false);
-          // Save letter to localStorage so it persists across sessions
+          // Keep the localStorage cache (fast local read, works offline)...
           localStorage.setItem(LETTER_CACHE_KEY(type), full);
+          // ...and sync it to Supabase so other devices/browsers see it too.
+          if (user && supabase) {
+            const period = format(new Date(), "yyyy-MM");
+            supabase.from("review_letters")
+              .upsert(
+                { user_id: user.id, type, period, content: full, updated_at: new Date().toISOString() },
+                { onConflict: "user_id,type,period" }
+              )
+              .then(({ error }) => {
+                if (error) console.error("Failed to sync review letter to Supabase:", error);
+              });
+          }
         },
       });
     } catch (e: any) {
       setLetter(`抱歉，生成失败了。${e.message || ""}`);
       setIsGenerating(false);
     }
-  }, [weekEntries, monthEntries, buildSummary, monthFinanceStats, wheelScores]);
+  }, [weekEntries, monthEntries, buildSummary, monthFinanceStats, wheelScores, user]);
 
   // Auto-trigger weekly letter from URL param
   useEffect(() => {

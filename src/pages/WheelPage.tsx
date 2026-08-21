@@ -5,8 +5,8 @@ import { ALL_DOMAINS, type LifeDomain } from "@/types/lifeOs";
 import { ArrowLeft, Save, Sparkles, Loader2, Plus, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, BarChart3, Target, History, Lightbulb } from "lucide-react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area } from "recharts";
 import { format, parseISO } from "date-fns";
-
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
+import { callLifeMentorJSON } from "@/lib/streamChat";
+import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
 
 const SUB_DOMAINS: Record<LifeDomain, string[]> = {
   "学习成长": ["知识积累", "技能精进", "思维升级", "输出创作"],
@@ -69,13 +69,9 @@ const WheelPage = () => {
         e.messages.filter(m => m.role === "user").map(m => ({ role: m.role, content: m.content }))
       );
       if (allMessages.length === 0) { setIsInferring(false); return; }
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ messages: allMessages, mode: "wheel-inference" }),
-      });
-      if (!resp.ok) throw new Error("推断失败");
-      const data = await resp.json();
+      const memoryContext = buildMemoryContext(entries, 14);
+      const patterns = getKeyPatterns(entries);
+      const data = await callLifeMentorJSON<InferResult>("wheel-inference", allMessages, { memoryContext, patterns });
       const newScores = { ...scores };
       const newInfer: InferResult = {};
       ALL_DOMAINS.forEach(d => {
@@ -95,13 +91,9 @@ const WheelPage = () => {
       const allMessages = recentEntries.flatMap(e =>
         e.messages.filter(m => m.role === "user").map(m => ({ role: m.role, content: m.content }))
       );
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ messages: allMessages, mode: "wheel-insight", scores }),
-      });
-      if (!resp.ok) throw new Error("洞察失败");
-      const data = await resp.json();
+      const memoryContext = buildMemoryContext(entries, 14);
+      const patterns = getKeyPatterns(entries);
+      const data = await callLifeMentorJSON<InsightResult>("wheel-insight", allMessages, { scores, memoryContext, patterns });
       setInsights(data);
       setActiveTab("insights");
       setTimeout(() => insightRef.current?.scrollIntoView({ behavior: "smooth" }), 300);

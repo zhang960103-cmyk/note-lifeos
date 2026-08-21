@@ -8,6 +8,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
 import { Clock, TrendingUp, Sparkles, Loader2, CalendarClock, Flame, Target, Zap, Battery, Search, Timer, Pencil, Check, X, Bookmark, BookmarkCheck, MessageCircle } from "lucide-react";
 import QuickTimeEntry from "@/components/QuickTimeEntry";
 import PageHeader from "@/components/PageHeader";
+import { callLifeMentorJSON } from "@/lib/streamChat";
+import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
 
 const CATEGORY_COLORS: Record<string, string> = {
   "工作": "hsl(39 58% 53%)",
@@ -656,7 +658,7 @@ export default function TimeStatsPage() {
         )}
 
         {/* AI Analysis */}
-        <AiAnalysis categoryData={categoryData} stats={stats} emotionTrend={emotionTrend} dailyData={dailyData} range={range} />
+        <AiAnalysis categoryData={categoryData} stats={stats} emotionTrend={emotionTrend} dailyData={dailyData} range={range} entries={entries} />
       </div>
     </>)}
     </div>
@@ -835,16 +837,13 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
     if (!todayEntry) return;
     setLoading(true);
     try {
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({
-          messages: todayEntry.messages.map((m: any) => ({ role: m.role, content: m.content })),
-          mode: "time-extract",
-        }),
-      });
-      if (!resp.ok) throw new Error();
-      const data = await resp.json();
+      const memoryContext = buildMemoryContext(entries, 14);
+      const patterns = getKeyPatterns(entries);
+      const data = await callLifeMentorJSON(
+        "time-extract",
+        todayEntry.messages.map((m: any) => ({ role: m.role, content: m.content })),
+        { memoryContext, patterns }
+      );
       const blocks = data.timeBlocks || [];
       setTimeBlocks(blocks);
       setSummary(data.summary || "");
@@ -960,13 +959,14 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
 
 /* ─── AI Analysis ─── */
 function AiAnalysis({
-  categoryData, stats, emotionTrend, dailyData, range,
+  categoryData, stats, emotionTrend, dailyData, range, entries,
 }: {
   categoryData: { name: string; value: number }[];
   stats: { total: number; done: number; topCategory: string; avgEmotion: string; activeDays: number };
   emotionTrend: { date: string; score: number; msgCount: number }[];
   dailyData: { date: string; done: number; total: number }[];
   range: string;
+  entries: any[];
 }) {
   const [analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -986,13 +986,14 @@ function AiAnalysis({
     setLoading(true);
     setError("");
     try {
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ messages: [{ role: "user", content: buildContext() }], mode: "time-analysis" }),
-      });
-      if (!resp.ok) throw new Error();
-      setAnalysis(await resp.json());
+      const memoryContext = buildMemoryContext(entries, 14);
+      const patterns = getKeyPatterns(entries);
+      const data = await callLifeMentorJSON(
+        "time-analysis",
+        [{ role: "user", content: buildContext() }],
+        { memoryContext, patterns }
+      );
+      setAnalysis(data);
     } catch { setError("AI 分析暂不可用"); } finally { setLoading(false); }
   };
 
