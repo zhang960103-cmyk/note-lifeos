@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,19 +9,28 @@ import { subDays, isAfter, subMonths, format, parseISO, startOfMonth, endOfMonth
 import { streamChat, type ChatMsg } from "@/lib/streamChat";
 
 const LETTER_CACHE_KEY = (type: string) => `review_letter_${type}_${format(new Date(), "yyyy-MM")}`;
+// 记录本月最后一次生成的是周信还是月报，刷新页面后据此恢复——
+// 否则页面固定只读"weekly"缓存，用户生成的月报刷新后就"凭空消失"了。
+const LAST_TYPE_KEY = () => `review_letter_last_type_${format(new Date(), "yyyy-MM")}`;
 
 const ReviewPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { entries, wheelScores, allTodos, monthFinanceStats, habits, energyLogs } = useLifeOs();
+  const { entries, wheelScores, allTodos, monthFinanceStats, habits, energyLogs, defaultModelProfileId } = useLifeOs();
   const { user } = useAuth();
   const [letter, setLetter] = useState<string | null>(null);
   const [letterType, setLetterType] = useState<"weekly" | "monthly" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [touchStart, setTouchStart] = useState(0);
-  const [autoTriggered, setAutoTriggered] = useState(false);
   const [goals, setGoals] = useState<any[]>([]);
+  // ref 而非 state：state 更新要等下一轮渲染才生效，
+  // 在此期间 effect 若因其他依赖变化重新执行，"是否已触发"的判断可能还没更新，
+  // 造成 auto=weekly 的自动生成被触发两次。ref 是同步的，没有这个竞态窗口。
+  const autoTriggeredRef = useRef(false);
+  // 用于取消上一次还没结束的生成请求：重新生成/组件卸载时中止，
+  // 避免旧请求的流式回调在新一轮生成开始后还继续写 letter，造成内容错乱。
+  const abortRef = useRef<AbortController | null>(null);
 
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -45,26 +54,35 @@ const ReviewPage = () => {
   // Restore saved letter on mount: show the local cache immediately (fast,
   // works offline), then let the Supabase copy (synced across devices)
   // override it once it comes back, if it's present.
+  // 恢复的是"本月最后一次生成"的那封信，不管它是周信还是月报。
   useEffect(() => {
-    const saved = localStorage.getItem(LETTER_CACHE_KEY("weekly"));
+    const lastType = localStorage.getItem(LAST_TYPE_KEY()) as "weekly" | "monthly" | null;
+    const type = lastType === "monthly" ? "monthly" : "weekly"; // 旧数据没有标记时按周信兜底
+    const saved = localStorage.getItem(LETTER_CACHE_KEY(type));
     if (saved) {
       setLetter(saved);
-      setLetterType("weekly");
+      setLetterType(type);
     }
   }, []);
 
   useEffect(() => {
     if (!user || !supabase) return;
     const period = format(new Date(), "yyyy-MM");
-    supabase.from("review_letters").select("content, type")
-      .eq("user_id", user.id).eq("period", period).eq("type", "weekly")
+    // 不再写死 type="weekly"：按 updated_at 取本月最新的一封（周信或月报都可能是最新），
+    // 这样月报也能在跨设备/刷新后正确恢复，而不是被周信缓存逻辑永久忽略。
+    supabase.from("review_letters").select("content, type, updated_at")
+      .eq("user_id", user.id).eq("period", period)
+      .order("updated_at", { ascending: false })
+      .limit(1)
       .maybeSingle()
       .then(({ data, error }) => {
         if (error) { console.error("Failed to load review letter from Supabase:", error); return; }
         if (data?.content) {
+          const type = (data.type === "monthly" ? "monthly" : "weekly") as "weekly" | "monthly";
           setLetter(data.content);
-          setLetterType("weekly");
-          localStorage.setItem(LETTER_CACHE_KEY("weekly"), data.content);
+          setLetterType(type);
+          localStorage.setItem(LETTER_CACHE_KEY(type), data.content);
+          localStorage.setItem(LAST_TYPE_KEY(), type);
         }
       });
   }, [user]);
@@ -90,6 +108,12 @@ const ReviewPage = () => {
   }, [today]);
 
   const generateLetter = useCallback(async (type: "weekly" | "monthly") => {
+    // 取消上一次还没跑完的生成请求，避免它的流式回调在这次生成开始后
+    // 还继续往 letter 里写，导致内容错乱。
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLetterType(type);
     setIsGenerating(true);
     setLetter("");
@@ -179,14 +203,23 @@ ${recentContent}
       await streamChat({
         messages: msgs,
         mode: type === "weekly" ? "weekly-review" : "monthly-review",
+        signal: controller.signal,
+        modelProfileId: defaultModelProfileId,
         onDelta: (chunk) => {
           full += chunk;
           setLetter(full);
         },
+        onRetry: () => {
+          // 上一次尝试的残留内容作废，避免重试后的新增量拼接在旧内容后面
+          full = "";
+          setLetter("");
+        },
         onDone: () => {
+          if (controller.signal.aborted) return; // 已被更新的一次生成或卸载取消，不再落地这次结果
           setIsGenerating(false);
           // Keep the localStorage cache (fast local read, works offline)...
           localStorage.setItem(LETTER_CACHE_KEY(type), full);
+          localStorage.setItem(LAST_TYPE_KEY(), type);
           // ...and sync it to Supabase so other devices/browsers see it too.
           if (user && supabase) {
             const period = format(new Date(), "yyyy-MM");
@@ -202,21 +235,25 @@ ${recentContent}
         },
       });
     } catch (e: any) {
+      if (controller.signal.aborted) return; // 主动取消，不当作失败展示
       setLetter(`抱歉，生成失败了。${e.message || ""}`);
       setIsGenerating(false);
     }
   }, [weekEntries, monthEntries, buildSummary, monthFinanceStats, wheelScores, user]);
 
+  // 组件卸载时取消还在进行的生成请求
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   // Auto-trigger weekly letter from URL param
   useEffect(() => {
-    if (autoTriggered) return;
+    if (autoTriggeredRef.current) return;
     const auto = searchParams.get("auto");
     if (auto === "weekly" && weekEntries.length >= 3 && !isGenerating && !letter) {
-      setAutoTriggered(true);
+      autoTriggeredRef.current = true;
       const timer = setTimeout(() => generateLetter("weekly"), 1000);
       return () => clearTimeout(timer);
     }
-  }, [searchParams, weekEntries.length, autoTriggered, isGenerating, letter, generateLetter]);
+  }, [searchParams, weekEntries.length, isGenerating, letter, generateLetter]);
 
   const weekStats = useMemo(() => buildSummary(weekEntries), [weekEntries, buildSummary]);
   const monthStats = useMemo(() => buildSummary(monthEntries), [monthEntries, buildSummary]);

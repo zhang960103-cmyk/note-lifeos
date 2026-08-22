@@ -175,6 +175,7 @@ export async function streamChat({
   patterns,
   onDelta,
   onDone,
+  onRetry,
   signal,
   modelProfileId,
   accessToken,
@@ -187,6 +188,10 @@ export async function streamChat({
   patterns?: string;
   onDelta: (text: string) => void;
   onDone: () => void;
+  // 重试前调用：调用方在这里把自己accumulate的文本(通常是 let full = "")清零，
+  // 否则第二次尝试的新增量会被追加到第一次失败尝试已经写入的残留文本后面，
+  // 造成保存内容重复/错乱。见 streamChat 内部注释。
+  onRetry?: () => void;
   signal?: AbortSignal;
   modelProfileId?: string;
   accessToken?: string;
@@ -255,6 +260,10 @@ export async function streamChat({
         const delayMs = getRetryDelay(attempt);
         console.warn(`[streamChat] Attempt ${attempt + 1}/${maxRetries + 1} failed, retrying in ${delayMs}ms:`, lastError.message);
         await new Promise(resolve => setTimeout(resolve, delayMs));
+        // 上一次尝试可能已经通过 onDelta 写入了部分文本（比如流到一半网络断了）。
+        // 在下一次 fetch 发出之前通知调用方清空累积buffer，避免新一轮的增量
+        // 被追加到旧的残留内容后面，导致保存的内容重复/错乱。
+        onRetry?.();
       } else {
         console.error(`[streamChat] Failed after ${attempt + 1} attempt(s):`, lastError);
         onDone();

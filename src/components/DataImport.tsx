@@ -9,8 +9,17 @@ import { useAuth } from "@/hooks/useAuth";
 interface ImportResult {
   day: number; msg: number; todo: number;
   finance: number; habit: number; wheel: number; energy: number;
+  localExtras: number;
   warnings: string[];
 }
+
+// 这个数字要跟 DataExport.tsx 里的 BACKUP_SCHEMA_VERSION 保持同步。
+// 只要以后新增字段都用"缺了就按默认值处理"的兼容写法，就不需要每次升级都改这里；
+// 只有备份整体结构发生不兼容变化时才升级判断逻辑。当前能安全处理 1(旧版，没有
+// schemaVersion字段，按1对待) 和 2。遇到更高版本号，说明是用更新的App导出的
+// 备份、格式可能已经变了，这里选择继续尝试导入但提醒用户——比直接拒绝更实用，
+// 大部分字段增量都是新增可选字段，不会真的读不懂。
+const MAX_KNOWN_SCHEMA_VERSION = 2;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -44,9 +53,17 @@ async function importBackup(
   const counts: ImportResult = {
     day: 0, msg: 0, todo: 0,
     finance: 0, habit: 0, wheel: 0, energy: 0,
+    localExtras: 0,
     warnings: [],
   };
   const warn = (ctx: string, msg: string) => counts.warnings.push(`[${ctx}] ${msg}`);
+
+  // 旧版本备份没有 schemaVersion 字段，按 1 对待（DataExport.tsx 里的字段结构
+  // 从一开始就是"缺了按默认值处理"的宽松写法，所以版本1也能正常读，不阻断导入）
+  const schemaVersion = typeof json.schemaVersion === "number" ? json.schemaVersion : 1;
+  if (schemaVersion > MAX_KNOWN_SCHEMA_VERSION) {
+    warn("version", `这份备份的格式版本(${schemaVersion})比当前App认识的版本(${MAX_KNOWN_SCHEMA_VERSION})更新，可能来自更新的App版本导出——已尝试按已知字段导入，但新增的字段可能不会被识别，建议更新App后再导入`);
+  }
 
   // 确保 profile 存在
   await supabase.from("profiles").upsert({ id: userId }, { onConflict: "id" });
@@ -162,6 +179,33 @@ async function importBackup(
     else counts.energy++;
   }
 
+  // 7. localExtras（预算/订阅/借还/项目——只存在本地，schemaVersion>=2的备份才有）
+  // 保守策略：只在当前设备这个key还没有数据时才写入，绝不覆盖用户在本设备上
+  // 已经有的本地数据——避免"导入一份几个月前的旧备份，把这几天新记的预算/
+  // 订阅覆盖没了"。key里的userId会重写成当前导入账号的id，即使备份来自
+  // 另一个账号也能正确落到"当前登录账号"名下，不会因为id对不上而全部丢弃。
+  const localExtras = (json.localExtras && typeof json.localExtras === "object")
+    ? json.localExtras as Record<string, string>
+    : {};
+  const KNOWN_LOCAL_PREFIXES = ["budgets_", "subscriptions_", "ious_", "projects_"];
+  for (const [rawKey, rawVal] of Object.entries(localExtras)) {
+    const prefix = KNOWN_LOCAL_PREFIXES.find(p => rawKey.startsWith(p));
+    if (!prefix || typeof rawVal !== "string") continue;
+    const targetKey = `${prefix}${userId}`;
+    try {
+      const existing = localStorage.getItem(targetKey);
+      const existingEmpty = !existing || existing === "[]" || existing === "null";
+      if (existingEmpty) {
+        localStorage.setItem(targetKey, rawVal);
+        counts.localExtras++;
+      } else {
+        warn("local_extras", `本设备已有 ${prefix}数据，跳过导入以免覆盖`);
+      }
+    } catch (e: any) {
+      warn("local_extras", e?.message || "写入本地数据失败");
+    }
+  }
+
   return counts;
 }
 
@@ -269,6 +313,7 @@ export default function DataImport() {
           <p className="text-muted-foreground">
             日记 {result.day} · 消息 {result.msg} · 待办 {result.todo} ·
             财务 {result.finance} · 习惯 {result.habit} · 能量 {result.energy} · 车轮 {result.wheel}
+            {result.localExtras > 0 && ` · 本地数据(预算/订阅等) ${result.localExtras}`}
           </p>
         </div>
       )}
@@ -312,6 +357,7 @@ export function FinanceCsvImport({ onImported }: { onImported?: (count: number) 
   const csvRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [count, setCount] = useState(0);
+  const [failCount, setFailCount] = useState(0);
   const [errMsg, setErrMsg] = useState("");
 
   const detectAlipay = (rows: string[][]): boolean =>
@@ -388,7 +434,7 @@ export function FinanceCsvImport({ onImported }: { onImported?: (count: number) 
   const handleCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user || !supabase) return;
-    setStatus("loading"); setErrMsg(""); setCount(0);
+    setStatus("loading"); setErrMsg(""); setCount(0); setFailCount(0);
 
     try {
       // Try UTF-8 first, then GBK for Alipay/WeChat exports
@@ -432,12 +478,19 @@ export function FinanceCsvImport({ onImported }: { onImported?: (count: number) 
 
       const BATCH = 50;
       let imported = 0;
+      let failed = 0;
+      // 之前一批(50条)插入失败时，这批的行数就直接从计数里消失了，没有任何提示——
+      // 用户以为"导入了80条"，其实实际到手的可能只有50条，另外30条静默丢了。
+      // 现在把失败的行数也记下来，最终结果如实告诉用户"成功X条，失败Y条"。
       for (let i = 0; i < toInsert.length; i += BATCH) {
-        const { error } = await supabase.from("finance_entries").insert(toInsert.slice(i, i + BATCH));
-        if (!error) imported += Math.min(BATCH, toInsert.length - i);
+        const batch = toInsert.slice(i, i + BATCH);
+        const { error } = await supabase.from("finance_entries").insert(batch);
+        if (!error) imported += batch.length;
+        else { failed += batch.length; console.error("[FinanceCsvImport] 批量插入失败:", error); }
       }
 
       setCount(imported);
+      setFailCount(failed);
       setStatus("done");
       onImported?.(imported);
     } catch (err: any) {
@@ -466,9 +519,15 @@ export function FinanceCsvImport({ onImported }: { onImported?: (count: number) 
           <span className="text-[9px] text-muted-foreground">支持支付宝/微信账单/自定义格式</span>
         </div>
       </button>
-      {status === "done" && (
+      {status === "done" && failCount === 0 && (
         <div className="mx-4 mb-2 rounded-md bg-green-500/10 border border-green-500/30 p-3 text-xs">
           <p className="text-green-600 flex items-center gap-1.5"><CheckCircle size={13} /> 成功导入 {count} 条账单</p>
+        </div>
+      )}
+      {status === "done" && failCount > 0 && (
+        <div className="mx-4 mb-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 p-3 text-xs">
+          <p className="text-yellow-600 flex items-center gap-1.5"><AlertTriangle size={13} /> 成功 {count} 条，失败 {failCount} 条</p>
+          <p className="text-muted-foreground mt-1">已有的账单记录不受影响，失败的部分可以重新导出CSV再试一次</p>
         </div>
       )}
       {status === "error" && (

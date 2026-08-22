@@ -4,7 +4,7 @@
  * userId is used as a namespace key so multi-account works.
  */
 import { useState, useCallback, useMemo } from "react";
-import { format, addMonths, addYears, addQuarters, parseISO } from "date-fns";
+import { format, addMonths, addYears, addQuarters, parseISO, setDate, getDate, getDaysInMonth } from "date-fns";
 import type { BudgetItem, SubscriptionItem, IouItem, BillingCycle } from "@/types/lifeOs";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -41,11 +41,17 @@ export function useBudgets(userId: string) {
 }
 
 // ─── SUBSCRIPTION ─────────────────────────────────────────────────────────────
-function nextBillingDate(from: string, cycle: BillingCycle): string {
+// anchorDay: 用户最初选定的账单日(1-31)。先按周期整月/整季/整年跳到下一个
+// 周期，再把"日"强制对齐回 anchorDay(月底截断时钳到当月最后一天)——这样
+// 无论 from 之前有没有被截断过，都不会继续往前漂移。
+function nextBillingDate(from: string, cycle: BillingCycle, anchorDay: number): string {
   const d = parseISO(from);
-  if (cycle === "monthly") return format(addMonths(d, 1), "yyyy-MM-dd");
-  if (cycle === "yearly") return format(addYears(d, 1), "yyyy-MM-dd");
-  return format(addQuarters(d, 1), "yyyy-MM-dd");
+  let next: Date;
+  if (cycle === "monthly") next = addMonths(d, 1);
+  else if (cycle === "yearly") next = addYears(d, 1);
+  else next = addQuarters(d, 1);
+  const clampedDay = Math.min(anchorDay, getDaysInMonth(next));
+  return format(setDate(next, clampedDay), "yyyy-MM-dd");
 }
 
 export function useSubscriptions(userId: string) {
@@ -53,7 +59,9 @@ export function useSubscriptions(userId: string) {
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>(() => load<SubscriptionItem>(KEY));
 
   const addSubscription = useCallback((s: Omit<SubscriptionItem, "id" | "createdAt">) => {
-    const item: SubscriptionItem = { ...s, id: uid(), createdAt: new Date().toISOString() };
+    // 记录下用户此刻选的账单日，作为以后每次续费的锚点
+    const billingDay = s.billingDay ?? getDate(parseISO(s.nextDate));
+    const item: SubscriptionItem = { ...s, billingDay, id: uid(), createdAt: new Date().toISOString() };
     setSubscriptions(prev => { const next = [item, ...prev]; save(KEY, next); return next; });
   }, [KEY]);
 
@@ -72,7 +80,8 @@ export function useSubscriptions(userId: string) {
     setSubscriptions(prev => {
       const next = prev.map(s => {
         if (s.id !== id) return s;
-        return { ...s, nextDate: nextBillingDate(s.nextDate, s.billingCycle) };
+        const anchorDay = s.billingDay ?? getDate(parseISO(s.nextDate));
+        return { ...s, billingDay: anchorDay, nextDate: nextBillingDate(s.nextDate, s.billingCycle, anchorDay) };
       });
       save(KEY, next); return next;
     });

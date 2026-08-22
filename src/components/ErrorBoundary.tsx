@@ -1,6 +1,19 @@
 import { Component, type ReactNode } from "react";
 
-interface Props { children: ReactNode }
+// 这个组件之前只在 App.tsx 最外层包了一次——意味着任何一个页面内部的渲染错误，
+// 都会把最外层这一整棵组件树全部卸载掉(React的默认行为)，包括Toaster、底部
+// TabBar、桌面端侧边栏，用户看到的是一片全屏黑屏，其他本来完全正常的模块也
+// 跟着一起"死机"，完全违背"单个模块故障不搞垮整个APP"的要求。
+//
+// 现在支持传入 `scope="page"` 在路由内容区域再包一层——这样某个页面自己崩了，
+// 只有那个页面的内容区域会显示这个兜底UI，顶部导航/底部Tab/其他还没崩的页面
+// 完全不受影响，切换到别的Tab就能恢复正常使用。外层App.tsx那层作为最后一道
+// 保险继续保留(比如Provider本身抛错这种更早期的崩溃，还是需要它兜底)。
+interface Props {
+  children: ReactNode;
+  scope?: "app" | "page";
+  boundaryName?: string;
+}
 interface State { hasError: boolean; error: Error | null }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -11,22 +24,35 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: any) {
-    console.error("ErrorBoundary caught:", error, info);
+    console.error(`[ErrorBoundary${this.props.boundaryName ? `:${this.props.boundaryName}` : ""}] 捕获到渲染错误:`, error, info?.componentStack);
   }
+
+  handleRetry = () => this.setState({ hasError: false, error: null });
 
   render() {
     if (this.state.hasError) {
+      const isPageScope = this.props.scope === "page";
       return (
-        <div className="fixed inset-0 flex flex-col items-center justify-center gap-4 p-6 bg-background text-center">
-          <span className="text-4xl">💥</span>
-          <p className="text-muted-foreground text-sm">出了点小问题，请尝试重新加载</p>
-          <p className="text-muted-foreground/50 text-[10px] max-w-xs break-all">{this.state.error?.message}</p>
-          <button
-            className="px-4 py-2 rounded-xl bg-gold text-background text-sm hover:bg-gold/90 transition"
-            onClick={() => window.location.reload()}
-          >
-            重新加载
-          </button>
+        <div className={`${isPageScope ? "h-full" : "fixed inset-0"} flex flex-col items-center justify-center gap-4 p-6 bg-background text-center`}>
+          <span className="text-4xl">😵</span>
+          <p className="text-foreground text-sm font-serif-sc">这个页面出了点问题</p>
+          <p className="text-muted-foreground text-caption max-w-xs leading-relaxed">
+            不用担心，你的日记、待办、账单数据都安全地存在云端，没有受影响。
+          </p>
+          <div className="flex gap-2">
+            <button
+              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition"
+              onClick={this.handleRetry}
+            >
+              重试
+            </button>
+            <button
+              className="px-4 py-2 rounded-xl bg-muted text-muted-foreground text-sm hover:bg-accent transition"
+              onClick={() => { window.location.href = "/"; }}
+            >
+              回首页
+            </button>
+          </div>
         </div>
       );
     }

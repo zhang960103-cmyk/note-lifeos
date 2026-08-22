@@ -13,6 +13,7 @@ import {
 import type { TodoItem, HabitItem, Priority, TaskStatus } from "@/types/lifeOs";
 import { callLifeMentorJSON } from "@/lib/streamChat";
 import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
+import { toast } from "sonner";
 
 const PRIORITY_KEYS: Record<string, { labelKey: string; dot: string; ring: string }> = {
   urgent: { labelKey: "todo.priority.urgent", dot: "bg-destructive", ring: "ring-destructive/30" },
@@ -420,7 +421,7 @@ const TodoPage = () => {
                     <p className="text-[9px] text-muted-foreground/40">空</p>
                   ) : q.items.slice(0, 5).map(t => (
                     <div key={t.id} className="flex items-center gap-1.5">
-                      <button onClick={() => handleToggle(t)} className="flex-shrink-0">
+                      <button onClick={() => handleToggle(t)} className="flex-shrink-0 p-2 -m-2">
                         <div className={`w-3 h-3 rounded-full border ${t.status === "doing" ? "bg-los-orange border-los-orange" : "border-muted-foreground"}`} />
                       </button>
                       <span className="text-[10px] text-foreground truncate">{t.text}</span>
@@ -517,6 +518,7 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
   onPomodoro: () => void; isTracking: boolean; trackingTime?: string; onStartTracking: () => void;
 }) {
   const { t } = useLanguage();
+  const { defaultModelProfileId } = useLifeOs();
   const isDone = todo.status === "done";
   const isDoing = todo.status === "doing";
   const [editText, setEditText] = useState(todo.text);
@@ -528,13 +530,18 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
   const handleDecompose = useCallback(async () => {
     setDecomposing(true);
     try {
-      const data = await callLifeMentorJSON("decompose", [{ role: "user", content: todo.text }]);
+      const data = await callLifeMentorJSON("decompose", [{ role: "user", content: todo.text }], { modelProfileId: defaultModelProfileId });
       if (data.subTasks?.length) {
         onUpdate({ subTasks: [...(todo.subTasks || []), ...data.subTasks.map((s: any) => ({ id: crypto.randomUUID(), text: s.text, done: false }))] });
+      } else {
+        toast.error("AI 没能拆出子任务，换个更具体的描述再试试", { id: "decompose-empty" });
       }
-    } catch {}
+    } catch (e) {
+      console.error("Decompose error:", e);
+      toast.error("拆解子任务失败，请检查网络后重试", { id: "decompose-error" });
+    }
     setDecomposing(false);
-  }, [todo.text, todo.subTasks, onUpdate]);
+  }, [todo.text, todo.subTasks, onUpdate, defaultModelProfileId]);
 
   const prio = getPriority(todo.priority);
 
@@ -580,12 +587,14 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
         <div className="px-3 pb-3 border-t border-border pt-2 space-y-2">
           {/* Sub-tasks */}
           {todo.subTasks?.map(st => (
-            <div key={st.id} className="flex items-center gap-2 text-xs ml-1">
-              <div className={`w-3 h-3 rounded border flex items-center justify-center ${st.done ? "bg-primary border-primary" : "border-muted-foreground/50"}`}>
+            <button key={st.id}
+              onClick={() => onUpdate({ subTasks: todo.subTasks.map(s => s.id === st.id ? { ...s, done: !s.done } : s) })}
+              className="flex items-center gap-2 text-xs ml-1 py-1 -my-1 w-full text-left">
+              <div className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${st.done ? "bg-primary border-primary" : "border-muted-foreground/50"}`}>
                 {st.done && <Check size={7} className="text-primary-foreground" />}
               </div>
               <span className={st.done ? "line-through text-muted-foreground" : "text-foreground"}>{st.text}</span>
-            </div>
+            </button>
           ))}
           {todo.note && <p className="text-[10px] text-muted-foreground bg-muted rounded-lg px-2 py-1.5">{todo.note}</p>}
           {/* Action bar */}
@@ -721,6 +730,7 @@ function InlineTimeline({ entries, allTodos, todayKey, updateTodo }: {
   updateTodo: (date: string, id: string, u: Partial<TodoItem>) => void;
 }) {
   const { t } = useLanguage();
+  const { defaultModelProfileId } = useLifeOs();
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [loading, setLoading] = useState(false);
   const [extracted, setExtracted] = useState(false);
@@ -751,7 +761,7 @@ function InlineTimeline({ entries, allTodos, todayKey, updateTodo }: {
       const data = await callLifeMentorJSON(
         "time-extract",
         todayEntry.messages.map((m: any) => ({ role: m.role, content: m.content })),
-        { memoryContext, patterns }
+        { memoryContext, patterns, modelProfileId: defaultModelProfileId }
       );
       setTimeBlocks(data.timeBlocks || []);
       setExtracted(true);
@@ -767,7 +777,10 @@ function InlineTimeline({ entries, allTodos, todayKey, updateTodo }: {
           });
         }
       });
-    } catch {} finally { setLoading(false); }
+    } catch (e) {
+      console.error("Extract timeline error:", e);
+      toast.error("从日记提取时间线失败，请检查网络后重试", { id: "extract-timeline-error" });
+    } finally { setLoading(false); setExtracted(true); }
   };
 
   useEffect(() => {

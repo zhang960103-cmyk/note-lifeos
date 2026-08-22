@@ -10,6 +10,7 @@ import QuickTimeEntry from "@/components/QuickTimeEntry";
 import PageHeader from "@/components/PageHeader";
 import { callLifeMentorJSON } from "@/lib/streamChat";
 import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
+import { toast } from "sonner";
 
 const CATEGORY_COLORS: Record<string, string> = {
   "工作": "hsl(39 58% 53%)",
@@ -798,7 +799,7 @@ import { useEffect } from "react";
 
 /* ─── Diary Timeline - auto-extracted with editable blocks ─── */
 function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
-  const { allTodos, updateTodo, todayKey } = useLifeOs();
+  const { allTodos, updateTodo, todayKey, defaultModelProfileId } = useLifeOs();
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [loading, setLoading] = useState(false);
   const [extracted, setExtracted] = useState(false);
@@ -842,15 +843,20 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
       const data = await callLifeMentorJSON(
         "time-extract",
         todayEntry.messages.map((m: any) => ({ role: m.role, content: m.content })),
-        { memoryContext, patterns }
+        { memoryContext, patterns, modelProfileId: defaultModelProfileId }
       );
       const blocks = data.timeBlocks || [];
       setTimeBlocks(blocks);
       setSummary(data.summary || "");
       setExtracted(true);
       if (blocks.length > 0) matchBlocksToTodos(blocks);
-    } catch {
+    } catch (e) {
+      console.error("Extract timeline error:", e);
       setTimeBlocks([]);
+      // 之前这里不设 extracted=true，失败时下面 "timeBlocks.length===0 && !extracted" 的兜底分支
+      // 永远进不去，会直接 return null——整个模块从界面上消失，用户看不到任何提示也无法重试。
+      setExtracted(true);
+      toast.error("从日记提取时间线失败，请检查网络后重试", { id: "extract-timeline-error" });
     } finally {
       setLoading(false);
     }
@@ -968,6 +974,7 @@ function AiAnalysis({
   range: string;
   entries: any[];
 }) {
+  const { defaultModelProfileId } = useLifeOs();
   const [analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -991,7 +998,7 @@ function AiAnalysis({
       const data = await callLifeMentorJSON(
         "time-analysis",
         [{ role: "user", content: buildContext() }],
-        { memoryContext, patterns }
+        { memoryContext, patterns, modelProfileId: defaultModelProfileId }
       );
       setAnalysis(data);
     } catch { setError("AI 分析暂不可用"); } finally { setLoading(false); }

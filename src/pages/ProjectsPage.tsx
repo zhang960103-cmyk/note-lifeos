@@ -90,9 +90,8 @@ export default function ProjectsPage() {
               <span className={`text-sm font-mono-jb font-bold ${colors.text}`}>{progress}%</span>
             </div>
             <div className="h-1.5 bg-black/10 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all`}
-                style={{ width: `${progress}%`, background: "currentColor" }}
-                className={colors.text} />
+              <div className={`h-full rounded-full transition-all ${colors.text}`}
+                style={{ width: `${progress}%`, background: "currentColor" }} />
             </div>
             <p className="text-label text-muted-foreground mt-1.5">
               {doneTodos.length} 完成 · {pendingTodos.length} 进行中 · {projectDiaryMentions.length} 条日记
@@ -248,7 +247,7 @@ export default function ProjectsPage() {
                   {p.description && <p className="text-caption text-muted-foreground truncate mt-0.5">{p.description}</p>}
                   <div className="flex items-center gap-1.5 mt-3">
                     <div className="flex-1 h-1 bg-black/10 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{width:`${pct}%`, background:"currentColor"}} className={c.text} />
+                      <div className={`h-full rounded-full ${c.text}`} style={{width:`${pct}%`, background:"currentColor"}} />
                     </div>
                     <span className={`text-label font-mono-jb ${c.text}`}>{pct}%</span>
                   </div>

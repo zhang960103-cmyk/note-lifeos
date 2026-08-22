@@ -16,6 +16,7 @@ import {
   ChevronLeft, Heart, Moon, Activity, Footprints,
   Zap, TrendingUp, Plus, RefreshCw, Link, Check
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface HealthMetrics {
   date: string;
@@ -80,8 +81,15 @@ export default function HealthPage() {
       });
 
     // Check connected sources from localStorage
-    const sources = JSON.parse(localStorage.getItem(`health_sources_${user.id}`) || "[]");
-    setConnectedSources(sources);
+    // 之前这里JSON.parse不做保护，一旦这个key被写坏(比如浏览器崩溃截断/
+    // 手动改过)，会在页面加载的useEffect里直接抛错，整页白屏。
+    try {
+      const raw = localStorage.getItem(`health_sources_${user.id}`);
+      setConnectedSources(raw ? JSON.parse(raw) : []);
+    } catch (e) {
+      console.warn("[HealthPage] health_sources 本地数据损坏，已重置:", e);
+      setConnectedSources([]);
+    }
   }, [user, today]);
 
   const saveMetrics = async () => {
@@ -95,8 +103,17 @@ export default function HealthPage() {
       readiness_score: editForm.readinessScore,
       energy_level: editForm.energyLevel, source: "manual",
     };
-    await supabase.from("health_metrics").upsert(row, { onConflict: "user_id,date" });
+    const { error } = await supabase.from("health_metrics").upsert(row, { onConflict: "user_id,date" });
+    // 之前这里不检查error，保存失败(网络/RLS)时依然显示"保存成功"并收起
+    // 表单，用户以为数据已经存了，实际云端什么都没有。
+    if (error) {
+      console.error("[HealthPage] 保存健康数据失败:", error);
+      toast.error("保存失败，请检查网络后重试");
+      setSaving(false);
+      return;
+    }
     setTodayMetrics({ ...editForm, date: today, source: "manual" });
+    setMetrics(prev => [{ ...editForm, date: today, source: "manual" } as HealthMetrics, ...prev.filter(m => m.date !== today)]);
     setShowEdit(false);
     setSaving(false);
   };
@@ -225,6 +242,7 @@ export default function HealthPage() {
                             const text = await file.text();
                             const lines = text.split("\n").filter(l => l.trim());
                             let imported = 0;
+                            let failed = 0;
                             for (const line of lines.slice(1)) {
                               const cols = line.split(",");
                               if (cols.length < 3) continue;
@@ -232,12 +250,29 @@ export default function HealthPage() {
                               const steps = parseInt(cols[1]) || 0;
                               const sleepHrs = parseFloat(cols[2]) || 0;
                               if (!date || !date.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
-                              await supabase.from("health_metrics").upsert({
+                              // 之前这里不检查每行upsert的error，失败的行会被静默丢弃，
+                              // 但最后仍然按"总行数"提示导入成功，用户以为全导入了。
+                              const { error: rowError } = await supabase.from("health_metrics").upsert({
                                 user_id: user.id, date, steps, sleep_hrs: sleepHrs, source: "huawei"
                               }, { onConflict: "user_id,date" });
-                              imported++;
+                              if (rowError) { failed++; console.error("[HealthPage] 华为数据导入失败:", date, rowError); }
+                              else imported++;
                             }
-                            alert(`已导入 ${imported} 条华为健康数据`);
+                            // 之前导入成功也从不把"huawei"标记为已连接来源，即使全部导入
+                            // 成功，来源列表里也永远显示"连接"而不是"已连接"。
+                            if (imported > 0) {
+                              setConnectedSources(prev => {
+                                if (prev.includes("huawei")) return prev;
+                                const next = [...prev, "huawei"];
+                                localStorage.setItem(`health_sources_${user.id}`, JSON.stringify(next));
+                                return next;
+                              });
+                            }
+                            if (failed > 0) {
+                              toast.error(`已导入 ${imported} 条，${failed} 条写入失败`);
+                            } else {
+                              toast.success(`已导入 ${imported} 条华为健康数据`);
+                            }
                           };
                           input.click();
                         } else {

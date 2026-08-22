@@ -6,18 +6,24 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { ChevronLeft, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 
 interface Place {
   id: string; name: string; lat: number; lng: number;
   emoji: string; note?: string; visitedAt: string;
 }
 
+// 之前这个Promise只有onload会resolve——CDN被墙/离线/广告拦截器拦截脚本时，
+// onload永远不触发，Promise永远pending，页面就一直停在空白canvas，
+// 没有任何报错也没有重试入口。现在加上onerror的reject和10秒超时兜底。
 function loadThree(): Promise<any> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if ((window as any).THREE) { resolve((window as any).THREE); return; }
     const s = document.createElement("script");
     s.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
-    s.onload = () => resolve((window as any).THREE);
+    const timer = setTimeout(() => reject(new Error("加载地球组件超时，请检查网络")), 10000);
+    s.onload = () => { clearTimeout(timer); resolve((window as any).THREE); };
+    s.onerror = () => { clearTimeout(timer); reject(new Error("加载地球组件失败，请检查网络后重试")); };
     document.head.appendChild(s);
   });
 }
@@ -32,6 +38,7 @@ export default function MapPage() {
   const [newPlace, setNewPlace] = useState({ name: "", lat: "", lng: "", emoji: "📍", note: "" });
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState<Place | null>(null);
+  const [globeError, setGlobeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -113,6 +120,9 @@ export default function MapPage() {
         renderer.render(scene, camera);
       };
       animate();
+    }).catch((e: Error) => {
+      console.error("[MapPage] three.js 加载失败:", e);
+      setGlobeError(e.message || "地球组件加载失败");
     });
 
     return () => { cancelAnimationFrame(raf); };
@@ -140,9 +150,24 @@ export default function MapPage() {
 
   const addPlace = async () => {
     if (!user || !newPlace.name || !newPlace.lat || !newPlace.lng) return;
+    // 之前这里只检查经纬度是否为空字符串，不检查是不是合法数字——用户输入
+    // 非数字文本会被parseFloat静默转成NaN，直接存进Supabase，标记点在
+    // 地球上位置错乱(NaN参与球面坐标计算)且没有任何提示。
+    const lat = parseFloat(newPlace.lat);
+    const lng = parseFloat(newPlace.lng);
+    if (Number.isNaN(lat) || lat < -90 || lat > 90) { toast.error("纬度需要是 -90 到 90 之间的数字"); return; }
+    if (Number.isNaN(lng) || lng < -180 || lng > 180) { toast.error("经度需要是 -180 到 180 之间的数字"); return; }
     setSaving(true);
-    const row = { user_id: user.id, name: newPlace.name, lat: parseFloat(newPlace.lat), lng: parseFloat(newPlace.lng), emoji: newPlace.emoji, note: newPlace.note, visited_at: new Date().toISOString() };
-    const { data } = await supabase.from("user_places").insert(row).select().single();
+    const row = { user_id: user.id, name: newPlace.name, lat, lng, emoji: newPlace.emoji, note: newPlace.note, visited_at: new Date().toISOString() };
+    const { data, error } = await supabase.from("user_places").insert(row).select().single();
+    // 之前这里不检查error，插入失败(网络/RLS)时表单照样清空收起，用户以为
+    // 地点已经加上了，实际上云端和地球上都没有这个点。
+    if (error) {
+      console.error("[MapPage] 添加地点失败:", error);
+      toast.error("添加失败，请重试");
+      setSaving(false);
+      return;
+    }
     if (data) setPlaces(p => [{ id: data.id, name: data.name, lat: data.lat, lng: data.lng, emoji: data.emoji, note: data.note, visitedAt: data.visited_at }, ...p]);
     setNewPlace({ name: "", lat: "", lng: "", emoji: "📍", note: "" });
     setShowAdd(false); setSaving(false);
@@ -165,7 +190,19 @@ export default function MapPage() {
 
       <div className="relative flex-1 overflow-hidden">
         <canvas ref={canvasRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
-        <p className="absolute bottom-20 left-1/2 -translate-x-1/2 text-label text-white/30 pointer-events-none">拖动旋转 · 金色圆点为已去过的地方</p>
+        {globeError ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
+            <p className="text-caption text-white/60">{globeError}</p>
+            <button
+              onClick={() => { setGlobeError(null); window.location.reload(); }}
+              className="text-caption text-gold border border-gold/30 rounded-full px-4 py-1.5 hover:bg-gold/10"
+            >
+              重新加载
+            </button>
+          </div>
+        ) : (
+          <p className="absolute bottom-20 left-1/2 -translate-x-1/2 text-label text-white/30 pointer-events-none">拖动旋转 · 金色圆点为已去过的地方</p>
+        )}
       </div>
 
       <div className="border-t border-border/30 bg-black/60 backdrop-blur-sm">

@@ -109,6 +109,11 @@ export interface SubscriptionItem {
   active: boolean;
   note?: string;
   createdAt: string;
+  // 用户最初选定的账单日（1-31，来自创建时的 nextDate）。用来在每次续费时
+  // 重新锚定日期，避免 addMonths 在月末被截断后（比如1月31日续费成2月28日）
+  // 一路越漂越靠前，永远回不到31号。旧数据没有这个字段时会退化为"以当前
+  // nextDate的日期作为锚点"，虽然追不回历史漂移，但至少不再继续漂。
+  billingDay?: number;
 }
 
 // === IOU (借还) Tracking ===

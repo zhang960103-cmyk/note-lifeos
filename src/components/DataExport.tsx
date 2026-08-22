@@ -2,10 +2,40 @@ import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/hooks/useAuth";
+
+// 备份文件的数据结构版本——独立于App显示版本号(2.2.0那种)，只在导入/导出
+// 需要判断"这份JSON我认不认识"的时候用。只要以后新增字段用的是"多了就多了、
+// 缺了就按默认值处理"的兼容写法，就不需要每次都升这个号；只有备份的整体
+// 结构发生不兼容变化时才升级，DataImport.tsx 会据此判断能不能安全导入。
+const BACKUP_SCHEMA_VERSION = 2;
+
+// 待办/日记/记账等核心数据已经在Supabase云端，走上面的entries/todos这些字段。
+// 但预算、订阅提醒、借还记录、项目分组这几个模块目前设计上只存在浏览器
+// localStorage里，从来没有同步到云端(见useLocalData.ts/useProjects.ts)——
+// 之前的"全部数据备份"其实完全没包含这几类，只要清了浏览器数据或换个设备，
+// 这些内容就随着"没被截图看到过的隐藏配置"一起丢了，用户还以为自己有备份。
+// 这里把它们也扫进备份里。
+function collectLocalExtras(userId: string): Record<string, string> {
+  const extras: Record<string, string> = {};
+  const prefixes = [`budgets_${userId}`, `subscriptions_${userId}`, `ious_${userId}`, `projects_${userId}`];
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (prefixes.includes(key)) {
+        const v = localStorage.getItem(key);
+        if (v != null) extras[key] = v;
+      }
+    }
+  } catch (e) {
+    console.warn("[DataExport] 读取本地扩展数据失败（不影响云端数据导出）:", e);
+  }
+  return extras;
+}
 
 export default function DataExport() {
   const { entries, allTodos, financeEntries, habits, wheelScores, energyLogs } = useLifeOs();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [exporting, setExporting] = useState(false);
 
   const exportJSON = () => {
@@ -13,13 +43,16 @@ export default function DataExport() {
     try {
       const data = {
         exportDate: new Date().toISOString(),
-        version: "1.0",
+        schemaVersion: BACKUP_SCHEMA_VERSION,
+        appVersion: "2.2.0",
         entries,
         todos: allTodos,
         financeEntries,
         habits,
         wheelScores,
         energyLogs,
+        // 预算/订阅/借还/项目——只在本地存在，第一次被纳入完整备份
+        localExtras: user ? collectLocalExtras(user.id) : {},
       };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -28,6 +61,11 @@ export default function DataExport() {
       a.download = `lifeos-backup-${new Date().toISOString().split("T")[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch (e: any) {
+      // 之前这里没有catch，Blob/下载被浏览器拒绝(存储空间不足、隐私模式限制等)
+      // 时会是完全静默的失败——按钮转完圈之后什么都没发生，用户不知道要不要重试。
+      console.error("[DataExport] JSON导出失败:", e);
+      alert(`导出失败：${e?.message || "未知错误"}\n\n可能是浏览器存储权限受限或空间不足，请检查后重试。`);
     } finally {
       setExporting(false);
     }
@@ -54,6 +92,9 @@ export default function DataExport() {
       a.download = `lifeos-todos-${new Date().toISOString().split("T")[0]}.csv`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch (e: any) {
+      console.error("[DataExport] CSV导出失败:", e);
+      alert(`导出失败：${e?.message || "未知错误"}\n\n可能是浏览器存储权限受限或空间不足，请检查后重试。`);
     } finally {
       setExporting(false);
     }

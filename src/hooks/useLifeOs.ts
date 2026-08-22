@@ -2,6 +2,15 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { DayEntry, WheelScore, ChatMessage, TodoItem, FinanceEntry, HabitItem } from "@/types/lifeOs";
 import { format, addDays, nextSunday, subDays } from "date-fns";
+import { toast } from "sonner";
+
+// 之前这里的写操作全部"发出去就不管了"——网络波动/RLS拒绝时 UI 已经乐观更新，
+// 但数据库其实没变，用户完全无感知，换设备/刷新后才发现数据"凭空消失"。
+// 统一在这里报错+提示，同一动作短时间内重复失败只显示一条（sonner 的 id 去重）。
+function reportSyncError(action: string, error: unknown) {
+  console.error(`[useLifeOs] ${action}失败:`, error);
+  toast.error(`${action}失败，请检查网络后重试`, { id: `sync-error-${action}` });
+}
 
 // Helper: convert dueDate hint from AI to actual ISO date
 function resolveDueDate(hint?: string): string | undefined {
@@ -72,7 +81,8 @@ export function useOnboarding(userId: string | undefined) {
 
   const complete = useCallback(async () => {
     if (!userId) return;
-    await supabase.from("profiles").update({ onboarded: true }).eq("id", userId);
+    const { error } = await supabase.from("profiles").update({ onboarded: true }).eq("id", userId);
+    if (error) reportSyncError("保存引导完成状态", error);
     localStorage.setItem(`onboarded_${userId}`, "1");
     setDone(true);
   }, [userId]);
@@ -90,12 +100,16 @@ export function useDayEntries(userId: string | undefined) {
   useEffect(() => {
     if (!userId) return;
     const load = async () => {
-      const { data: dayData } = await supabase
+      const { data: dayData, error: loadError } = await supabase
         .from("day_entries")
         .select("*")
         .eq("user_id", userId)
         .order("date", { ascending: false });
 
+      if (loadError) {
+        console.error("[useLifeOs] 加载日记数据失败:", loadError);
+        toast.error("数据加载失败，请检查网络后下拉刷新", { id: "load-entries-error" });
+      }
       if (!dayData) return;
 
       const entryIds = dayData.map(d => d.id);
@@ -187,7 +201,8 @@ export function useDayEntries(userId: string | undefined) {
         supabase.from("day_entries")
           .upsert({ user_id: userId, date: todayKey }, { onConflict: "user_id,date" })
           .select("id").single()
-          .then(({ data: entry }) => {
+          .then(({ data: entry, error: entryError }) => {
+            if (entryError) { console.error("[useLifeOs] 自动生成重复待办失败(day_entries):", entryError); return; }
             if (!entry) return;
             supabase.from("todos").insert({
               id: newTodo.id,
@@ -202,7 +217,9 @@ export function useDayEntries(userId: string | undefined) {
               source_date: todayKey,
               created_at: newTodo.createdAt,
               updated_at: newTodo.updatedAt,
-            }).then();
+            }).then(({ error: todoError }) => {
+              if (todoError) console.error("[useLifeOs] 自动生成重复待办失败(todos):", todoError);
+            });
           });
       }
     });
@@ -228,13 +245,14 @@ export function useDayEntries(userId: string | undefined) {
     if (!userId) return;
     const entryId = await ensureEntry(todayKey);
 
-    await supabase.from("chat_messages").insert({
+    const { error: msgError } = await supabase.from("chat_messages").insert({
       entry_id: entryId,
       user_id: userId,
       role: msg.role,
       content: msg.content,
       timestamp: msg.timestamp,
     });
+    if (msgError) reportSyncError("保存对话消息", msgError);
 
     setEntries(prev => {
       const idx = prev.findIndex(e => e.date === todayKey);
@@ -302,12 +320,13 @@ export function useDayEntries(userId: string | undefined) {
       ? [...new Set([...entry.topicTags, ...meta.topicTags])].slice(0, 6)
       : entry.topicTags;
 
-    await supabase.from("day_entries").update({
+    const { error: metaError } = await supabase.from("day_entries").update({
       emotion_tags: newEmotionTags,
       topic_tags: newTopicTags,
       emotion_score: meta.emotionScore ?? entry.emotionScore,
       updated_at: new Date().toISOString(),
     }).eq("id", entry.id);
+    if (metaError) reportSyncError("保存日记标签", metaError);
 
     // Insert new todos
     if (meta.todos && meta.todos.length > 0) {
@@ -318,7 +337,7 @@ export function useDayEntries(userId: string | undefined) {
         return !existingNorms.some(en => en === n || en.includes(n) || n.includes(en));
       });
       if (deduped.length > 0) {
-        await supabase.from("todos").insert(deduped.map(t => ({
+        const { error: insertTodosError } = await supabase.from("todos").insert(deduped.map(t => ({
           id: t.id,
           user_id: userId,
           entry_id: entry.id,
@@ -335,6 +354,7 @@ export function useDayEntries(userId: string | undefined) {
           created_at: t.createdAt,
           updated_at: t.updatedAt,
         })));
+        if (insertTodosError) reportSyncError("保存AI识别出的待办", insertTodosError);
       }
     }
   }, [userId, entries]);
@@ -355,11 +375,12 @@ export function useDayEntries(userId: string | undefined) {
     const todo = entry?.todos.find(t => t.id === todoId);
     if (todo) {
       const newStatus = todo.status === "done" ? "todo" : "done";
-      await supabase.from("todos").update({
+      const { error: toggleError } = await supabase.from("todos").update({
         status: newStatus,
         completed_at: newStatus === "done" ? new Date().toISOString() : null,
         updated_at: new Date().toISOString(),
       }).eq("id", todoId);
+      if (toggleError) reportSyncError("更新待办状态", toggleError);
     }
   }, [entries]);
 
@@ -376,14 +397,38 @@ export function useDayEntries(userId: string | undefined) {
     if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
     if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate;
     if (updates.note !== undefined) dbUpdates.note = updates.note;
-    await supabase.from("todos").update(dbUpdates).eq("id", todoId);
+    // 之前这里只白名单了以上5个字段，标签/截止时间/子任务/重复规则的编辑
+    // 在UI上看起来生效了(本地state更新了)，但从来没写进数据库——刷新页面
+    // 或换设备后全部消失。这几个列名和 addTodoToDate 的 insert 用的是同一套，
+    // 已确认在数据库里存在。
+    if (updates.tags !== undefined) dbUpdates.tags = updates.tags;
+    if (updates.dueTime !== undefined) dbUpdates.due_time = updates.dueTime;
+    if (updates.subTasks !== undefined) dbUpdates.sub_tasks = JSON.stringify(updates.subTasks);
+    if (updates.recur !== undefined) dbUpdates.recur = updates.recur;
+    if (updates.recurDays !== undefined) dbUpdates.recur_days = updates.recurDays;
+    const { error: updateError } = await supabase.from("todos").update(dbUpdates).eq("id", todoId);
+    if (updateError) reportSyncError("更新待办", updateError);
+
+    // project_id 单独一次请求：ProjectsPage 把待办拖进项目时会调这里，但这张表
+    // 是否真的有 project_id 列未经确认（代码里从没有其他地方读写过它）。
+    // 单独发一次请求，即使这一列不存在导致失败，也只影响"项目关联"这一个功能，
+    // 不会连累上面已验证字段的更新一起失败。
+    if (updates.projectId !== undefined) {
+      const { error: projectError } = await supabase.from("todos")
+        .update({ project_id: updates.projectId })
+        .eq("id", todoId);
+      if (projectError) {
+        console.error("[useLifeOs] 关联项目失败，todos表可能还没有 project_id 列:", projectError);
+        reportSyncError("关联项目", projectError);
+      }
+    }
   }, []);
 
   const addTodoToDate = useCallback(async (date: string, todo: TodoItem) => {
     if (!userId) return;
     const entryId = await ensureEntry(date);
 
-    await supabase.from("todos").insert({
+    const { error: addError } = await supabase.from("todos").insert({
       id: todo.id,
       user_id: userId,
       entry_id: entryId,
@@ -400,6 +445,7 @@ export function useDayEntries(userId: string | undefined) {
       created_at: todo.createdAt,
       updated_at: todo.updatedAt,
     });
+    if (addError) reportSyncError("新建待办", addError);
 
     setEntries(prev => {
       const idx = prev.findIndex(e => e.date === date);
@@ -422,14 +468,16 @@ export function useDayEntries(userId: string | undefined) {
 
   const deleteEntry = useCallback(async (id: string) => {
     setEntries(prev => prev.filter(e => e.id !== id));
-    await supabase.from("day_entries").delete().eq("id", id);
+    const { error } = await supabase.from("day_entries").delete().eq("id", id);
+    if (error) reportSyncError("删除日记", error);
   }, []);
 
   const deleteTodo = useCallback(async (date: string, todoId: string) => {
     setEntries(prev => prev.map(e =>
       e.date === date ? { ...e, todos: e.todos.filter(t => t.id !== todoId) } : e
     ));
-    await supabase.from("todos").delete().eq("id", todoId);
+    const { error } = await supabase.from("todos").delete().eq("id", todoId);
+    if (error) reportSyncError("删除待办", error);
   }, []);
 
   const setFocusTodo = useCallback(async (date: string, todoId: string) => {
@@ -450,13 +498,15 @@ export function useDayEntries(userId: string | undefined) {
     })));
 
     // Update target todo to "doing" in DB
-    await supabase.from("todos").update({ status: "doing", updated_at: new Date().toISOString() }).eq("id", todoId);
+    const { error: focusError } = await supabase.from("todos").update({ status: "doing", updated_at: new Date().toISOString() }).eq("id", todoId);
+    if (focusError) reportSyncError("切换待办为进行中", focusError);
 
     // Reset previously "doing" todos in DB so state stays consistent after refresh
     if (prevDoingIds.length > 0) {
-      await supabase.from("todos")
+      const { error: resetError } = await supabase.from("todos")
         .update({ status: "todo", updated_at: new Date().toISOString() })
         .in("id", prevDoingIds);
+      if (resetError) console.error("[useLifeOs] 重置其他进行中待办失败:", resetError);
     }
   }, [userId]);
 
@@ -492,6 +542,7 @@ function mapTodo(row: any): TodoItem {
     reminderMinutes: row.reminder_minutes,
     note: row.note,
     emotionTag: row.emotion_tag,
+    projectId: row.project_id ?? undefined,
     sourceDate: row.source_date,
     completedAt: row.completed_at,
     createdAt: row.created_at,
@@ -514,10 +565,11 @@ export function useWheelScores(userId: string | undefined) {
   const addScore = useCallback(async (score: WheelScore) => {
     if (!userId) return;
     const dateKey = score.date.split("T")[0];
-    await supabase.from("wheel_scores").upsert(
+    const { error } = await supabase.from("wheel_scores").upsert(
       { user_id: userId, date: dateKey, scores: score.scores as any },
       { onConflict: "user_id,date" }
     );
+    if (error) reportSyncError("保存生命之轮评分", error);
     setScores(prev => [
       { date: dateKey, scores: score.scores },
       ...prev.filter(s => s.date.split("T")[0] !== dateKey),
@@ -549,7 +601,7 @@ export function useFinance(userId: string | undefined) {
 
   const addEntry = useCallback(async (e: Omit<FinanceEntry, "id" | "createdAt">) => {
     if (!userId) return;
-    const { data } = await supabase.from("finance_entries").insert({
+    const { data, error } = await supabase.from("finance_entries").insert({
       user_id: userId,
       date: e.date,
       type: e.type,
@@ -558,6 +610,7 @@ export function useFinance(userId: string | undefined) {
       note: e.note,
     }).select().single();
 
+    if (error) reportSyncError("保存收支记录", error);
     if (data) {
       setEntries(prev => [{
         id: data.id,
@@ -589,7 +642,8 @@ export function useFinance(userId: string | undefined) {
 
   const deleteEntry = useCallback(async (id: string) => {
     setEntries(prev => prev.filter(e => e.id !== id));
-    await supabase.from("finance_entries").delete().eq("id", id);
+    const { error } = await supabase.from("finance_entries").delete().eq("id", id);
+    if (error) reportSyncError("删除收支记录", error);
   }, []);
 
   const updateEntry = useCallback(async (id: string, updates: Partial<Omit<FinanceEntry, "id" | "createdAt">>) => {
@@ -600,7 +654,8 @@ export function useFinance(userId: string | undefined) {
     if (updates.note !== undefined) dbUpdates.note = updates.note;
     if (updates.type !== undefined) dbUpdates.type = updates.type;
     if (updates.date !== undefined) dbUpdates.date = updates.date;
-    await supabase.from("finance_entries").update(dbUpdates).eq("id", id);
+    const { error } = await supabase.from("finance_entries").update(dbUpdates).eq("id", id);
+    if (error) reportSyncError("更新收支记录", error);
   }, []);
 
   return { entries, addEntry, deleteEntry, updateEntry, todayStats, monthStats };
@@ -633,12 +688,13 @@ export function useEnergyLogs(userId: string | undefined) {
 
   const addLog = useCallback(async (level: EnergyLog['level'], note: string = '') => {
     if (!userId) return;
-    const { data } = await supabase.from("energy_logs").insert({
+    const { data, error } = await supabase.from("energy_logs").insert({
       user_id: userId,
       level,
       note,
     }).select().single();
 
+    if (error) reportSyncError("保存精力记录", error);
     if (data) {
       setLogs(prev => [{
         id: data.id,
@@ -706,7 +762,7 @@ export function useHabits(userId: string | undefined) {
 
   const addHabit = useCallback(async (h: Omit<HabitItem, "id" | "createdAt" | "checkIns">) => {
     if (!userId) return;
-    const { data } = await supabase.from("habits").insert({
+    const { data, error } = await supabase.from("habits").insert({
       user_id: userId,
       name: h.name,
       emoji: h.emoji,
@@ -714,6 +770,7 @@ export function useHabits(userId: string | undefined) {
       check_ins: [],
     }).select().single();
 
+    if (error) reportSyncError("新建习惯", error);
     if (data) {
       setHabits(prev => [{
         id: data.id,
@@ -734,12 +791,14 @@ export function useHabits(userId: string | undefined) {
       : [...habit.checkIns, date];
 
     setHabits(prev => prev.map(h => h.id === id ? { ...h, checkIns: newCheckIns } : h));
-    await supabase.from("habits").update({ check_ins: newCheckIns }).eq("id", id);
+    const { error } = await supabase.from("habits").update({ check_ins: newCheckIns }).eq("id", id);
+    if (error) reportSyncError("更新习惯打卡", error);
   }, [habits]);
 
   const deleteHabit = useCallback(async (id: string) => {
     setHabits(prev => prev.filter(h => h.id !== id));
-    await supabase.from("habits").delete().eq("id", id);
+    const { error } = await supabase.from("habits").delete().eq("id", id);
+    if (error) reportSyncError("删除习惯", error);
   }, []);
 
   return { habits, addHabit, checkIn, deleteHabit };

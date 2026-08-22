@@ -7,6 +7,7 @@ import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, Line
 import { format, parseISO } from "date-fns";
 import { callLifeMentorJSON } from "@/lib/streamChat";
 import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
+import { toast } from "sonner";
 
 const SUB_DOMAINS: Record<LifeDomain, string[]> = {
   "学习成长": ["知识积累", "技能精进", "思维升级", "输出创作"],
@@ -34,7 +35,7 @@ type InsightResult = Record<string, DomainInsight> & {
 type TabKey = "scores" | "insights" | "trends" | "history";
 
 const WheelPage = () => {
-  const { wheelScores, addWheelScore, entries, addTodoToDate, todayKey } = useLifeOs();
+  const { wheelScores, addWheelScore, entries, addTodoToDate, todayKey, defaultModelProfileId } = useLifeOs();
   const navigate = useNavigate();
   const insightRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -71,7 +72,7 @@ const WheelPage = () => {
       if (allMessages.length === 0) { setIsInferring(false); return; }
       const memoryContext = buildMemoryContext(entries, 14);
       const patterns = getKeyPatterns(entries);
-      const data = await callLifeMentorJSON<InferResult>("wheel-inference", allMessages, { memoryContext, patterns });
+      const data = await callLifeMentorJSON<InferResult>("wheel-inference", allMessages, { memoryContext, patterns, modelProfileId: defaultModelProfileId });
       const newScores = { ...scores };
       const newInfer: InferResult = {};
       ALL_DOMAINS.forEach(d => {
@@ -80,7 +81,10 @@ const WheelPage = () => {
       setScores(newScores);
       setInferData(newInfer);
       setAdjustedDomains(new Set());
-    } catch (e) { console.error("Wheel inference error:", e); }
+    } catch (e) {
+      console.error("Wheel inference error:", e);
+      toast.error("AI 推断评分失败，请检查网络后重试", { id: "wheel-infer-error" });
+    }
     setIsInferring(false);
   };
 
@@ -93,11 +97,14 @@ const WheelPage = () => {
       );
       const memoryContext = buildMemoryContext(entries, 14);
       const patterns = getKeyPatterns(entries);
-      const data = await callLifeMentorJSON<InsightResult>("wheel-insight", allMessages, { scores, memoryContext, patterns });
+      const data = await callLifeMentorJSON<InsightResult>("wheel-insight", allMessages, { scores, memoryContext, patterns, modelProfileId: defaultModelProfileId });
       setInsights(data);
       setActiveTab("insights");
       setTimeout(() => insightRef.current?.scrollIntoView({ behavior: "smooth" }), 300);
-    } catch (e) { console.error("Wheel insight error:", e); }
+    } catch (e) {
+      console.error("Wheel insight error:", e);
+      toast.error("AI 洞察生成失败，请检查网络后重试", { id: "wheel-insight-error" });
+    }
     setIsLoadingInsight(false);
   };
 

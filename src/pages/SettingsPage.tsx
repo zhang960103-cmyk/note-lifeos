@@ -9,6 +9,7 @@ import DataExport from "@/components/DataExport";
 import DataImport, { FinanceCsvImport } from "@/components/DataImport";
 import GlobalSearch from "@/components/GlobalSearch";
 import { useModelProfiles, type ModelProfile } from "@/hooks/useModelProfiles";
+import { isEncryptionEnabled, setEncryptionEnabled, setEncryptionPassword } from "@/lib/crypto";
 
 const APP_VERSION = "2.2.0";
 
@@ -52,6 +53,10 @@ export default function SettingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newProfile, setNewProfile] = useState({ name: "", description: "", base_url: "", model: "", api_key_encrypted: "", usage_tag: "chat", is_default: false, version: "1.0", status: "active" });
+  // 加密开关的读写走的是localStorage而不是React state，按钮点了之后UI不会自动
+  // 重新渲染——这个计数器纯粹是拿来强制触发一次re-render，让上面按钮的文字/颜色
+  // 跟着localStorage里的最新值刷新。
+  const [, setEncryptionUiTick] = useState(0);
 
   // Load profile
   useEffect(() => {
@@ -71,8 +76,38 @@ export default function SettingsPage() {
     }
   };
 
+  // 只清本地缓存的key(仅本设备)——注意：预算/订阅/借还/项目这四类数据从设计上
+  // 就只存在localStorage，从来没有同步到云端(见useLocalData.ts/useProjects.ts)，
+  // 所以"仅清空本地"对这四类数据其实等同于永久删除，不是"仅清空本地缓存"那么
+  // 轻量，必须在确认文案里明确说清楚，不能让用户误以为云端还留着备份。
+  // 之前这里用 k.startsWith("budgets_") 这种不带userId的宽泛匹配，会连同一台
+  // 设备上其他账号的本地数据一起清掉——改成精确匹配当前账号的key。
+  const clearLocalKeysFor = (userId: string) => {
+    const exactPrefixes = [
+      `budgets_${userId}`, `subscriptions_${userId}`, `ious_${userId}`, `projects_${userId}`,
+    ];
+    Object.keys(localStorage).forEach(k => {
+      if (k.includes(userId) || exactPrefixes.some(p => k === p)) {
+        localStorage.removeItem(k);
+      }
+    });
+  };
+
+  const handleClearLocalOnly = () => {
+    if (!user) return;
+    const confirmed = confirm(
+      "仅清空本设备本地数据？\n\n" +
+      "云端的日记、待办、财务记录、生命之轮数据不会受影响，其他设备登录同一账号仍能看到。\n\n" +
+      "⚠️ 但预算、订阅提醒、借还记录、项目分组这4类数据目前只存在本设备本地、从未同步到云端——清空后这4类数据会永久丢失，无法通过云端恢复。\n\n" +
+      "确认清空吗？"
+    );
+    if (!confirmed) return;
+    clearLocalKeysFor(user.id);
+    alert("本设备本地数据已清空。云端日记/待办/财务等数据不受影响，账号仍保持登录。");
+  };
+
   const handleDeleteAccount = async () => {
-    const confirmed = confirm("⚠️ 确认删除账号？\n\n这将永久删除您的所有日记、待办、财务记录、生命之轮数据。此操作不可撤销。\n\n请再次确认：您真的要删除账号吗？");
+    const confirmed = confirm("⚠️ 确认删除云端全部数据？\n\n这将永久删除您在云端的所有日记、待办、财务记录、生命之轮数据。此操作不可撤销。\n\n请再次确认：您真的要删除吗？");
     if (!confirmed) return;
     const reconfirm = window.prompt("请输入您的邮箱地址确认删除：");
     if (!user || reconfirm?.trim() !== user.email) {
@@ -80,26 +115,36 @@ export default function SettingsPage() {
       return;
     }
     try {
-      // Delete all user data from all tables
-      await Promise.all([
-        supabase.from("day_entries").delete().eq("user_id", user.id),
-        supabase.from("todos").delete().eq("user_id", user.id),
-        supabase.from("finance_entries").delete().eq("user_id", user.id),
-        supabase.from("wheel_scores").delete().eq("user_id", user.id),
-        supabase.from("habits").delete().eq("user_id", user.id),
-        supabase.from("energy_logs").delete().eq("user_id", user.id),
-        supabase.from("goals").delete().eq("user_id", user.id),
-        supabase.from("ai_model_profiles").delete().eq("user_id", user.id),
-      ]);
-      // Clear localStorage
-      Object.keys(localStorage).forEach(k => {
-        if (k.includes(user.id) || k.startsWith("budgets_") || k.startsWith("subscriptions_") || k.startsWith("ious_") || k.startsWith("onboarded_")) {
-          localStorage.removeItem(k);
-        }
+      // Delete all user data from all tables.
+      // 之前这里 Promise.all 只等 promise 是否 reject，不检查每个结果的 error——
+      // supabase-js 失败时是 resolve 不是 reject，所以某张表删除失败时用户依然会看到
+      // "账号已删除"的成功提示，实际上那张表的数据还留在库里。这里改成逐个检查 error 并汇总。
+      const tables = [
+        "day_entries", "todos", "chat_messages", "finance_entries", "wheel_scores",
+        "habits", "energy_logs", "goals", "ai_model_profiles",
+        "insight_bookmarks", "user_places", "health_metrics", "review_letters",
+      ] as const;
+      const results = await Promise.all(
+        tables.map(t => supabase.from(t).delete().eq("user_id", user.id))
+      );
+      const failedTables: string[] = [];
+      results.forEach((r, i) => {
+        if (r.error) { failedTables.push(tables[i]); console.error(`[删除账号] 表 ${tables[i]} 删除失败:`, r.error); }
       });
+
+      // Clear localStorage（本地这几类数据从未同步云端，云端数据删了本地也要跟着清，
+      // 否则退出登录前还能在本设备继续看到"已删除"的账号数据）
+      clearLocalKeysFor(user.id);
+
+      if (failedTables.length > 0) {
+        alert(`部分数据删除失败（${failedTables.join("、")}），请检查网络后重新尝试删除账号，或联系支持处理残留数据。为安全起见暂不会退出登录。`);
+        return;
+      }
+
       await signOut();
-      alert("账号已删除。感谢您使用罗盘。");
+      alert("账号云端数据已删除，已退出登录。\n\n注意：出于安全限制，登录凭证（邮箱/密码）本身需要联系支持才能彻底注销；您的日记、待办等业务数据已经全部清除。感谢您使用罗盘。");
     } catch (e) {
+      console.error("[删除账号] 异常:", e);
       alert("删除失败，请重试。如问题持续，请联系支持。");
     }
   };
@@ -127,6 +172,13 @@ export default function SettingsPage() {
   const currentLang = LANGUAGES.find(l => l.key === lang);
   const currentCurrency = CURRENCY_OPTIONS.find(c => c.key === currency);
   const defaultProfile = profiles.find(p => p.is_default);
+  // usage_tag==="private" 的模型(比如自己填的本地/私有网关)不占用云端每日额度，
+  // 和 HomePage.tsx 里 bumpAiCall/aiQuotaExceeded 的判断逻辑保持一致。
+  const isPrivateModelActive = defaultProfile?.usage_tag === "private";
+  // 之前这个key是"ai_calls_日期"，不分账号——同一浏览器登录过的所有账号共用
+  // 同一个每日额度计数，A账号的额度会被B账号的对话消耗掉。按userId分开存。
+  const aiCallsKey = user ? `ai_calls_${user.id}_${new Date().toISOString().slice(0, 10)}` : "";
+  const aiCallCountToday = aiCallsKey ? parseInt(localStorage.getItem(aiCallsKey) || "0") : 0;
 
   if (showSearch) return <GlobalSearch onClose={() => setShowSearch(false)} />;
 
@@ -174,9 +226,13 @@ export default function SettingsPage() {
               <LogOut size={14} className="text-destructive" />
               <span className="text-xs text-destructive">{t("settings.logout")}</span>
             </button>
+            <button onClick={handleClearLocalOnly} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent transition border-t border-border">
+              <Trash2 size={14} className="text-muted-foreground" />
+              <span className="text-xs text-foreground">仅清空本设备本地数据</span>
+            </button>
             <button onClick={handleDeleteAccount} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-destructive/5 transition border-t border-border">
               <Trash2 size={14} className="text-destructive/70" />
-              <span className="text-xs text-destructive/70">删除账号与所有数据</span>
+              <span className="text-xs text-destructive/70">删除云端全部数据</span>
             </button>
           </div>
         </section>
@@ -510,14 +566,18 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-foreground">今日 AI 对话次数</span>
                 <span className="text-xs font-mono-jb text-muted-foreground">
-                  {parseInt(localStorage.getItem(`ai_calls_${new Date().toISOString().slice(0, 10)}`) || "0")} / 30
+                  {isPrivateModelActive ? "不限（私有模型）" : `${aiCallCountToday} / 30`}
                 </span>
               </div>
               <div className="mt-1.5 h-1.5 bg-muted rounded-full overflow-hidden">
                 <div className="h-full bg-primary rounded-full transition-all"
-                  style={{ width: `${Math.min(parseInt(localStorage.getItem(`ai_calls_${new Date().toISOString().slice(0, 10)}`) || "0") / 30 * 100, 100)}%` }} />
+                  style={{ width: isPrivateModelActive ? "100%" : `${Math.min(aiCallCountToday / 30 * 100, 100)}%` }} />
               </div>
-              <p className="text-[9px] text-muted-foreground mt-1">每日 30 次免费，次日自动重置</p>
+              <p className="text-[9px] text-muted-foreground mt-1">
+                {isPrivateModelActive
+                  ? "当前默认模型标记为🔒私有，不占用云端每日额度"
+                  : "每日 30 次免费，次日自动重置"}
+              </p>
             </div>
             {/* 日记加密 */}
             <div className="px-4 py-3">
@@ -525,33 +585,37 @@ export default function SettingsPage() {
                 <span className="text-xs text-foreground">日记内容加密</span>
                 <button
                   onClick={() => {
-                    const current = localStorage.getItem("diary_encryption") === "1";
+                    if (!user) return;
+                    const current = isEncryptionEnabled(user.id);
                     if (!current) {
                       const pw = window.prompt("设置加密密码（请牢记，丢失后无法找回）：");
                       if (pw && pw.length >= 6) {
-                        localStorage.setItem("diary_encryption", "1");
-                        sessionStorage.setItem("diary_enc_pw_session", pw);
-                        alert("✅ 加密已开启。新记录的日记将在上传前加密。");
+                        setEncryptionEnabled(true, user.id);
+                        setEncryptionPassword(pw, user.id);
+                        setEncryptionUiTick(v => v + 1);
+                        alert("⚠️ 密码已保存在本设备。但请注意：目前这个开关还只是记录了你的设置意愿，日记内容的实际加密上传还没有接通（详见下方说明），新写的日记暂时不会真的变成密文。");
                       } else if (pw !== null) {
                         alert("密码至少6位");
                       }
                     } else {
-                      if (confirm("关闭加密？已加密的内容将显示为密文。")) {
-                        localStorage.removeItem("diary_encryption");
-                        sessionStorage.removeItem("diary_enc_pw_session");
+                      if (confirm("关闭加密标记？")) {
+                        setEncryptionEnabled(false, user.id);
+                        setEncryptionUiTick(v => v + 1);
                       }
                     }
                   }}
                   className={`text-[10px] px-3 py-1 rounded-full transition ${
-                    localStorage.getItem("diary_encryption") === "1"
+                    user && isEncryptionEnabled(user.id)
                       ? "bg-los-green/20 text-los-green"
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
-                  {localStorage.getItem("diary_encryption") === "1" ? "已开启" : "已关闭"}
+                  {user && isEncryptionEnabled(user.id) ? "已开启" : "已关闭"}
                 </button>
               </div>
-              <p className="text-[9px] text-muted-foreground">开启后日记内容在上传前 AES-256 加密，服务端只存密文</p>
+              <p className="text-[9px] text-los-orange">
+                ⚠️ 底层 AES-256 加密函数已经写好，但还没有接到日记的实际读写流程上——开启这个开关目前不会真正加密你的日记内容。这是本次审计发现的问题，接通它涉及"加密后AI还能不能分析日记内容"这类产品取舍，需要你确认方案后再实现。
+              </p>
             </div>
           </div>
         </section>

@@ -5,7 +5,7 @@ import { CheckSquare, Square, ChevronDown, ChevronUp, Trash2, FileText, AlertTri
 import { format, parseISO, subDays, eachDayOfInterval, startOfYear, getDay } from "date-fns";
 
 const HistoryPage = () => {
-  const { entries, toggleTodo, deleteEntry, monthFinanceStats, financeEntries } = useLifeOs();
+  const { entries, toggleTodo, deleteEntry, monthFinanceStats } = useLifeOs();
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -65,7 +65,11 @@ const HistoryPage = () => {
 
   const selectedEntry = selectedDate ? entries.find(e => e.date === selectedDate) : null;
 
-  const recentFinance = useMemo(() => financeEntries.slice(0, 5), [financeEntries]);
+  // 之前这里从全量financeEntries里取前5条，标题却写"本月财务"——如果本月
+  // 消费记录不足5条，列表会用上个月甚至更早的记录悄悄补齐，用户看到的
+  // 日期/金额和"本月"完全对不上。改为只从monthFinanceStats.entries(已经
+  // 按当月过滤)里取，数据来源和上面的统计卡片保持一致。
+  const recentFinance = useMemo(() => monthFinanceStats.entries.slice(0, 5), [monthFinanceStats.entries]);
 
   const handleDelete = (id: string) => {
     if (confirmDeleteId === id) {

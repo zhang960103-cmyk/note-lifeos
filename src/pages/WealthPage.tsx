@@ -2,17 +2,35 @@ import { useMemo, useState, useEffect } from "react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useBudgets, useSubscriptions, useIous } from "@/hooks/useLocalData";
-import { format, parseISO, subDays, startOfMonth, endOfMonth, isWithinInterval, addDays } from "date-fns";
+import { format, parseISO, subDays, startOfMonth, endOfMonth, isWithinInterval, addMonths, addYears, addQuarters } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { Wallet, BookOpen, Trash2, Pencil, Check, X, Plus, CreditCard, Users, Target, RefreshCw, Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrencySymbol } from "@/lib/currencyUtils";
 import type { BillingCycle } from "@/types/lifeOs";
+import { toast } from "sonner";
 
 const COLORS = ["hsl(39,58%,53%)", "hsl(0,65%,55%)", "hsl(142,60%,45%)", "hsl(210,60%,50%)", "hsl(280,55%,55%)", "hsl(30,50%,45%)"];
 const EXPENSE_CATEGORIES = ["餐饮", "购物", "交通", "娱乐", "住房", "医疗", "学习", "旅行", "其他"];
 const BILLING_LABELS: Record<BillingCycle, string> = { monthly: "月付", yearly: "年付", quarterly: "季付" };
 type WealthTab = "records" | "budget" | "subscriptions" | "ious";
+
+// 金额校验：拒绝空值/非数字/负数/无穷大，避免 Number("") / Number("abc") 产出
+// NaN 被悄悄存进账本、预算或订阅里，后面所有求和/百分比计算全部变成 NaN。
+function parsePositiveAmount(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
+function defaultNextDateFor(cycle: BillingCycle): string {
+  const now = new Date();
+  if (cycle === "monthly") return format(addMonths(now, 1), "yyyy-MM-dd");
+  if (cycle === "yearly") return format(addYears(now, 1), "yyyy-MM-dd");
+  return format(addQuarters(now, 1), "yyyy-MM-dd");
+}
 
 export default function WealthPage() {
   const { financeEntries, deleteFinanceEntry, updateFinanceEntry, energyLogs } = useLifeOs();
@@ -38,7 +56,15 @@ export default function WealthPage() {
   const [subName, setSubName] = useState("");
   const [subAmount, setSubAmount] = useState("");
   const [subCycle, setSubCycle] = useState<BillingCycle>("monthly");
-  const [subNextDate, setSubNextDate] = useState(format(addDays(new Date(), 30), "yyyy-MM-dd"));
+  const [subNextDate, setSubNextDate] = useState(defaultNextDateFor("monthly"));
+  // 用户手动改过续费日之后，就不再跟着付款周期自动改写它了
+  const [subNextDateTouched, setSubNextDateTouched] = useState(false);
+
+  // 之前这里无论选月付/年付/季付，默认续费日都写死"30天后"——选了年付
+  // 却显示一个月内就要续费，明显不对。现在跟着周期联动，除非用户自己改过。
+  useEffect(() => {
+    if (!subNextDateTouched) setSubNextDate(defaultNextDateFor(subCycle));
+  }, [subCycle, subNextDateTouched]);
 
   const [showIouForm, setShowIouForm] = useState(false);
   const [iouDir, setIouDir] = useState<"i_owe" | "they_owe">("they_owe");
@@ -88,18 +114,30 @@ export default function WealthPage() {
     [subscriptions]);
 
   const handleAddBudget = () => {
-    if (!budgetCategory || !budgetLimit) return;
-    addBudget({ category: budgetCategory, emoji: "💰", limit: Number(budgetLimit), period: "monthly" });
+    const limit = parsePositiveAmount(budgetLimit);
+    if (!budgetCategory || limit === null) {
+      toast.error("请输入一个大于0的月度上限金额", { id: "budget-invalid" });
+      return;
+    }
+    addBudget({ category: budgetCategory, emoji: "💰", limit, period: "monthly" });
     setBudgetLimit(""); setShowBudgetForm(false);
   };
   const handleAddSub = () => {
-    if (!subName || !subAmount) return;
-    addSubscription({ name: subName, emoji: "📱", amount: Number(subAmount), billingCycle: subCycle, nextDate: subNextDate, category: "娱乐", active: true });
-    setSubName(""); setSubAmount(""); setShowSubForm(false);
+    const amount = parsePositiveAmount(subAmount);
+    if (!subName.trim() || amount === null) {
+      toast.error("请填写名称，并输入一个大于0的金额", { id: "sub-invalid" });
+      return;
+    }
+    addSubscription({ name: subName.trim(), emoji: "📱", amount, billingCycle: subCycle, nextDate: subNextDate, category: "娱乐", active: true });
+    setSubName(""); setSubAmount(""); setSubNextDateTouched(false); setSubNextDate(defaultNextDateFor("monthly")); setSubCycle("monthly"); setShowSubForm(false);
   };
   const handleAddIou = () => {
-    if (!iouPerson || !iouAmount || !iouReason) return;
-    addIou({ direction: iouDir, person: iouPerson, amount: Number(iouAmount), reason: iouReason, status: "pending" });
+    const amount = parsePositiveAmount(iouAmount);
+    if (!iouPerson.trim() || amount === null || !iouReason.trim()) {
+      toast.error("请填写对方、原因，并输入一个大于0的金额", { id: "iou-invalid" });
+      return;
+    }
+    addIou({ direction: iouDir, person: iouPerson.trim(), amount, reason: iouReason.trim(), status: "pending" });
     setIouPerson(""); setIouAmount(""); setIouReason(""); setShowIouForm(false);
   };
 
@@ -213,7 +251,12 @@ export default function WealthPage() {
                         <>
                           <input value={editAmount} onChange={e => setEditAmount(e.target.value)} type="number" className="w-16 bg-muted border border-border rounded px-1 py-0.5 text-xs font-mono-jb text-foreground" />
                           <input value={editNote} onChange={e => setEditNote(e.target.value)} className="flex-1 bg-muted border border-border rounded px-1 py-0.5 text-xs text-foreground" />
-                          <button onClick={() => { updateFinanceEntry(f.id, { amount: Number(editAmount), note: editNote }); setEditingId(null); }} className="text-los-green"><Check size={12} /></button>
+                          <button onClick={() => {
+                            const amount = parsePositiveAmount(editAmount);
+                            if (amount === null) { toast.error("金额需要是大于0的数字", { id: "edit-amount-invalid" }); return; }
+                            updateFinanceEntry(f.id, { amount, note: editNote });
+                            setEditingId(null);
+                          }} className="text-los-green"><Check size={12} /></button>
                           <button onClick={() => setEditingId(null)} className="text-muted-foreground"><X size={12} /></button>
                         </>
                       ) : (
@@ -276,7 +319,7 @@ export default function WealthPage() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={handleAddBudget} disabled={!budgetLimit} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-xs disabled:opacity-30">保存</button>
+                  <button onClick={handleAddBudget} disabled={parsePositiveAmount(budgetLimit) === null} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-xs disabled:opacity-30">保存</button>
                   <button onClick={() => setShowBudgetForm(false)} className="px-4 bg-muted text-muted-foreground py-2 rounded-lg text-xs">取消</button>
                 </div>
               </div>
@@ -372,10 +415,10 @@ export default function WealthPage() {
                       {(["monthly", "yearly", "quarterly"] as BillingCycle[]).map(c => <option key={c} value={c}>{BILLING_LABELS[c]}</option>)}
                     </select></div>
                   <div><label className="text-[9px] text-muted-foreground mb-1 block">下次续费日</label>
-                    <input value={subNextDate} onChange={e => setSubNextDate(e.target.value)} type="date" className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none" /></div>
+                    <input value={subNextDate} onChange={e => { setSubNextDate(e.target.value); setSubNextDateTouched(true); }} type="date" className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none" /></div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={handleAddSub} disabled={!subName || !subAmount} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-xs disabled:opacity-30">保存</button>
+                  <button onClick={handleAddSub} disabled={!subName.trim() || parsePositiveAmount(subAmount) === null} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-xs disabled:opacity-30">保存</button>
                   <button onClick={() => setShowSubForm(false)} className="px-4 bg-muted text-muted-foreground py-2 rounded-lg text-xs">取消</button>
                 </div>
               </div>
@@ -402,10 +445,14 @@ export default function WealthPage() {
                         <span className="text-[9px] text-muted-foreground">下次 {s.nextDate}</span>
                       </div>
                     </div>
-                    <div className="flex gap-2 items-center">
-                      <button onClick={() => renewSubscription(s.id)} className="text-muted-foreground hover:text-primary" title="标记已续费"><RefreshCw size={13} /></button>
+                    <div className="flex gap-1 items-center">
+                      <button onClick={() => renewSubscription(s.id)} className="text-muted-foreground hover:text-primary p-2 -m-1" title="标记已续费"><RefreshCw size={13} /></button>
                       <button onClick={() => toggleActive(s.id)} className={`text-[9px] px-2 py-1 rounded-full ${s.active ? "bg-los-green/20 text-los-green" : "bg-muted text-muted-foreground"}`}>{s.active ? "活跃" : "停用"}</button>
-                      <button onClick={() => deleteSubscription(s.id)} className="text-muted-foreground/40 hover:text-destructive"><Trash2 size={12} /></button>
+                      <button
+                        onClick={() => { if (confirm(`确定删除订阅"${s.name}"吗？`)) deleteSubscription(s.id); }}
+                        className="text-muted-foreground/40 hover:text-destructive p-2 -m-1" title="删除">
+                        <Trash2 size={12} />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -450,7 +497,7 @@ export default function WealthPage() {
                 <div className="mb-2"><label className="text-[9px] text-muted-foreground mb-1 block">原因</label>
                   <input value={iouReason} onChange={e => setIouReason(e.target.value)} placeholder="上次聚餐AA" className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none" /></div>
                 <div className="flex gap-2">
-                  <button onClick={handleAddIou} disabled={!iouPerson || !iouAmount || !iouReason} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-xs disabled:opacity-30">保存</button>
+                  <button onClick={handleAddIou} disabled={!iouPerson.trim() || parsePositiveAmount(iouAmount) === null || !iouReason.trim()} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-xs disabled:opacity-30">保存</button>
                   <button onClick={() => setShowIouForm(false)} className="px-4 bg-muted text-muted-foreground py-2 rounded-lg text-xs">取消</button>
                 </div>
               </div>

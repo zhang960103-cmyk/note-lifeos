@@ -1,16 +1,21 @@
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const DESKTOP_NAV = [
   { path: "/", icon: "🧭", label: "今日" },
   { path: "/todos", icon: "✅", label: "待办" },
+  { path: "/calendar", icon: "📅", label: "日历" },
   { path: "/time-stats", icon: "⏰", label: "时间" },
   { path: "/wheel", icon: "⚖️", label: "生命之轮" },
   { path: "/wealth", icon: "💰", label: "财富" },
   { path: "/review", icon: "📮", label: "复盘" },
   { path: "/goals", icon: "🎯", label: "目标" },
-  { path: "/insights", icon: "💡", label: "洞察" },
-  { path: "/history", icon: "📅", label: "历史" },
+  { path: "/projects", icon: "🗂️", label: "项目" },
+  { path: "/health", icon: "❤️", label: "健康" },
+  { path: "/map", icon: "🗺️", label: "足迹" },
+  { path: "/history", icon: "📖", label: "日记墙" },
+  { path: "/search", icon: "🔍", label: "搜索" },
+  { path: "/guide", icon: "📘", label: "使用指南" },
   { path: "/settings", icon: "⚙️", label: "设置" },
   { path: "/privacy", icon: "🔒", label: "隐私政策" },
 ];
@@ -49,26 +54,29 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
 import { initSupabaseHealth } from "@/integrations/supabase/validate";
+// HomePage/TodoPage 是绝大多数用户(包括手机上的家人)打开app后最先/最常停留的页面，
+// 保持同步加载，避免多一次网络请求的白屏等待；其余页面按路由懒加载，减小首屏 JS 体积。
 import HomePage from "@/pages/HomePage";
 import TodoPage from "@/pages/TodoPage";
-import HistoryPage from "@/pages/HistoryPage";
-import ReviewPage from "@/pages/ReviewPage";
-import WheelPage from "@/pages/WheelPage";
-import WealthPage from "@/pages/WealthPage";
-import GuidePage from "@/pages/GuidePage";
-import SettingsPage from "@/pages/SettingsPage";
-// InsightsPage merged into CalendarPage
-import GoalsPage from "@/pages/GoalsPage";
-import TimeStatsPage from "@/pages/TimeStatsPage";
-import CalendarPage from "@/pages/CalendarPage";
-import ProjectsPage from "@/pages/ProjectsPage";
-import SearchPage from "@/pages/SearchPage";
-import HealthPage from "@/pages/HealthPage";
-import MapPage from "@/pages/MapPage";
 import AuthPage from "@/pages/AuthPage";
 import PrivacyPage from "@/pages/PrivacyPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import NotFound from "@/pages/NotFound";
+
+const HistoryPage = lazy(() => import("@/pages/HistoryPage"));
+const ReviewPage = lazy(() => import("@/pages/ReviewPage"));
+const WheelPage = lazy(() => import("@/pages/WheelPage"));
+const WealthPage = lazy(() => import("@/pages/WealthPage"));
+const GuidePage = lazy(() => import("@/pages/GuidePage"));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
+// InsightsPage merged into CalendarPage
+const GoalsPage = lazy(() => import("@/pages/GoalsPage"));
+const TimeStatsPage = lazy(() => import("@/pages/TimeStatsPage"));
+const CalendarPage = lazy(() => import("@/pages/CalendarPage"));
+const ProjectsPage = lazy(() => import("@/pages/ProjectsPage"));
+const SearchPage = lazy(() => import("@/pages/SearchPage"));
+const HealthPage = lazy(() => import("@/pages/HealthPage"));
+const MapPage = lazy(() => import("@/pages/MapPage"));
 import Onboarding from "@/components/Onboarding";
 import InstallBanner from "@/components/InstallBanner";
 import TabBar from "@/components/TabBar";
@@ -80,6 +88,7 @@ const queryClient = new QueryClient();
 
 const AppInner = () => {
   const { onboarded } = useLifeOs();
+  const location = useLocation();
   useReminders();
 
   if (onboarded === null) {
@@ -104,26 +113,38 @@ const AppInner = () => {
           <DesktopSidebar />
         </div>
         <div className="flex-1 overflow-hidden pb-[52px] lg:pb-0">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/todos" element={<TodoPage />} />
-            <Route path="/history" element={<HistoryPage />} />
-            <Route path="/review" element={<ReviewPage />} />
-            <Route path="/wheel" element={<WheelPage />} />
-            <Route path="/wealth" element={<WealthPage />} />
-            <Route path="/guide" element={<GuidePage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/insights" element={<Navigate to="/calendar" replace />} />
-            <Route path="/goals" element={<GoalsPage />} />
-            <Route path="/time-stats" element={<TimeStatsPage />} />
-            <Route path="/calendar" element={<CalendarPage />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/health" element={<HealthPage />} />
-            <Route path="/map" element={<MapPage />} />
-            <Route path="/privacy" element={<PrivacyPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          {/* key={pathname}：某个页面渲染崩了触发这层边界后，边界组件的state会
+              一直停在"已崩溃"，之前切到别的Tab也看不到东西，因为React没有卸载
+              重建这个ErrorBoundary。加上key，一旦路由变化就强制重新挂载，
+              离开出问题的页面后自动恢复正常，不需要用户手动刷新整个App。*/}
+          <ErrorBoundary scope="page" boundaryName={location.pathname} key={location.pathname}>
+            <Suspense fallback={
+              <div className="h-full flex items-center justify-center">
+                <Loader2 className="animate-spin text-gold" size={24} />
+              </div>
+            }>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/todos" element={<TodoPage />} />
+                <Route path="/history" element={<HistoryPage />} />
+                <Route path="/review" element={<ReviewPage />} />
+                <Route path="/wheel" element={<WheelPage />} />
+                <Route path="/wealth" element={<WealthPage />} />
+                <Route path="/guide" element={<GuidePage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/insights" element={<Navigate to="/calendar" replace />} />
+                <Route path="/goals" element={<GoalsPage />} />
+                <Route path="/time-stats" element={<TimeStatsPage />} />
+                <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/projects" element={<ProjectsPage />} />
+                <Route path="/search" element={<SearchPage />} />
+                <Route path="/health" element={<HealthPage />} />
+                <Route path="/map" element={<MapPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </div>
         <div className="lg:hidden">
           <TabBar />

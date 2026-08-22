@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Trash2, ChevronDown, ChevronUp, Target } from "lucide-react";
 import { CardSkeleton } from "@/components/SkeletonLoaders";
+import { toast } from "sonner";
 
 interface KeyResult {
   id: string;
@@ -108,6 +109,9 @@ const GoalsPage = () => {
       key_results: krs as any,
     }).select().single();
 
+    // 之前这里无论插入成功与否都会清空并收起表单，一旦insert因为网络/RLS
+    // 失败，用户看到表单收起以为保存成功，实际这条目标完全没有落库——
+    // 现在只有真正插入成功才清表单，失败则保留用户已填内容并提示重试。
     if (data && !error) {
       setGoals(prev => [{
         id: data.id,
@@ -116,18 +120,31 @@ const GoalsPage = () => {
         keyResults: (data.key_results as any[]) || [],
         createdAt: data.created_at,
       }, ...prev]);
+      setNewTitle("");
+      setNewKRs(["", "", ""]);
+      setShowCreate(false);
+    } else {
+      console.error("[GoalsPage] 创建目标失败:", error);
+      toast.error("创建目标失败，请检查网络后重试");
     }
-    setNewTitle("");
-    setNewKRs(["", "", ""]);
-    setShowCreate(false);
   }, [newTitle, newKRs, user]);
 
   const deleteGoal = useCallback(async (id: string) => {
+    const prevGoals = goals;
     setGoals(prev => prev.filter(g => g.id !== id));
-    await supabase.from("goals").delete().eq("id", id);
-  }, []);
+    const { error } = await supabase.from("goals").delete().eq("id", id);
+    // 之前这里不检查error，删除失败(网络/RLS)时UI已经把目标移除，用户
+    // 却完全不知道云端其实还留着（或者其实没删掉）。失败时把本地状态还原
+    // 并提示，避免"看起来删了、其实没删"的假象。
+    if (error) {
+      console.error("[GoalsPage] 删除目标失败:", error);
+      setGoals(prevGoals);
+      toast.error("删除失败，请重试");
+    }
+  }, [goals]);
 
   const updateKRProgress = useCallback(async (goalId: string, krId: string, progress: number) => {
+    const prevGoals = goals;
     setGoals(prev => prev.map(g =>
       g.id === goalId
         ? { ...g, keyResults: g.keyResults.map(kr => kr.id === krId ? { ...kr, progress } : kr) }
@@ -136,7 +153,12 @@ const GoalsPage = () => {
     const goal = goals.find(g => g.id === goalId);
     if (goal) {
       const updated = goal.keyResults.map(kr => kr.id === krId ? { ...kr, progress } : kr);
-      await supabase.from("goals").update({ key_results: updated as any }).eq("id", goalId);
+      const { error } = await supabase.from("goals").update({ key_results: updated as any }).eq("id", goalId);
+      if (error) {
+        console.error("[GoalsPage] 更新KR进度失败:", error);
+        setGoals(prevGoals);
+        toast.error("进度更新失败，请重试");
+      }
     }
   }, [goals]);
 
@@ -233,12 +255,19 @@ const GoalsPage = () => {
                       <div key={kr.id} className="space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-foreground">{kr.text}</span>
-                          <span className="text-[9px] text-muted-foreground font-mono-jb">{kr.linkedTodoCount} 关联</span>
+                          <span className="text-[9px] text-muted-foreground font-mono-jb">
+                            {kr.linkedTodoCount > 0 ? `${kr.linkedTodoCount} 关联 · 自动追踪` : "0 关联"}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
+                          {/* linkedTodoCount>0时，goalsWithLinked已经把progress强制算成
+                              doneCount/linked.length——之前这里滑块仍然可拖动，但下一次
+                              渲染就会被自动进度覆盖回去，看起来像"拖了没反应"。改为对
+                              有关联待办的KR禁用手动拖动，只对纯手动KR保留可拖动滑块。*/}
                           <input type="range" min={0} max={100} value={kr.progress}
+                            disabled={kr.linkedTodoCount > 0}
                             onChange={e => updateKRProgress(goal.id, kr.id, +e.target.value)}
-                            className="flex-1 accent-primary h-1" />
+                            className="flex-1 accent-primary h-1 disabled:opacity-50 disabled:cursor-not-allowed" />
                           <span className="text-[10px] text-primary font-mono-jb w-8 text-right">{kr.progress}%</span>
                         </div>
                       </div>

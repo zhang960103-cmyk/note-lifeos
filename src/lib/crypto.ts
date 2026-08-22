@@ -80,24 +80,32 @@ export function clearSessionKey(): void {
 }
 
 // Encryption enabled flag
-export function isEncryptionEnabled(): boolean {
-  return localStorage.getItem("diary_encryption") === "1";
+// 之前这几个key是全局的、不分账号——同一台设备/浏览器换个账号登录，会看到
+// 上一个账号开关的"已开启"状态，甚至能用上一个账号在sessionStorage里留下的
+// 密码去解密(如果不关标签页)。多账号小范围公测场景下这是真实的账号隔离漏洞，
+// 所以全部按 userId 分开存。
+function scopedKey(base: string, userId: string): string {
+  return `${base}_${userId}`;
 }
 
-export function setEncryptionEnabled(v: boolean): void {
-  if (v) localStorage.setItem("diary_encryption", "1");
-  else localStorage.removeItem("diary_encryption");
+export function isEncryptionEnabled(userId: string): boolean {
+  return localStorage.getItem(scopedKey("diary_encryption", userId)) === "1";
 }
 
-export function getEncryptionPassword(): string {
-  return localStorage.getItem("diary_enc_pw") || "";
+export function setEncryptionEnabled(v: boolean, userId: string): void {
+  if (v) localStorage.setItem(scopedKey("diary_encryption", userId), "1");
+  else localStorage.removeItem(scopedKey("diary_encryption", userId));
 }
 
-export function setEncryptionPassword(pw: string): void {
+export function getEncryptionPassword(userId: string): string {
+  return localStorage.getItem(scopedKey("diary_enc_pw", userId)) || "";
+}
+
+export function setEncryptionPassword(pw: string, userId: string): void {
   // Store pw in sessionStorage only (lost on tab close for security)
-  sessionStorage.setItem("diary_enc_pw_session", pw);
+  sessionStorage.setItem(scopedKey("diary_enc_pw_session", userId), pw);
 }
 
-export function getSessionPassword(): string {
-  return sessionStorage.getItem("diary_enc_pw_session") || "";
+export function getSessionPassword(userId: string): string {
+  return sessionStorage.getItem(scopedKey("diary_enc_pw_session", userId)) || "";
 }

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Mic, MicOff, X, Check, RefreshCw } from "lucide-react";
+import { Mic, MicOff, X, Check, RefreshCw, AlertTriangle } from "lucide-react";
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
@@ -13,11 +13,16 @@ export default function VoiceInput({ onTranscript, onClose }: VoiceInputProps) {
   const [state, setState] = useState<VoiceState>("idle"); // 不自动开始
   const [rawText, setRawText] = useState("");
   const [editableText, setEditableText] = useState("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
 
   const startListening = useCallback(() => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
+    if (!SR) {
+      setErrorMsg("当前浏览器不支持语音识别，换个浏览器或直接打字吧");
+      return;
+    }
+    setErrorMsg(null);
     const recog = new SR();
     recog.lang = "zh-CN";
     recog.continuous = false;
@@ -31,15 +36,42 @@ export default function VoiceInput({ onTranscript, onClose }: VoiceInputProps) {
       // 直接进预览，跳过AI纠错（慢且不必要）
       setState("preview");
     };
-    recog.onerror = () => setState("idle");
+    recog.onerror = (e: any) => {
+      const errType = e?.error;
+      if (errType === "not-allowed" || errType === "service-not-allowed") {
+        setErrorMsg("没有麦克风权限，请在系统/浏览器设置里允许访问麦克风后重试");
+      } else if (errType === "no-speech") {
+        setErrorMsg("没有识别到语音，请靠近麦克风再说一次");
+      } else if (errType === "network") {
+        setErrorMsg("网络异常，语音识别服务暂时不可用");
+      } else if (errType === "audio-capture") {
+        setErrorMsg("找不到可用的麦克风设备");
+      } else if (errType === "aborted") {
+        // 用户主动点击停止触发的中止，不算错误，不提示
+      } else {
+        setErrorMsg("语音识别出错，请重试");
+      }
+      // 用函数式更新读取"当前"状态，而不是闭包创建时捕获的 state——
+      // 否则这里的 state 永远是 startListening 被调用那一刻的旧值("idle")，
+      // 判断永远为假，识别报错后界面会卡在"录音中…"出不来。
+      setState(s => (s === "listening" ? "idle" : s));
+    };
     recog.onend = () => {
-      if (state === "listening") setState("idle");
+      // 同样问题：必须用函数式更新读最新状态，不能用闭包里的 state。
+      // 只有还处于"listening"时才归位到 idle，避免覆盖 onresult 已经设置的 "preview"。
+      setState(s => (s === "listening" ? "idle" : s));
     };
 
-    recog.start();
-    recognitionRef.current = recog;
-    setState("listening");
-  }, [state]);
+    try {
+      recog.start();
+      recognitionRef.current = recog;
+      setState("listening");
+    } catch (err) {
+      console.error("[VoiceInput] start() failed:", err);
+      setErrorMsg("启动语音识别失败，请重试");
+      setState("idle");
+    }
+  }, []);
 
   const stopListening = () => {
     recognitionRef.current?.stop();
@@ -53,10 +85,16 @@ export default function VoiceInput({ onTranscript, onClose }: VoiceInputProps) {
   };
 
   const handleRetry = () => {
-    setRawText(""); setEditableText(""); setState("idle");
+    setRawText(""); setEditableText(""); setState("idle"); setErrorMsg(null);
   };
 
-  // 不再 useEffect 自动开始，让用户手动点击
+  // 组件卸载（比如识别过程中用户直接关掉弹窗）时停止识别，
+  // 避免残留的识别实例在卸载后继续触发 onresult/onerror/onend 里的 setState。
+  useEffect(() => {
+    return () => {
+      try { recognitionRef.current?.stop(); } catch {}
+    };
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center" onClick={onClose}>
@@ -90,6 +128,14 @@ export default function VoiceInput({ onTranscript, onClose }: VoiceInputProps) {
             <p className="text-caption text-muted-foreground">
               {state === "listening" ? "识别完成后可以编辑" : "不需要特定格式，随便说"}
             </p>
+
+            {errorMsg && (
+              <div className="mt-3 flex items-center justify-center gap-1.5 text-caption text-destructive bg-destructive/10 rounded-lg px-3 py-2 mx-auto max-w-[280px]">
+                <AlertTriangle size={12} className="flex-shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
             <button onClick={onClose} className="mt-5 text-muted-foreground text-caption flex items-center gap-1 mx-auto">
               <X size={12} /> 取消
             </button>

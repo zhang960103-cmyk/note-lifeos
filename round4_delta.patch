@@ -1,0 +1,337 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index c015a2d..ba9adb7 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -14,6 +14,8 @@ const DESKTOP_NAV = [
+   { path: "/health", icon: "❤️", label: "健康" },
+   { path: "/map", icon: "🗺️", label: "足迹" },
+   { path: "/history", icon: "📖", label: "日记墙" },
++  { path: "/search", icon: "🔍", label: "搜索" },
++  { path: "/guide", icon: "📘", label: "使用指南" },
+   { path: "/settings", icon: "⚙️", label: "设置" },
+   { path: "/privacy", icon: "🔒", label: "隐私政策" },
+ ];
+diff --git a/src/hooks/useReminders.ts b/src/hooks/useReminders.ts
+index 23bde35..42abd17 100644
+--- a/src/hooks/useReminders.ts
++++ b/src/hooks/useReminders.ts
+@@ -79,7 +79,10 @@ export function useReminders() {
+       const todayStr = format(now, "yyyy-MM-dd");
+       const nowMinutes = now.getHours() * 60 + now.getMinutes();
+       allTodos.forEach(todo => {
+-        if (todo.status === "done") return;
++        // 之前这里只排除"done"，没有排除"dropped"——上面按分钟轮询的提醒
++        // 已经排除了dropped，这里漏排除导致用户已经主动放弃/取消的待办，
++        // 切回App时(visibilitychange)还是会弹出一条"逾期提醒"，行为不一致。
++        if (todo.status === "done" || todo.status === "dropped") return;
+         if (!todo.dueDate || !todo.dueTime) return;
+         if (todo.dueDate !== todayStr) return;
+         const [h, m] = todo.dueTime.split(":").map(Number);
+diff --git a/src/pages/GoalsPage.tsx b/src/pages/GoalsPage.tsx
+index da63d69..11eaa49 100644
+--- a/src/pages/GoalsPage.tsx
++++ b/src/pages/GoalsPage.tsx
+@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
+ import { supabase } from "@/integrations/supabase/client";
+ import { Plus, Trash2, ChevronDown, ChevronUp, Target } from "lucide-react";
+ import { CardSkeleton } from "@/components/SkeletonLoaders";
++import { toast } from "sonner";
+ 
+ interface KeyResult {
+   id: string;
+@@ -108,6 +109,9 @@ const GoalsPage = () => {
+       key_results: krs as any,
+     }).select().single();
+ 
++    // 之前这里无论插入成功与否都会清空并收起表单，一旦insert因为网络/RLS
++    // 失败，用户看到表单收起以为保存成功，实际这条目标完全没有落库——
++    // 现在只有真正插入成功才清表单，失败则保留用户已填内容并提示重试。
+     if (data && !error) {
+       setGoals(prev => [{
+         id: data.id,
+@@ -116,18 +120,31 @@ const GoalsPage = () => {
+         keyResults: (data.key_results as any[]) || [],
+         createdAt: data.created_at,
+       }, ...prev]);
++      setNewTitle("");
++      setNewKRs(["", "", ""]);
++      setShowCreate(false);
++    } else {
++      console.error("[GoalsPage] 创建目标失败:", error);
++      toast.error("创建目标失败，请检查网络后重试");
+     }
+-    setNewTitle("");
+-    setNewKRs(["", "", ""]);
+-    setShowCreate(false);
+   }, [newTitle, newKRs, user]);
+ 
+   const deleteGoal = useCallback(async (id: string) => {
++    const prevGoals = goals;
+     setGoals(prev => prev.filter(g => g.id !== id));
+-    await supabase.from("goals").delete().eq("id", id);
+-  }, []);
++    const { error } = await supabase.from("goals").delete().eq("id", id);
++    // 之前这里不检查error，删除失败(网络/RLS)时UI已经把目标移除，用户
++    // 却完全不知道云端其实还留着（或者其实没删掉）。失败时把本地状态还原
++    // 并提示，避免"看起来删了、其实没删"的假象。
++    if (error) {
++      console.error("[GoalsPage] 删除目标失败:", error);
++      setGoals(prevGoals);
++      toast.error("删除失败，请重试");
++    }
++  }, [goals]);
+ 
+   const updateKRProgress = useCallback(async (goalId: string, krId: string, progress: number) => {
++    const prevGoals = goals;
+     setGoals(prev => prev.map(g =>
+       g.id === goalId
+         ? { ...g, keyResults: g.keyResults.map(kr => kr.id === krId ? { ...kr, progress } : kr) }
+@@ -136,7 +153,12 @@ const GoalsPage = () => {
+     const goal = goals.find(g => g.id === goalId);
+     if (goal) {
+       const updated = goal.keyResults.map(kr => kr.id === krId ? { ...kr, progress } : kr);
+-      await supabase.from("goals").update({ key_results: updated as any }).eq("id", goalId);
++      const { error } = await supabase.from("goals").update({ key_results: updated as any }).eq("id", goalId);
++      if (error) {
++        console.error("[GoalsPage] 更新KR进度失败:", error);
++        setGoals(prevGoals);
++        toast.error("进度更新失败，请重试");
++      }
+     }
+   }, [goals]);
+ 
+@@ -233,12 +255,19 @@ const GoalsPage = () => {
+                       <div key={kr.id} className="space-y-1">
+                         <div className="flex items-center justify-between">
+                           <span className="text-xs text-foreground">{kr.text}</span>
+-                          <span className="text-[9px] text-muted-foreground font-mono-jb">{kr.linkedTodoCount} 关联</span>
++                          <span className="text-[9px] text-muted-foreground font-mono-jb">
++                            {kr.linkedTodoCount > 0 ? `${kr.linkedTodoCount} 关联 · 自动追踪` : "0 关联"}
++                          </span>
+                         </div>
+                         <div className="flex items-center gap-2">
++                          {/* linkedTodoCount>0时，goalsWithLinked已经把progress强制算成
++                              doneCount/linked.length——之前这里滑块仍然可拖动，但下一次
++                              渲染就会被自动进度覆盖回去，看起来像"拖了没反应"。改为对
++                              有关联待办的KR禁用手动拖动，只对纯手动KR保留可拖动滑块。*/}
+                           <input type="range" min={0} max={100} value={kr.progress}
++                            disabled={kr.linkedTodoCount > 0}
+                             onChange={e => updateKRProgress(goal.id, kr.id, +e.target.value)}
+-                            className="flex-1 accent-primary h-1" />
++                            className="flex-1 accent-primary h-1 disabled:opacity-50 disabled:cursor-not-allowed" />
+                           <span className="text-[10px] text-primary font-mono-jb w-8 text-right">{kr.progress}%</span>
+                         </div>
+                       </div>
+diff --git a/src/pages/HealthPage.tsx b/src/pages/HealthPage.tsx
+index 6968d67..3bda3c1 100644
+--- a/src/pages/HealthPage.tsx
++++ b/src/pages/HealthPage.tsx
+@@ -16,6 +16,7 @@ import {
+   ChevronLeft, Heart, Moon, Activity, Footprints,
+   Zap, TrendingUp, Plus, RefreshCw, Link, Check
+ } from "lucide-react";
++import { toast } from "sonner";
+ 
+ interface HealthMetrics {
+   date: string;
+@@ -80,8 +81,15 @@ export default function HealthPage() {
+       });
+ 
+     // Check connected sources from localStorage
+-    const sources = JSON.parse(localStorage.getItem(`health_sources_${user.id}`) || "[]");
+-    setConnectedSources(sources);
++    // 之前这里JSON.parse不做保护，一旦这个key被写坏(比如浏览器崩溃截断/
++    // 手动改过)，会在页面加载的useEffect里直接抛错，整页白屏。
++    try {
++      const raw = localStorage.getItem(`health_sources_${user.id}`);
++      setConnectedSources(raw ? JSON.parse(raw) : []);
++    } catch (e) {
++      console.warn("[HealthPage] health_sources 本地数据损坏，已重置:", e);
++      setConnectedSources([]);
++    }
+   }, [user, today]);
+ 
+   const saveMetrics = async () => {
+@@ -95,8 +103,17 @@ export default function HealthPage() {
+       readiness_score: editForm.readinessScore,
+       energy_level: editForm.energyLevel, source: "manual",
+     };
+-    await supabase.from("health_metrics").upsert(row, { onConflict: "user_id,date" });
++    const { error } = await supabase.from("health_metrics").upsert(row, { onConflict: "user_id,date" });
++    // 之前这里不检查error，保存失败(网络/RLS)时依然显示"保存成功"并收起
++    // 表单，用户以为数据已经存了，实际云端什么都没有。
++    if (error) {
++      console.error("[HealthPage] 保存健康数据失败:", error);
++      toast.error("保存失败，请检查网络后重试");
++      setSaving(false);
++      return;
++    }
+     setTodayMetrics({ ...editForm, date: today, source: "manual" });
++    setMetrics(prev => [{ ...editForm, date: today, source: "manual" } as HealthMetrics, ...prev.filter(m => m.date !== today)]);
+     setShowEdit(false);
+     setSaving(false);
+   };
+@@ -225,6 +242,7 @@ export default function HealthPage() {
+                             const text = await file.text();
+                             const lines = text.split("\n").filter(l => l.trim());
+                             let imported = 0;
++                            let failed = 0;
+                             for (const line of lines.slice(1)) {
+                               const cols = line.split(",");
+                               if (cols.length < 3) continue;
+@@ -232,12 +250,29 @@ export default function HealthPage() {
+                               const steps = parseInt(cols[1]) || 0;
+                               const sleepHrs = parseFloat(cols[2]) || 0;
+                               if (!date || !date.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
+-                              await supabase.from("health_metrics").upsert({
++                              // 之前这里不检查每行upsert的error，失败的行会被静默丢弃，
++                              // 但最后仍然按"总行数"提示导入成功，用户以为全导入了。
++                              const { error: rowError } = await supabase.from("health_metrics").upsert({
+                                 user_id: user.id, date, steps, sleep_hrs: sleepHrs, source: "huawei"
+                               }, { onConflict: "user_id,date" });
+-                              imported++;
++                              if (rowError) { failed++; console.error("[HealthPage] 华为数据导入失败:", date, rowError); }
++                              else imported++;
++                            }
++                            // 之前导入成功也从不把"huawei"标记为已连接来源，即使全部导入
++                            // 成功，来源列表里也永远显示"连接"而不是"已连接"。
++                            if (imported > 0) {
++                              setConnectedSources(prev => {
++                                if (prev.includes("huawei")) return prev;
++                                const next = [...prev, "huawei"];
++                                localStorage.setItem(`health_sources_${user.id}`, JSON.stringify(next));
++                                return next;
++                              });
++                            }
++                            if (failed > 0) {
++                              toast.error(`已导入 ${imported} 条，${failed} 条写入失败`);
++                            } else {
++                              toast.success(`已导入 ${imported} 条华为健康数据`);
+                             }
+-                            alert(`已导入 ${imported} 条华为健康数据`);
+                           };
+                           input.click();
+                         } else {
+diff --git a/src/pages/HistoryPage.tsx b/src/pages/HistoryPage.tsx
+index ce65705..9d0bbc8 100644
+--- a/src/pages/HistoryPage.tsx
++++ b/src/pages/HistoryPage.tsx
+@@ -5,7 +5,7 @@ import { CheckSquare, Square, ChevronDown, ChevronUp, Trash2, FileText, AlertTri
+ import { format, parseISO, subDays, eachDayOfInterval, startOfYear, getDay } from "date-fns";
+ 
+ const HistoryPage = () => {
+-  const { entries, toggleTodo, deleteEntry, monthFinanceStats, financeEntries } = useLifeOs();
++  const { entries, toggleTodo, deleteEntry, monthFinanceStats } = useLifeOs();
+   const navigate = useNavigate();
+   const [expandedId, setExpandedId] = useState<string | null>(null);
+   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+@@ -65,7 +65,11 @@ const HistoryPage = () => {
+ 
+   const selectedEntry = selectedDate ? entries.find(e => e.date === selectedDate) : null;
+ 
+-  const recentFinance = useMemo(() => financeEntries.slice(0, 5), [financeEntries]);
++  // 之前这里从全量financeEntries里取前5条，标题却写"本月财务"——如果本月
++  // 消费记录不足5条，列表会用上个月甚至更早的记录悄悄补齐，用户看到的
++  // 日期/金额和"本月"完全对不上。改为只从monthFinanceStats.entries(已经
++  // 按当月过滤)里取，数据来源和上面的统计卡片保持一致。
++  const recentFinance = useMemo(() => monthFinanceStats.entries.slice(0, 5), [monthFinanceStats.entries]);
+ 
+   const handleDelete = (id: string) => {
+     if (confirmDeleteId === id) {
+diff --git a/src/pages/MapPage.tsx b/src/pages/MapPage.tsx
+index 9e759ac..fb6ffc8 100644
+--- a/src/pages/MapPage.tsx
++++ b/src/pages/MapPage.tsx
+@@ -6,18 +6,24 @@ import { useNavigate } from "react-router-dom";
+ import { useAuth } from "@/hooks/useAuth";
+ import { supabase } from "@/integrations/supabase/client";
+ import { ChevronLeft, Plus, X } from "lucide-react";
++import { toast } from "sonner";
+ 
+ interface Place {
+   id: string; name: string; lat: number; lng: number;
+   emoji: string; note?: string; visitedAt: string;
+ }
+ 
++// 之前这个Promise只有onload会resolve——CDN被墙/离线/广告拦截器拦截脚本时，
++// onload永远不触发，Promise永远pending，页面就一直停在空白canvas，
++// 没有任何报错也没有重试入口。现在加上onerror的reject和10秒超时兜底。
+ function loadThree(): Promise<any> {
+-  return new Promise((resolve) => {
++  return new Promise((resolve, reject) => {
+     if ((window as any).THREE) { resolve((window as any).THREE); return; }
+     const s = document.createElement("script");
+     s.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+-    s.onload = () => resolve((window as any).THREE);
++    const timer = setTimeout(() => reject(new Error("加载地球组件超时，请检查网络")), 10000);
++    s.onload = () => { clearTimeout(timer); resolve((window as any).THREE); };
++    s.onerror = () => { clearTimeout(timer); reject(new Error("加载地球组件失败，请检查网络后重试")); };
+     document.head.appendChild(s);
+   });
+ }
+@@ -32,6 +38,7 @@ export default function MapPage() {
+   const [newPlace, setNewPlace] = useState({ name: "", lat: "", lng: "", emoji: "📍", note: "" });
+   const [saving, setSaving] = useState(false);
+   const [selected, setSelected] = useState<Place | null>(null);
++  const [globeError, setGlobeError] = useState<string | null>(null);
+ 
+   useEffect(() => {
+     if (!user) return;
+@@ -113,6 +120,9 @@ export default function MapPage() {
+         renderer.render(scene, camera);
+       };
+       animate();
++    }).catch((e: Error) => {
++      console.error("[MapPage] three.js 加载失败:", e);
++      setGlobeError(e.message || "地球组件加载失败");
+     });
+ 
+     return () => { cancelAnimationFrame(raf); };
+@@ -140,9 +150,24 @@ export default function MapPage() {
+ 
+   const addPlace = async () => {
+     if (!user || !newPlace.name || !newPlace.lat || !newPlace.lng) return;
++    // 之前这里只检查经纬度是否为空字符串，不检查是不是合法数字——用户输入
++    // 非数字文本会被parseFloat静默转成NaN，直接存进Supabase，标记点在
++    // 地球上位置错乱(NaN参与球面坐标计算)且没有任何提示。
++    const lat = parseFloat(newPlace.lat);
++    const lng = parseFloat(newPlace.lng);
++    if (Number.isNaN(lat) || lat < -90 || lat > 90) { toast.error("纬度需要是 -90 到 90 之间的数字"); return; }
++    if (Number.isNaN(lng) || lng < -180 || lng > 180) { toast.error("经度需要是 -180 到 180 之间的数字"); return; }
+     setSaving(true);
+-    const row = { user_id: user.id, name: newPlace.name, lat: parseFloat(newPlace.lat), lng: parseFloat(newPlace.lng), emoji: newPlace.emoji, note: newPlace.note, visited_at: new Date().toISOString() };
+-    const { data } = await supabase.from("user_places").insert(row).select().single();
++    const row = { user_id: user.id, name: newPlace.name, lat, lng, emoji: newPlace.emoji, note: newPlace.note, visited_at: new Date().toISOString() };
++    const { data, error } = await supabase.from("user_places").insert(row).select().single();
++    // 之前这里不检查error，插入失败(网络/RLS)时表单照样清空收起，用户以为
++    // 地点已经加上了，实际上云端和地球上都没有这个点。
++    if (error) {
++      console.error("[MapPage] 添加地点失败:", error);
++      toast.error("添加失败，请重试");
++      setSaving(false);
++      return;
++    }
+     if (data) setPlaces(p => [{ id: data.id, name: data.name, lat: data.lat, lng: data.lng, emoji: data.emoji, note: data.note, visitedAt: data.visited_at }, ...p]);
+     setNewPlace({ name: "", lat: "", lng: "", emoji: "📍", note: "" });
+     setShowAdd(false); setSaving(false);
+@@ -165,7 +190,19 @@ export default function MapPage() {
+ 
+       <div className="relative flex-1 overflow-hidden">
+         <canvas ref={canvasRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+-        <p className="absolute bottom-20 left-1/2 -translate-x-1/2 text-label text-white/30 pointer-events-none">拖动旋转 · 金色圆点为已去过的地方</p>
++        {globeError ? (
++          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
++            <p className="text-caption text-white/60">{globeError}</p>
++            <button
++              onClick={() => { setGlobeError(null); window.location.reload(); }}
++              className="text-caption text-gold border border-gold/30 rounded-full px-4 py-1.5 hover:bg-gold/10"
++            >
++              重新加载
++            </button>
++          </div>
++        ) : (
++          <p className="absolute bottom-20 left-1/2 -translate-x-1/2 text-label text-white/30 pointer-events-none">拖动旋转 · 金色圆点为已去过的地方</p>
++        )}
+       </div>
+ 
+       <div className="border-t border-border/30 bg-black/60 backdrop-blur-sm">

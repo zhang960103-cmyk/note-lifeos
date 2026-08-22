@@ -79,7 +79,10 @@ export function useReminders() {
       const todayStr = format(now, "yyyy-MM-dd");
       const nowMinutes = now.getHours() * 60 + now.getMinutes();
       allTodos.forEach(todo => {
-        if (todo.status === "done") return;
+        // 之前这里只排除"done"，没有排除"dropped"——上面按分钟轮询的提醒
+        // 已经排除了dropped，这里漏排除导致用户已经主动放弃/取消的待办，
+        // 切回App时(visibilitychange)还是会弹出一条"逾期提醒"，行为不一致。
+        if (todo.status === "done" || todo.status === "dropped") return;
         if (!todo.dueDate || !todo.dueTime) return;
         if (todo.dueDate !== todayStr) return;
         const [h, m] = todo.dueTime.split(":").map(Number);

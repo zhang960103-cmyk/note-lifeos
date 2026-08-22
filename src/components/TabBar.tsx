@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { MoreHorizontal, X, BookOpen, Target, Clock, History, Star, CalendarDays, BarChart2, Briefcase, Search, Heart, Map } from "lucide-react";
+import { MoreHorizontal, X, BookOpen, Target, History, Star, BarChart2, Briefcase, Search, Heart, Map } from "lucide-react";
 
 // 主Tab：今日/待办/日历/复盘/财富
 // 日历 = 时间入口（直觉），时间统计进入分析页
@@ -27,6 +27,10 @@ const MORE_GROUPS = [
     label: "记录",
     items: [
       { path: "/history",  icon: <History size={16} />,     label: "日记墙" },
+      { path: "/projects", icon: <Briefcase size={16} />,   label: "项目" },
+      { path: "/health",   icon: <Heart size={16} />,       label: "健康" },
+      { path: "/map",      icon: <Map size={16} />,         label: "足迹" },
+      { path: "/search",   icon: <Search size={16} />,      label: "搜索" },
     ],
   },
   {

@@ -237,7 +237,10 @@ export default function CalendarPage() {
           const dateStr = localDateStr(day);
           const isToday = dateStr === todayStr;
           const isSelected = dateStr === selectedDate;
-          const hasActivity = allTodos.some(t => (t.completedAt?.slice(0,10)||t.sourceDate) === dateStr);
+          // 之前只看 allTodos，只写了日记但没有待办的那天会完全没有小圆点提示，
+          // 看起来像"这天什么都没做"，其实只是没生成待办。
+          const hasActivity = allTodos.some(t => (t.completedAt?.slice(0,10)||t.sourceDate) === dateStr)
+            || entries.some(e => e.date === dateStr);
           return (
             <button key={i} onClick={() => setSelectedDate(dateStr)}
               className={`flex-1 text-center py-1.5 transition ${isSelected && !isToday ? "bg-primary/10" : ""}`}>
@@ -310,6 +313,38 @@ export default function CalendarPage() {
         {view === "stats" && (
           <div className="px-4 py-3 space-y-4 pb-6">
 
+            {/* 选中日的日记摘要——合并 InsightsPage 之后这块内容曾经被漏掉，
+                selectedEntry 算出来了但从没渲染过，用户点日历完全看不到那天写了什么 */}
+            {selectedEntry && (selectedEntry.emotionTags.length > 0 || selectedEntry.topicTags.length > 0 || selectedEntry.messages.length > 0) && (
+              <div className="bg-card border border-gold-border rounded-xl p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-caption text-muted-foreground">📖 这天的日记</p>
+                  {selectedEntry.emotionScore > 0 && (
+                    <span className="text-label font-mono-jb text-muted-foreground">情绪 {selectedEntry.emotionScore}/10</span>
+                  )}
+                </div>
+                {(selectedEntry.emotionTags.length > 0 || selectedEntry.topicTags.length > 0) && (
+                  <div className="flex gap-1 flex-wrap mb-1.5">
+                    {selectedEntry.emotionTags.map(tag => (
+                      <span key={tag} className="text-label bg-primary/10 text-primary px-1.5 py-0.5 rounded">{tag}</span>
+                    ))}
+                    {selectedEntry.topicTags.map(tag => (
+                      <span key={tag} className="text-label bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{tag}</span>
+                    ))}
+                  </div>
+                )}
+                {(() => {
+                  const lastUserMsg = [...selectedEntry.messages].reverse().find(m => m.role === "user");
+                  if (!lastUserMsg) return null;
+                  return (
+                    <p className="text-caption text-foreground/90 leading-relaxed line-clamp-3">
+                      {lastUserMsg.content}
+                    </p>
+                  );
+                })()}
+              </div>
+            )}
+
             {/* 选中日概览 */}
             <div>
               <p className="text-caption text-muted-foreground mb-2">
@@ -345,7 +380,9 @@ export default function CalendarPage() {
               ) : (
                 <div className="bg-card border border-border rounded-xl p-4 text-center">
                   <p className="text-caption text-muted-foreground">
-                    {selectedDate === todayStr ? "今天还没有时间记录" : "这天没有数据"}
+                    {selectedEntry
+                      ? "这天写了日记，但还没有可统计的时间记录"
+                      : selectedDate === todayStr ? "今天还没有时间记录" : "这天没有数据"}
                   </p>
                   <p className="text-label text-muted-foreground/60 mt-1">
                     在主页说「今天上午开了2小时会」自动记录

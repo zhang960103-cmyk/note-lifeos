@@ -15,6 +15,12 @@ import { createTodoFromExtract } from "@/hooks/useLifeOs";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, parseISO } from "date-fns";
 import type { TodoItem } from "@/types/lifeOs";
+import { toast } from "sonner";
+
+// EnergyLog.level 存的是中文（'高'|'中'|'低'|'透支'），ENERGY_LEVELS 这个UI常量
+// 用的是英文 value——两边转换要一致，否则"选中态"高亮和写入的记录会对不上。
+const ENERGY_LEVEL_TO_CN: Record<string, '高' | '中' | '低'> = { high: '高', medium: '中', low: '低' };
+const ENERGY_LEVEL_FROM_CN: Record<string, string> = { '高': 'high', '中': 'medium', '低': 'low', '透支': 'low' };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
 const ENERGY_LEVELS = [
@@ -42,6 +48,7 @@ const HomePage = () => {
     addFinanceEntry, todayFinanceStats, wheelScores, entries, allTodos, toggleTodo,
     habits, checkInHabit, setFocusTodo, addTodoToDate,
     energyLogs, addEnergyLog, energySummary, consecutiveLowDays,
+    defaultModelProfileId, isPrivateModelActive,
   } = useLifeOs();
   const [dailyQuestion, setDailyQuestion] = useState<{ question: string; domain: string } | null>(null);
   const [input, setInput] = useState("");
@@ -85,10 +92,16 @@ const HomePage = () => {
 
   // R1: AI 每日调用配额（防止成本失控）
   const DAILY_LIMIT = 30;
-  const todayCallKey = `ai_calls_${todayKey}`;
-  const aiCallCount = parseInt(localStorage.getItem(todayCallKey) || "0");
-  const aiQuotaExceeded = aiCallCount >= DAILY_LIMIT;
-  const bumpAiCall = () => localStorage.setItem(todayCallKey, String(aiCallCount + 1));
+  // 之前key是 ai_calls_日期，不分账号，同一浏览器多个账号会共用同一个计数——
+  // 按userId分开存。
+  const todayCallKey = user ? `ai_calls_${user.id}_${todayKey}` : "";
+  const aiCallCount = todayCallKey ? parseInt(localStorage.getItem(todayCallKey) || "0") : 0;
+  // 标了🔒私有/本地的模型不占用云端每日额度
+  const aiQuotaExceeded = !isPrivateModelActive && aiCallCount >= DAILY_LIMIT;
+  const bumpAiCall = () => {
+    if (isPrivateModelActive || !todayCallKey) return;
+    localStorage.setItem(todayCallKey, String(aiCallCount + 1));
+  };
 
   // Android keyboard fix: listen to visualViewport resize to prevent input being hidden
   useEffect(() => {
@@ -270,6 +283,19 @@ const HomePage = () => {
     sendMessage(`[快速情绪记录] ${mood.emoji} ${t(mood.labelKey)}`);
   };
 
+  // 精力记录：ENERGY_LEVELS 常量和对应的多语言文案(home.energy.*)其实早就写好了，
+  // 但从来没有一个按钮真正调用过 addEnergyLog——"精力都去哪儿了"这块功能
+  // 一直只有读(能量预警banner、AI简报)没有写。补上这个入口。
+  const handleEnergyCheckIn = (lvl: typeof ENERGY_LEVELS[number]) => {
+    addEnergyLog(ENERGY_LEVEL_TO_CN[lvl.value]);
+    toast.success(`已记录精力：${lvl.emoji} ${t(lvl.labelKey)}`, { id: "energy-checkin" });
+  };
+
+  const todayLatestEnergy = useMemo(() => {
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    return energyLogs.find(l => format(new Date(l.timestamp), "yyyy-MM-dd") === todayStr) || null;
+  }, [energyLogs]);
+
   const focusTodo = useMemo(() => {
     return allTodos.find(t => t.status === "doing");
   }, [allTodos]);
@@ -448,6 +474,7 @@ const HomePage = () => {
         memoryContext: fullMemoryContext,
         patterns,
         accessToken,
+        modelProfileId: defaultModelProfileId,
         onDelta: (chunk) => {
           full += chunk;
           setStreamingContent(full);
@@ -694,6 +721,23 @@ const HomePage = () => {
                     {mood.emoji}
                   </button>
                 ))}
+              </div>
+
+              {/* Quick energy check-in */}
+              <div className="mt-3">
+                <p className="text-caption text-muted-foreground text-center mb-1.5">{t("home.energy.title")}</p>
+                <div className="flex justify-center gap-2">
+                  {ENERGY_LEVELS.map(lvl => {
+                    const active = todayLatestEnergy && ENERGY_LEVEL_FROM_CN[todayLatestEnergy.level] === lvl.value;
+                    return (
+                      <button key={lvl.value} onClick={() => handleEnergyCheckIn(lvl)}
+                        className={`w-11 h-11 rounded-full flex items-center justify-center text-xl transition-all ${active ? "bg-primary/15 ring-2 ring-primary" : "bg-surface-2 hover:scale-110 hover:bg-surface-3"}`}
+                        title={t(lvl.labelKey)}>
+                        {lvl.emoji}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* 今日习惯打卡（主页可见）*/}
