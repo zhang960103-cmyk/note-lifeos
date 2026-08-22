@@ -1,5 +1,13 @@
 /**
- * 3D 地图 — 纯 Three.js（通过 script 标签动态加载，无 npm 依赖冲突）
+ * 3D 地图 — Three.js
+ *
+ * 之前这里是运行时从 cdnjs.cloudflare.com 拉 three.min.js 的 <script> 标签，
+ * 用户反馈"地球加载不出来/一直转圈"——根因是 cdnjs.cloudflare.com 在国内网络
+ * 环境下经常被墙/连接极不稳定，家庭成员在国内用手机打开这个页面时，这个
+ * 外部脚本大概率永远加载不出来。改成把 three 作为 npm 依赖直接打包进
+ * MapPage 自己的 JS 分片里（MapPage 本身在 App.tsx 里已经是路由懒加载），
+ * 和其它页面代码一起从同一个域名(你自己的Vercel部署)加载，不再依赖任何
+ * 第三方CDN，从根上去掉了这个网络失败点，而不是只加个报错提示。
  */
 import { useRef, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -7,25 +15,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { ChevronLeft, Plus, X } from "lucide-react";
 import { toast } from "sonner";
+import * as THREE from "three";
 
 interface Place {
   id: string; name: string; lat: number; lng: number;
   emoji: string; note?: string; visitedAt: string;
-}
-
-// 之前这个Promise只有onload会resolve——CDN被墙/离线/广告拦截器拦截脚本时，
-// onload永远不触发，Promise永远pending，页面就一直停在空白canvas，
-// 没有任何报错也没有重试入口。现在加上onerror的reject和10秒超时兜底。
-function loadThree(): Promise<any> {
-  return new Promise((resolve, reject) => {
-    if ((window as any).THREE) { resolve((window as any).THREE); return; }
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
-    const timer = setTimeout(() => reject(new Error("加载地球组件超时，请检查网络")), 10000);
-    s.onload = () => { clearTimeout(timer); resolve((window as any).THREE); };
-    s.onerror = () => { clearTimeout(timer); reject(new Error("加载地球组件失败，请检查网络后重试")); };
-    document.head.appendChild(s);
-  });
 }
 
 export default function MapPage() {
@@ -51,7 +45,10 @@ export default function MapPage() {
     if (!canvas) return;
     let raf = 0;
 
-    loadThree().then((THREE: any) => {
+    // three.js 现在是静态import，不再是异步加载资源，这里改成同步try/catch——
+    // 仍然保留globeError兜底，因为WebGL本身也可能因为设备/浏览器不支持而抛错
+    // (比如禁用了硬件加速的老旧设备)，这种情况下最好也给用户一个提示而不是白屏。
+    try {
       const W = canvas.clientWidth, H = canvas.clientHeight;
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
       renderer.setPixelRatio(window.devicePixelRatio);
@@ -120,10 +117,10 @@ export default function MapPage() {
         renderer.render(scene, camera);
       };
       animate();
-    }).catch((e: Error) => {
-      console.error("[MapPage] three.js 加载失败:", e);
-      setGlobeError(e.message || "地球组件加载失败");
-    });
+    } catch (e: any) {
+      console.error("[MapPage] 地球组件初始化失败:", e);
+      setGlobeError(e?.message || "地球组件加载失败，请刷新重试");
+    }
 
     return () => { cancelAnimationFrame(raf); };
   }, []);
