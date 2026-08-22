@@ -33,17 +33,17 @@ const AuthPage = ({ onSignUp, onSignIn }: AuthPageProps) => {
     // Timeout protection: if Supabase doesn't respond in 15s, unblock the button
     const timeout = setTimeout(() => {
       setLoading(false);
-      setError("连接超时，请检查网络后重试");
+      setError(t("auth.error.timeout"));
     }, 15000);
     try {
       if (isLogin) await onSignIn(email, password);
       else await onSignUp(email, password);
     } catch (err: any) {
       const msg = err.message || t("auth.error.default");
-      // Translate common Supabase error messages to Chinese
-      if (msg.includes("Invalid login credentials")) setError("邮箱或密码错误");
-      else if (msg.includes("Email not confirmed")) setError("请先验证邮箱，检查收件箱");
-      else if (msg.includes("User already registered")) setError("该邮箱已注册，请直接登录");
+      // Translate common Supabase error messages into the current UI language
+      if (msg.includes("Invalid login credentials")) setError(t("auth.error.invalid_credentials"));
+      else if (msg.includes("Email not confirmed")) setError(t("auth.error.email_not_confirmed"));
+      else if (msg.includes("User already registered")) setError(t("auth.error.already_registered"));
       else setError(msg);
     } finally {
       clearTimeout(timeout);
@@ -112,7 +112,7 @@ const AuthPage = ({ onSignUp, onSignIn }: AuthPageProps) => {
       });
       if (error) throw error;
     } catch (err: any) {
-      setError(err.message || "Google 登录失败");
+      setError(err.message || t("auth.error.google_fail"));
       setLoading(false);
     }
   };
@@ -164,22 +164,22 @@ const AuthPage = ({ onSignUp, onSignIn }: AuthPageProps) => {
               </div>
               <div className="mt-8 max-w-xl">
                 <h1 className="font-serif-sc text-5xl leading-tight text-foreground">
-                  把日记、待办、复盘和 AI 导师，整理成一个真正可发布的网页版入口。
+                  {t("auth.hero.title")}
                 </h1>
                 <p className="mt-5 text-sm leading-8 text-foreground/70">
-                  现在支持网页版登录、Google OAuth、邮箱密码、手机验证码与访客体验；同时保留移动端沉浸式布局，适合封装为 PWA 或 App WebView。
+                  {t("auth.hero.desc")}
                 </p>
               </div>
             </div>
 
             <div className="grid gap-4">
               <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
-                <div className="flex items-center gap-3 text-gold"><MonitorSmartphone size={18} /><span className="text-sm">双端兼容体验</span></div>
-                <p className="mt-2 text-xs leading-6 text-foreground/65">桌面端使用双栏展示，移动端保持单手操作与底部导航习惯。</p>
+                <div className="flex items-center gap-3 text-gold"><MonitorSmartphone size={18} /><span className="text-sm">{t("auth.hero.feature1.title")}</span></div>
+                <p className="mt-2 text-xs leading-6 text-foreground/65">{t("auth.hero.feature1.desc")}</p>
               </div>
               <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
-                <div className="flex items-center gap-3 text-gold"><ShieldCheck size={18} /><span className="text-sm">发布级认证链路</span></div>
-                <p className="mt-2 text-xs leading-6 text-foreground/65">Supabase PKCE 会话、恢复密码、OAuth 回跳与匿名体验都可直接用于上线部署。</p>
+                <div className="flex items-center gap-3 text-gold"><ShieldCheck size={18} /><span className="text-sm">{t("auth.hero.feature2.title")}</span></div>
+                <p className="mt-2 text-xs leading-6 text-foreground/65">{t("auth.hero.feature2.desc")}</p>
               </div>
             </div>
           </section>

@@ -7,6 +7,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { format, addDays, subDays, startOfWeek, startOfMonth, endOfMonth,
          eachDayOfInterval, parseISO } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area,
@@ -36,12 +37,27 @@ function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
-const DAY_LABELS = ["日","一","二","三","四","五","六"];
+const DAY_LABEL_KEYS = [
+  "calendar.day_sun", "calendar.day_mon", "calendar.day_tue", "calendar.day_wed",
+  "calendar.day_thu", "calendar.day_fri", "calendar.day_sat",
+];
+
+// 固定分类标签（内部用中文做匹配 key，展示时需要走翻译，见 CATEGORY_LABEL_KEYS）
+const CATEGORY_LABEL_KEYS: Record<string, string> = {
+  "工作": "calendar.category_work",
+  "学习": "calendar.category_study",
+  "运动": "calendar.category_exercise",
+  "生活": "calendar.category_life",
+  "娱乐": "calendar.category_entertainment",
+  "社交": "calendar.category_social",
+  "其他": "calendar.category_other",
+};
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 7); // 7–22
 const CELL_H = 44;
 
 export default function CalendarPage() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { allTodos, entries, energyLogs, habits } = useLifeOs();
   const todayStr = localDateStr(new Date());
 
@@ -142,10 +158,10 @@ export default function CalendarPage() {
     const HV = ["工作","学习","运动","阅读","写作","项目","课程","目标","创作"];
     const LD = ["通勤","会议","家务","杂事","等待","刷手机","娱乐","游戏","其他"];
     const q = {
-      drive:    { label:"驱动", desc:"高价值·充能", emoji:"🚀", color:"hsl(142,60%,45%)", min:0, items:[] as string[] },
-      delegate: { label:"委托", desc:"高价值·消耗", emoji:"⚡", color:"hsl(39,58%,53%)", min:0, items:[] as string[] },
-      delight:  { label:"愉悦", desc:"低价值·充能", emoji:"✨", color:"hsl(210,60%,50%)", min:0, items:[] as string[] },
-      drain:    { label:"消耗", desc:"低价值·消耗", emoji:"🔋", color:"hsl(0,65%,55%)",  min:0, items:[] as string[] },
+      drive:    { label:t("calendar.quadrant_drive_label"), desc:t("calendar.quadrant_drive_desc"), emoji:"🚀", color:"hsl(142,60%,45%)", min:0, items:[] as string[] },
+      delegate: { label:t("calendar.quadrant_delegate_label"), desc:t("calendar.quadrant_delegate_desc"), emoji:"⚡", color:"hsl(39,58%,53%)", min:0, items:[] as string[] },
+      delight:  { label:t("calendar.quadrant_delight_label"), desc:t("calendar.quadrant_delight_desc"), emoji:"✨", color:"hsl(210,60%,50%)", min:0, items:[] as string[] },
+      drain:    { label:t("calendar.quadrant_drain_label"), desc:t("calendar.quadrant_drain_desc"), emoji:"🔋", color:"hsl(0,65%,55%)",  min:0, items:[] as string[] },
     };
     const todos = view === "stats" ? selectedTodos : weekTodos;
     todos.forEach(t => {
@@ -156,7 +172,7 @@ export default function CalendarPage() {
       q[key].min += mins; q[key].items.push(t.text);
     });
     return q;
-  }, [selectedTodos, weekTodos, view]);
+  }, [selectedTodos, weekTodos, view, t]);
 
   // ── 精力×时间交叉 ──
   const energyTimeData = useMemo(() => {
@@ -210,19 +226,19 @@ export default function CalendarPage() {
           <ChevronLeft size={20} />
         </button>
         <button onClick={() => { setWeekOffset(0); setSelectedDate(todayStr); }}
-          className="text-xs px-2 py-1 bg-muted rounded-lg text-muted-foreground hover:bg-accent">本周</button>
+          className="text-xs px-2 py-1 bg-muted rounded-lg text-muted-foreground hover:bg-accent">{t("calendar.this_week")}</button>
         <button onClick={() => setWeekOffset(w => w+1)} className="touch-target text-muted-foreground hover:text-foreground rounded-xl" style={{transform:"scale(0.8)"}}>
           <ChevronRight size={20} />
         </button>
         <span className="text-sm font-serif-sc text-foreground flex-1">
-          {format(weekStart,"M月d日")} – {format(addDays(weekStart,6),"M月d日")}
+          {format(weekStart,t("calendar.date_format"))} – {format(addDays(weekStart,6),t("calendar.date_format"))}
         </span>
         {/* 视图切换 */}
         <div className="flex gap-0.5 bg-muted rounded-lg p-0.5">
           {(["calendar","stats","drip"] as const).map(v => (
             <button key={v} onClick={() => setView(v)}
               className={`text-label px-2 py-1 rounded transition ${view===v ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>
-              {v==="calendar" ? "日历" : v==="stats" ? "统计" : "矩阵"}
+              {v==="calendar" ? t("calendar.view_calendar") : v==="stats" ? t("calendar.view_stats") : t("calendar.view_drip")}
             </button>
           ))}
         </div>
@@ -245,7 +261,7 @@ export default function CalendarPage() {
             <button key={i} onClick={() => setSelectedDate(dateStr)}
               className={`flex-1 text-center py-1.5 transition ${isSelected && !isToday ? "bg-primary/10" : ""}`}>
               <div className={`text-label ${isToday ? "text-primary font-bold" : "text-muted-foreground"}`}>
-                {DAY_LABELS[day.getDay()]}
+                {t(DAY_LABEL_KEYS[day.getDay()])}
               </div>
               <div className={`text-sm font-mono-jb mx-auto w-6 h-6 flex items-center justify-center rounded-full mt-0.5
                 ${isToday ? "bg-primary text-primary-foreground font-bold" : isSelected ? "bg-primary/20 text-primary" : "text-foreground"}`}>
@@ -318,9 +334,9 @@ export default function CalendarPage() {
             {selectedEntry && (selectedEntry.emotionTags.length > 0 || selectedEntry.topicTags.length > 0 || selectedEntry.messages.length > 0) && (
               <div className="bg-card border border-gold-border rounded-xl p-3">
                 <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-caption text-muted-foreground">📖 这天的日记</p>
+                  <p className="text-caption text-muted-foreground">{t("calendar.diary_heading")}</p>
                   {selectedEntry.emotionScore > 0 && (
-                    <span className="text-label font-mono-jb text-muted-foreground">情绪 {selectedEntry.emotionScore}/10</span>
+                    <span className="text-label font-mono-jb text-muted-foreground">{t("calendar.emotion_score", { score: selectedEntry.emotionScore })}</span>
                   )}
                 </div>
                 {(selectedEntry.emotionTags.length > 0 || selectedEntry.topicTags.length > 0) && (
@@ -348,8 +364,8 @@ export default function CalendarPage() {
             {/* 选中日概览 */}
             <div>
               <p className="text-caption text-muted-foreground mb-2">
-                {selectedDate === todayStr ? "今天" : selectedDate.slice(5)} · {selectedTodos.length}个事项
-                {selectedTotalMin > 0 && ` · 共${selectedTotalMin >= 60 ? Math.round(selectedTotalMin/60)+"h" : selectedTotalMin+"m"}`}
+                {selectedDate === todayStr ? t("calendar.today") : selectedDate.slice(5)} · {t("calendar.items_count", { count: selectedTodos.length })}
+                {selectedTotalMin > 0 && ` · ${t("calendar.total_time", { time: selectedTotalMin >= 60 ? Math.round(selectedTotalMin/60)+"h" : selectedTotalMin+"m" })}`}
               </p>
               {selectedCategoryData.length > 0 ? (
                 <div className="flex gap-3 items-center bg-card border border-border rounded-xl p-3">
@@ -366,7 +382,7 @@ export default function CalendarPage() {
                     {selectedCategoryData.slice(0,4).map((c,i) => (
                       <div key={c.name} className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background:COLORS[i%COLORS.length] }} />
-                        <span className="text-caption text-muted-foreground flex-1">{c.name}</span>
+                        <span className="text-caption text-muted-foreground flex-1">{t(CATEGORY_LABEL_KEYS[c.name] || c.name)}</span>
                         <span className="text-caption font-mono-jb text-foreground">
                           {c.value>=60 ? Math.round(c.value/60)+"h" : c.value+"m"}
                         </span>
@@ -381,11 +397,11 @@ export default function CalendarPage() {
                 <div className="bg-card border border-border rounded-xl p-4 text-center">
                   <p className="text-caption text-muted-foreground">
                     {selectedEntry
-                      ? "这天写了日记，但还没有可统计的时间记录"
-                      : selectedDate === todayStr ? "今天还没有时间记录" : "这天没有数据"}
+                      ? t("calendar.no_trackable_time")
+                      : selectedDate === todayStr ? t("calendar.no_time_today") : t("calendar.no_data_day")}
                   </p>
                   <p className="text-label text-muted-foreground/60 mt-1">
-                    在主页说「今天上午开了2小时会」自动记录
+                    {t("calendar.record_hint")}
                   </p>
                 </div>
               )}
@@ -394,13 +410,13 @@ export default function CalendarPage() {
             {/* 本周汇总 */}
             <div>
               <p className="text-caption text-muted-foreground mb-2">
-                本周合计 · {weekTotalMin>=60 ? Math.round(weekTotalMin/60)+"h" : weekTotalMin+"m"}
+                {t("calendar.week_total")} · {weekTotalMin>=60 ? Math.round(weekTotalMin/60)+"h" : weekTotalMin+"m"}
               </p>
               <div className="flex gap-1.5 flex-wrap">
                 {weekCategoryData.map((c,i) => (
                   <div key={c.name} className="flex items-center gap-1.5 bg-card border border-border rounded-xl px-2.5 py-1.5">
                     <span className="w-2 h-2 rounded-full" style={{background:COLORS[i%COLORS.length]}} />
-                    <span className="text-caption text-foreground">{c.name}</span>
+                    <span className="text-caption text-foreground">{t(CATEGORY_LABEL_KEYS[c.name] || c.name)}</span>
                     <span className="text-label font-mono-jb text-muted-foreground">
                       {c.value>=60 ? Math.round(c.value/60)+"h" : c.value+"m"}
                     </span>
@@ -412,22 +428,22 @@ export default function CalendarPage() {
             {/* 精力×时间交叉分析 */}
             {energyTimeData.some(d => d.energy > 0) && (
               <div>
-                <p className="text-caption text-muted-foreground mb-2">精力 × 效率交叉分析</p>
+                <p className="text-caption text-muted-foreground mb-2">{t("calendar.energy_efficiency_title")}</p>
                 <div className="bg-card border border-border rounded-xl p-3">
                   <ResponsiveContainer width="100%" height={100}>
                     <AreaChart data={energyTimeData} margin={{top:4,right:4,bottom:0,left:-20}}>
                       <XAxis dataKey="date" tick={{fontSize:10}} axisLine={false} tickLine={false} />
                       <YAxis tick={false} axisLine={false} tickLine={false} />
                       <Tooltip formatter={(v:any, name:string) => [
-                        name==="energy" ? ["低","中","高"][v-1]||"无" : v,
-                        name==="energy" ? "精力" : "完成数"
+                        name==="energy" ? [t("calendar.level_low"),t("calendar.level_mid"),t("calendar.level_high")][v-1]||t("calendar.level_none") : v,
+                        name==="energy" ? t("calendar.metric_energy") : t("calendar.metric_done")
                       ]} />
                       <Area type="monotone" dataKey="energy" stroke="hsl(39,58%,53%)" fill="hsl(39,58%,53%,0.2)" strokeWidth={2} />
                       <Area type="monotone" dataKey="done" stroke="hsl(152,41%,49%)" fill="hsl(152,41%,49%,0.15)" strokeWidth={2} />
                     </AreaChart>
                   </ResponsiveContainer>
                   <p className="text-label text-muted-foreground text-center mt-1">
-                    🟡精力趋势 🟢完成数量 — 高精力时多做重要事
+                    {t("calendar.energy_chart_caption")}
                   </p>
                 </div>
               </div>
@@ -436,7 +452,7 @@ export default function CalendarPage() {
             {/* 习惯完成率 */}
             {habitStats && habitStats.length > 0 && (
               <div>
-                <p className="text-caption text-muted-foreground mb-2">本周习惯完成率</p>
+                <p className="text-caption text-muted-foreground mb-2">{t("calendar.habit_completion_title")}</p>
                 <div className="bg-card border border-border rounded-xl p-3 space-y-2">
                   {habitStats.map(h => (
                     <div key={h.name} className="flex items-center gap-2">
@@ -460,9 +476,9 @@ export default function CalendarPage() {
         {view === "drip" && (
           <div className="px-4 py-3 space-y-3 pb-6">
             <div className="flex items-center justify-between">
-              <p className="text-caption text-muted-foreground">时间价值矩阵 — 本周</p>
+              <p className="text-caption text-muted-foreground">{t("calendar.drip_title")}</p>
               <div className="flex gap-1">
-                <button onClick={() => setView("stats")} className="text-label px-2 py-1 bg-muted rounded text-muted-foreground hover:text-foreground">切换到统计</button>
+                <button onClick={() => setView("stats")} className="text-label px-2 py-1 bg-muted rounded text-muted-foreground hover:text-foreground">{t("calendar.switch_to_stats")}</button>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -479,18 +495,16 @@ export default function CalendarPage() {
                     <div className="text-label text-muted-foreground mb-1">{q.desc}</div>
                     <div className="text-label text-muted-foreground">
                       {q.min>=60 ? Math.round(q.min/60)+"h" : q.min+"m"}
-                      {q.items.length > 0 && ` · ${q.items.slice(0,2).join("、")}${q.items.length>2?"…":""}`}
+                      {q.items.length > 0 && ` · ${q.items.slice(0,2).join(t("calendar.list_separator"))}${q.items.length>2?"…":""}`}
                     </div>
                   </div>
                 );
               })}
             </div>
             <div className="bg-card border border-border rounded-xl p-3">
-              <p className="text-caption text-muted-foreground mb-1">解读</p>
+              <p className="text-caption text-muted-foreground mb-1">{t("calendar.interpretation_title")}</p>
               <p className="text-caption text-foreground leading-relaxed">
-                🚀驱动区时间多 = 你在做最有意义的事 ·
-                🔋消耗区占比高 = 考虑委托或减少无意义事项 ·
-                ✨愉悦区适量即可，过多影响成长
+                {t("calendar.drip_interpretation")}
               </p>
             </div>
           </div>
@@ -501,9 +515,9 @@ export default function CalendarPage() {
       {/* ── 底部提示 ── */}
       <div className="px-4 py-2 border-t border-border flex-shrink-0 flex items-center justify-between">
         <p className="text-label text-muted-foreground">
-          {view==="calendar" ? "点击日期查看统计 · 🟡记录 🔵安排 🟢完成"
-           : view==="stats" ? "统计来自待办计时和对话时间块"
-           : "DRIP矩阵帮你看时间花在了哪个象限"}
+          {view==="calendar" ? t("calendar.hint_calendar")
+           : view==="stats" ? t("calendar.hint_stats")
+           : t("calendar.hint_drip")}
         </p>
         <span className="text-label text-muted-foreground font-mono-jb">{format(new Date(),"HH:mm")}</span>
       </div>

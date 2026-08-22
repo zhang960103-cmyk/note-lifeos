@@ -2,9 +2,11 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, X, MessageCircle, CheckSquare } from "lucide-react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function GlobalSearch({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { entries, allTodos } = useLifeOs();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,22 +53,22 @@ export default function GlobalSearch({ onClose }: { onClose: () => void }) {
           ref={inputRef}
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="搜索日记、待办..."
+          placeholder={t("global_search.placeholder")}
           className="flex-1 bg-transparent text-sm text-foreground focus:outline-none"
         />
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label={t("common.close")}>
           <X size={16} />
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
         {query.trim().length < 2 && (
-          <p className="text-xs text-muted-foreground text-center py-8">输入至少 2 个字符开始搜索</p>
+          <p className="text-xs text-muted-foreground text-center py-8">{t("global_search.hint")}</p>
         )}
 
         {results.messages.length > 0 && (
           <div>
-            <p className="text-[10px] text-gold font-mono-jb mb-2">💬 日记 ({results.messages.length})</p>
+            <p className="text-[10px] text-gold font-mono-jb mb-2">💬 {t("global_search.journal_section")} ({results.messages.length})</p>
             <div className="space-y-1.5">
               {results.messages.map((m, i) => (
                 <button
@@ -77,7 +79,7 @@ export default function GlobalSearch({ onClose }: { onClose: () => void }) {
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <MessageCircle size={10} className="text-muted-foreground" />
                     <span className="text-[9px] text-muted-foreground font-mono-jb">{m.date}</span>
-                    <span className="text-[9px] text-muted-foreground">{m.role === "user" ? "我" : "罗盘"}</span>
+                    <span className="text-[9px] text-muted-foreground">{m.role === "user" ? t("global_search.role_me") : t("global_search.role_compass")}</span>
                   </div>
                   <p className="text-xs text-foreground leading-[1.6]">{highlight(m.content)}</p>
                 </button>
@@ -88,7 +90,7 @@ export default function GlobalSearch({ onClose }: { onClose: () => void }) {
 
         {results.todos.length > 0 && (
           <div>
-            <p className="text-[10px] text-gold font-mono-jb mb-2">✅ 待办 ({results.todos.length})</p>
+            <p className="text-[10px] text-gold font-mono-jb mb-2">✅ {t("global_search.todos_section")} ({results.todos.length})</p>
             <div className="space-y-1.5">
               {results.todos.map(todo => (
                 <button
@@ -108,7 +110,7 @@ export default function GlobalSearch({ onClose }: { onClose: () => void }) {
         )}
 
         {query.trim().length >= 2 && results.messages.length === 0 && results.todos.length === 0 && (
-          <p className="text-xs text-muted-foreground text-center py-8">没有找到「{query}」相关结果</p>
+          <p className="text-xs text-muted-foreground text-center py-8">{t("global_search.no_results", { query })}</p>
         )}
       </div>
     </div>

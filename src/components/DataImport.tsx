@@ -3,6 +3,11 @@ import { Upload, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/contexts/LanguageContext";
+
+// importBackup() runs outside any component, so it can't call the useLanguage()
+// hook directly — it takes a `t` function passed in from the caller instead.
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -39,9 +44,10 @@ function pickDate(v: unknown): string {
 
 async function importBackup(
   json: Record<string, unknown>,
-  userId: string
+  userId: string,
+  t: TFunc
 ): Promise<ImportResult> {
-  if (!supabase) throw new Error("Supabase 未配置");
+  if (!supabase) throw new Error(t("data_import.error.supabase_not_configured"));
 
   const entries        = safeArray<any>(json.entries);
   const topTodos       = safeArray<any>(json.todos);
@@ -62,7 +68,7 @@ async function importBackup(
   // 从一开始就是"缺了按默认值处理"的宽松写法，所以版本1也能正常读，不阻断导入）
   const schemaVersion = typeof json.schemaVersion === "number" ? json.schemaVersion : 1;
   if (schemaVersion > MAX_KNOWN_SCHEMA_VERSION) {
-    warn("version", `这份备份的格式版本(${schemaVersion})比当前App认识的版本(${MAX_KNOWN_SCHEMA_VERSION})更新，可能来自更新的App版本导出——已尝试按已知字段导入，但新增的字段可能不会被识别，建议更新App后再导入`);
+    warn("version", t("data_import.warning.version_newer", { version: schemaVersion, maxVersion: MAX_KNOWN_SCHEMA_VERSION }));
   }
 
   // 确保 profile 存在
@@ -199,10 +205,10 @@ async function importBackup(
         localStorage.setItem(targetKey, rawVal);
         counts.localExtras++;
       } else {
-        warn("local_extras", `本设备已有 ${prefix}数据，跳过导入以免覆盖`);
+        warn("local_extras", t("data_import.warning.local_extras_skip", { prefix }));
       }
     } catch (e: any) {
-      warn("local_extras", e?.message || "写入本地数据失败");
+      warn("local_extras", e?.message || t("data_import.error.local_write_failed"));
     }
   }
 
@@ -246,6 +252,7 @@ type Status = "idle" | "reading" | "importing" | "done" | "error";
 
 export default function DataImport() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [status,  setStatus]  = useState<Status>("idle");
@@ -263,15 +270,15 @@ export default function DataImport() {
       const json = JSON.parse(text) as Record<string, unknown>;
 
       if (!json.entries && !json.todos && !json.habits) {
-        throw new Error("不是有效的 LifeOS 备份（缺少 entries / todos / habits）");
+        throw new Error(t("data_import.error.invalid_backup"));
       }
 
       setStatus("importing");
-      const res = await importBackup(json, user.id);
+      const res = await importBackup(json, user.id, t);
       setResult(res);
       setStatus(res.warnings.length > 0 ? "error" : "done");
     } catch (err: any) {
-      setErrMsg(err?.message ?? "未知错误");
+      setErrMsg(err?.message ?? t("data_import.error.unknown"));
       setStatus("error");
     } finally {
       if (fileRef.current) fileRef.current.value = "";
@@ -280,9 +287,9 @@ export default function DataImport() {
 
   const isLoading = status === "reading" || status === "importing";
   const label =
-    status === "reading"   ? "读取文件…" :
-    status === "importing" ? "正在导入…" :
-    "导入 JSON 备份";
+    status === "reading"   ? t("data_import.button.reading") :
+    status === "importing" ? t("data_import.button.importing") :
+    t("data_import.button.select_file");
 
   return (
     <div className="space-y-1">
@@ -308,12 +315,14 @@ export default function DataImport() {
       {status === "done" && result && (
         <div className="mx-4 mb-2 rounded-md bg-green-500/10 border border-green-500/30 p-3 text-xs space-y-1">
           <p className="flex items-center gap-1.5 font-medium text-green-600">
-            <CheckCircle size={13} /> 导入成功
+            <CheckCircle size={13} /> {t("data_import.success")}
           </p>
           <p className="text-muted-foreground">
-            日记 {result.day} · 消息 {result.msg} · 待办 {result.todo} ·
-            财务 {result.finance} · 习惯 {result.habit} · 能量 {result.energy} · 车轮 {result.wheel}
-            {result.localExtras > 0 && ` · 本地数据(预算/订阅等) ${result.localExtras}`}
+            {t("data_import.summary", {
+              day: result.day, msg: result.msg, todo: result.todo,
+              finance: result.finance, habit: result.habit, energy: result.energy, wheel: result.wheel,
+            })}
+            {result.localExtras > 0 && ` · ${t("data_import.summary.local_extras_suffix", { count: result.localExtras })}`}
           </p>
         </div>
       )}
@@ -321,14 +330,16 @@ export default function DataImport() {
       {status === "error" && result && (
         <div className="mx-4 mb-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 p-3 text-xs space-y-1">
           <p className="flex items-center gap-1.5 font-medium text-yellow-600">
-            <AlertTriangle size={13} /> 部分成功，{result.warnings.length} 个警告
+            <AlertTriangle size={13} /> {t("data_import.partial_success", { count: result.warnings.length })}
           </p>
           <p className="text-muted-foreground">
-            日记 {result.day} · 消息 {result.msg} · 待办 {result.todo} ·
-            财务 {result.finance} · 习惯 {result.habit} · 能量 {result.energy}
+            {t("data_import.summary_partial", {
+              day: result.day, msg: result.msg, todo: result.todo,
+              finance: result.finance, habit: result.habit, energy: result.energy,
+            })}
           </p>
           <details className="mt-1">
-            <summary className="cursor-pointer text-muted-foreground">查看详情</summary>
+            <summary className="cursor-pointer text-muted-foreground">{t("data_import.view_details")}</summary>
             <ul className="mt-1 space-y-0.5 font-mono text-[10px] text-destructive">
               {result.warnings.map((w, i) => <li key={i}>{w}</li>)}
             </ul>
@@ -339,7 +350,7 @@ export default function DataImport() {
       {status === "error" && !result && errMsg && (
         <div className="mx-4 mb-2 rounded-md bg-destructive/10 border border-destructive/30 p-3 text-xs">
           <p className="flex items-center gap-1.5 font-medium text-destructive">
-            <AlertTriangle size={13} /> 导入失败
+            <AlertTriangle size={13} /> {t("data_import.fail")}
           </p>
           <p className="text-muted-foreground mt-1">{errMsg}</p>
         </div>
@@ -354,6 +365,7 @@ export default function DataImport() {
 
 export function FinanceCsvImport({ onImported }: { onImported?: (count: number) => void }) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const csvRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [count, setCount] = useState(0);
@@ -463,7 +475,7 @@ export function FinanceCsvImport({ onImported }: { onImported?: (count: number) 
       else if (detectWechat(rows)) records = parseWechat(rows);
       else records = parseGeneric(rows);
 
-      if (records.length === 0) throw new Error("未能识别CSV格式，请确认有date/amount/type列，或使用支付宝/微信账单格式");
+      if (records.length === 0) throw new Error(t("data_import.error.csv_format_unrecognized"));
 
       // Batch insert to Supabase
       const toInsert = records.map(r => ({
@@ -494,7 +506,7 @@ export function FinanceCsvImport({ onImported }: { onImported?: (count: number) 
       setStatus("done");
       onImported?.(imported);
     } catch (err: any) {
-      setErrMsg(err?.message ?? "解析失败");
+      setErrMsg(err?.message ?? t("data_import.error.csv_parse_failed"));
       setStatus("error");
     } finally {
       if (csvRef.current) csvRef.current.value = "";
@@ -514,20 +526,20 @@ export function FinanceCsvImport({ onImported }: { onImported?: (count: number) 
           : <Upload size={14} className="text-muted-foreground" />}
         <div className="flex-1">
           <span className="text-xs text-foreground block">
-            {status === "loading" ? "导入中…" : "导入账单 CSV"}
+            {status === "loading" ? t("data_import.button.csv_importing") : t("data_import.button.select_csv")}
           </span>
-          <span className="text-[9px] text-muted-foreground">支持支付宝/微信账单/自定义格式</span>
+          <span className="text-[9px] text-muted-foreground">{t("data_import.csv_hint")}</span>
         </div>
       </button>
       {status === "done" && failCount === 0 && (
         <div className="mx-4 mb-2 rounded-md bg-green-500/10 border border-green-500/30 p-3 text-xs">
-          <p className="text-green-600 flex items-center gap-1.5"><CheckCircle size={13} /> 成功导入 {count} 条账单</p>
+          <p className="text-green-600 flex items-center gap-1.5"><CheckCircle size={13} /> {t("data_import.csv_success", { count })}</p>
         </div>
       )}
       {status === "done" && failCount > 0 && (
         <div className="mx-4 mb-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 p-3 text-xs">
-          <p className="text-yellow-600 flex items-center gap-1.5"><AlertTriangle size={13} /> 成功 {count} 条，失败 {failCount} 条</p>
-          <p className="text-muted-foreground mt-1">已有的账单记录不受影响，失败的部分可以重新导出CSV再试一次</p>
+          <p className="text-yellow-600 flex items-center gap-1.5"><AlertTriangle size={13} /> {t("data_import.csv_partial", { count, failCount })}</p>
+          <p className="text-muted-foreground mt-1">{t("data_import.csv_partial_hint")}</p>
         </div>
       )}
       {status === "error" && (

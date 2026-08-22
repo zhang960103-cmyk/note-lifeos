@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ChevronLeft, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import * as THREE from "three";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Place {
   id: string; name: string; lat: number; lng: number;
@@ -24,6 +25,7 @@ interface Place {
 
 export default function MapPage() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { user } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<any>({});
@@ -119,7 +121,7 @@ export default function MapPage() {
       animate();
     } catch (e: any) {
       console.error("[MapPage] 地球组件初始化失败:", e);
-      setGlobeError(e?.message || "地球组件加载失败，请刷新重试");
+      setGlobeError(e?.message || t("map.globe_error_fallback"));
     }
 
     return () => { cancelAnimationFrame(raf); };
@@ -152,8 +154,8 @@ export default function MapPage() {
     // 地球上位置错乱(NaN参与球面坐标计算)且没有任何提示。
     const lat = parseFloat(newPlace.lat);
     const lng = parseFloat(newPlace.lng);
-    if (Number.isNaN(lat) || lat < -90 || lat > 90) { toast.error("纬度需要是 -90 到 90 之间的数字"); return; }
-    if (Number.isNaN(lng) || lng < -180 || lng > 180) { toast.error("经度需要是 -180 到 180 之间的数字"); return; }
+    if (Number.isNaN(lat) || lat < -90 || lat > 90) { toast.error(t("map.error_lat_range")); return; }
+    if (Number.isNaN(lng) || lng < -180 || lng > 180) { toast.error(t("map.error_lng_range")); return; }
     setSaving(true);
     const row = { user_id: user.id, name: newPlace.name, lat, lng, emoji: newPlace.emoji, note: newPlace.note, visited_at: new Date().toISOString() };
     const { data, error } = await supabase.from("user_places").insert(row).select().single();
@@ -161,7 +163,7 @@ export default function MapPage() {
     // 地点已经加上了，实际上云端和地球上都没有这个点。
     if (error) {
       console.error("[MapPage] 添加地点失败:", error);
-      toast.error("添加失败，请重试");
+      toast.error(t("map.error_add_failed"));
       setSaving(false);
       return;
     }
@@ -177,7 +179,7 @@ export default function MapPage() {
           <button onClick={() => navigate(-1)} className="touch-target text-white/70 hover:text-white rounded-xl" style={{transform:"scale(0.85)"}}>
             <ChevronLeft size={22} />
           </button>
-          <h1 className="font-serif-sc text-base text-white">我去过的地方</h1>
+          <h1 className="font-serif-sc text-base text-white">{t("map.title")}</h1>
           <span className="text-caption text-white/40 ml-1">({places.length})</span>
         </div>
         <button onClick={() => setShowAdd(true)} className="touch-target text-gold hover:bg-gold/10 rounded-xl" style={{transform:"scale(0.85)"}}>
@@ -194,18 +196,18 @@ export default function MapPage() {
               onClick={() => { setGlobeError(null); window.location.reload(); }}
               className="text-caption text-gold border border-gold/30 rounded-full px-4 py-1.5 hover:bg-gold/10"
             >
-              重新加载
+              {t("map.reload")}
             </button>
           </div>
         ) : (
-          <p className="absolute bottom-20 left-1/2 -translate-x-1/2 text-label text-white/30 pointer-events-none">拖动旋转 · 金色圆点为已去过的地方</p>
+          <p className="absolute bottom-20 left-1/2 -translate-x-1/2 text-label text-white/30 pointer-events-none">{t("map.hint_rotate")}</p>
         )}
       </div>
 
       <div className="border-t border-border/30 bg-black/60 backdrop-blur-sm">
         <div className="flex gap-2 px-4 py-2 overflow-x-auto scrollbar-none">
           {places.length === 0 ? (
-            <p className="text-caption text-white/40 py-1">点击 + 添加你去过的地方</p>
+            <p className="text-caption text-white/40 py-1">{t("map.empty_places")}</p>
           ) : places.slice(0, 10).map(p => (
             <button key={p.id} onClick={() => setSelected(p)}
               className="flex-shrink-0 flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-xl px-3 py-1.5 hover:bg-white/20 transition">
@@ -237,21 +239,21 @@ export default function MapPage() {
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
           <div className="w-full max-w-[600px] mx-auto bg-surface-1 rounded-t-2xl p-5">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-semibold font-serif-sc text-foreground">添加地点</p>
+              <p className="text-sm font-semibold font-serif-sc text-foreground">{t("map.add_place_title")}</p>
               <button onClick={() => setShowAdd(false)} className="text-muted-foreground"><X size={16} /></button>
             </div>
             <div className="space-y-3">
               <div className="flex gap-2">
                 <input value={newPlace.emoji} onChange={e => setNewPlace(p => ({...p, emoji: e.target.value}))} className="w-14 bg-surface-2 border border-border rounded-xl text-center text-xl focus:outline-none" maxLength={2} />
-                <input value={newPlace.name} onChange={e => setNewPlace(p => ({...p, name: e.target.value}))} placeholder="地点名称" className="flex-1 bg-surface-2 border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary" />
+                <input value={newPlace.name} onChange={e => setNewPlace(p => ({...p, name: e.target.value}))} placeholder={t("map.name_placeholder")} className="flex-1 bg-surface-2 border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary" />
               </div>
               <div className="flex gap-2">
-                <input value={newPlace.lat} onChange={e => setNewPlace(p => ({...p, lat: e.target.value}))} placeholder="纬度 (如 39.9)" className="flex-1 bg-surface-2 border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary" />
-                <input value={newPlace.lng} onChange={e => setNewPlace(p => ({...p, lng: e.target.value}))} placeholder="经度 (如 116.4)" className="flex-1 bg-surface-2 border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary" />
+                <input value={newPlace.lat} onChange={e => setNewPlace(p => ({...p, lat: e.target.value}))} placeholder={t("map.lat_placeholder")} className="flex-1 bg-surface-2 border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary" />
+                <input value={newPlace.lng} onChange={e => setNewPlace(p => ({...p, lng: e.target.value}))} placeholder={t("map.lng_placeholder")} className="flex-1 bg-surface-2 border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary" />
               </div>
-              <input value={newPlace.note} onChange={e => setNewPlace(p => ({...p, note: e.target.value}))} placeholder="备注（选填）" className="w-full bg-surface-2 border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary" />
+              <input value={newPlace.note} onChange={e => setNewPlace(p => ({...p, note: e.target.value}))} placeholder={t("map.note_placeholder")} className="w-full bg-surface-2 border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary" />
               <button onClick={addPlace} disabled={saving || !newPlace.name || !newPlace.lat} className="w-full py-3 bg-primary text-primary-foreground rounded-xl text-sm font-medium disabled:opacity-30">
-                {saving ? "保存中…" : "添加到地图"}
+                {saving ? t("map.saving") : t("map.add_to_map")}
               </button>
             </div>
           </div>

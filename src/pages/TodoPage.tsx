@@ -23,6 +23,17 @@ const PRIORITY_KEYS: Record<string, { labelKey: string; dot: string; ring: strin
 };
 const getPriority = (p: string) => PRIORITY_KEYS[p] ?? PRIORITY_KEYS["normal"];
 
+// Tags are stored/matched internally as Chinese literals (e.g. from PLAN_TEMPLATES) —
+// this is a display-only lookup for rendering, mirroring CalendarPage's CATEGORY_LABEL_KEYS.
+const TAG_LABEL_KEYS: Record<string, string> = {
+  "工作": "calendar.category_work",
+  "学习": "calendar.category_study",
+  "运动": "calendar.category_exercise",
+  "生活": "calendar.category_life",
+  "娱乐": "calendar.category_entertainment",
+  "休息": "todo.tag.rest",
+};
+
 type ViewMode = "list" | "matrix" | "timeline";
 
 const TodoPage = () => {
@@ -73,7 +84,7 @@ const TodoPage = () => {
         setPomodoroTime(prev => {
           if (prev <= 1) {
             setPomodoroRunning(false);
-            if (Notification.permission === "granted") new Notification("🍅 番茄钟结束！", { body: "休息5分钟吧" });
+            if (Notification.permission === "granted") new Notification(t("todo.pomodoro.done_title"), { body: t("todo.pomodoro.done_body") });
             return 0;
           }
           return prev - 1;
@@ -81,7 +92,7 @@ const TodoPage = () => {
       }, 1000);
     }
     return () => { if (pomodoroRef.current) clearInterval(pomodoroRef.current); };
-  }, [pomodoroRunning, pomodoroTime]);
+  }, [pomodoroRunning, pomodoroTime, t]);
 
   // Time tracking timer
   useEffect(() => {
@@ -196,9 +207,10 @@ const TodoPage = () => {
 
   // Week days for habits
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekDayKeys = ["calendar.day_mon", "calendar.day_tue", "calendar.day_wed", "calendar.day_thu", "calendar.day_fri", "calendar.day_sat", "calendar.day_sun"];
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = addDays(weekStart, i);
-    return { date: format(d, "yyyy-MM-dd"), label: ["一", "二", "三", "四", "五", "六", "日"][i], isToday: isToday(d) };
+    return { date: format(d, "yyyy-MM-dd"), label: t(weekDayKeys[i]), isToday: isToday(d) };
   });
 
   // Pomodoro overlay
@@ -236,15 +248,15 @@ const TodoPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
         <div>
-          <h1 className="font-serif-sc text-lg text-foreground">待办</h1>
-          {streak > 0 && <p className="text-[10px] text-muted-foreground flex items-center gap-1"><Flame size={10} className="text-primary" />{streak}天连续完成</p>}
+          <h1 className="font-serif-sc text-lg text-foreground">{t("tab.todo")}</h1>
+          {streak > 0 && <p className="text-[10px] text-muted-foreground flex items-center gap-1"><Flame size={10} className="text-primary" />{t("todo.streak", { days: streak })}</p>}
         </div>
         <div className="flex items-center gap-1.5">
           <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
             {([
-              { key: "list" as const, icon: <List size={14} />, label: "列表" },
-              { key: "matrix" as const, icon: <LayoutGrid size={14} />, label: "矩阵" },
-              { key: "timeline" as const, icon: <CalendarClock size={14} />, label: "时间线" },
+              { key: "list" as const, icon: <List size={14} />, label: t("todo.view.list") },
+              { key: "matrix" as const, icon: <LayoutGrid size={14} />, label: t("todo.view.matrix") },
+              { key: "timeline" as const, icon: <CalendarClock size={14} />, label: t("todo.view.timeline") },
             ]).map(v => (
               <button key={v.key} onClick={() => setView(v.key)}
                 className={`p-1.5 rounded-md transition text-xs flex items-center gap-1 ${view === v.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
@@ -266,9 +278,9 @@ const TodoPage = () => {
           <span className="text-xs font-mono text-primary">{stats.rate}%</span>
         </div>
         <div className="flex gap-4 text-[10px] text-muted-foreground">
-          <span>{stats.todo} 待办</span>
-          <span className="text-los-orange">{stats.doing} 进行</span>
-          <span className="text-primary">{stats.done} 完成</span>
+          <span>{stats.todo} {t("tab.todo")}</span>
+          <span className="text-los-orange">{stats.doing} {t("todo.stats.doing")}</span>
+          <span className="text-primary">{stats.done} {t("todo.action.complete")}</span>
         </div>
       </div>
 
@@ -276,11 +288,11 @@ const TodoPage = () => {
       <div className="px-4 flex gap-2 mb-3 overflow-x-auto scrollbar-none">
         <button onClick={() => setShowHabits(!showHabits)}
           className={`text-[11px] px-3 py-1.5 rounded-full border transition flex items-center gap-1 flex-shrink-0 ${showHabits ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
-          <Zap size={12} /> 习惯
+          <Zap size={12} /> {t("todo.habits")}
         </button>
         <button onClick={() => setShowTemplates(!showTemplates)}
           className={`text-[11px] px-3 py-1.5 rounded-full border transition flex items-center gap-1 flex-shrink-0 ${showTemplates ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
-          <Calendar size={12} /> 模板
+          <Calendar size={12} /> {t("todo.templates")}
         </button>
         {/* Project filter pills */}
         {activeProjects.map(p => {
@@ -298,7 +310,7 @@ const TodoPage = () => {
         {activeProjects.length > 0 && (
           <button onClick={() => navigate("/projects")}
             className="text-[11px] px-3 py-1.5 rounded-full border border-border text-muted-foreground hover:text-foreground transition flex items-center gap-1 flex-shrink-0">
-            <Folder size={12} /> 管理
+            <Folder size={12} /> {t("todo.projects_manage")}
           </button>
         )}
       </div>
@@ -308,7 +320,7 @@ const TodoPage = () => {
         <div className="px-4 mb-3 animate-in fade-in slide-in-from-top-2">
           <div className="bg-card border border-border rounded-xl p-3 space-y-2">
             {habits.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-2">还没有习惯，点击添加</p>
+              <p className="text-xs text-muted-foreground text-center py-2">{t("todo.habit.empty")}</p>
             ) : habits.map(habit => (
               <div key={habit.id} className="flex items-center gap-2">
                 <span className="text-sm">{habit.emoji}</span>
@@ -332,14 +344,14 @@ const TodoPage = () => {
                 <select value={habitEmoji} onChange={e => setHabitEmoji(e.target.value)} className="bg-muted border border-border rounded-lg px-2 py-1 text-sm">
                   {["💪", "📚", "🏃", "💧", "🧘", "✍️", "🎯", "😴"].map(e => <option key={e} value={e}>{e}</option>)}
                 </select>
-                <input value={habitName} onChange={e => setHabitName(e.target.value)} placeholder="习惯名称" autoFocus
+                <input value={habitName} onChange={e => setHabitName(e.target.value)} placeholder={t("todo.habit.name")} autoFocus
                   className="flex-1 bg-muted border border-border rounded-lg px-3 py-1 text-xs text-foreground focus:outline-none focus:border-primary" />
                 <button onClick={() => {
                   if (habitName.trim()) { addHabit({ name: habitName, emoji: habitEmoji, targetDays: [1, 2, 3, 4, 5] }); setHabitName(""); setShowHabitCreate(false); }
                 }} className="text-xs bg-primary text-primary-foreground px-3 rounded-lg">+</button>
               </div>
             ) : (
-              <button onClick={() => setShowHabitCreate(true)} className="text-[10px] text-primary hover:text-primary/80 transition">+ 添加习惯</button>
+              <button onClick={() => setShowHabitCreate(true)} className="text-[10px] text-primary hover:text-primary/80 transition">+ {t("todo.habit.add")}</button>
             )}
           </div>
         </div>
@@ -358,7 +370,7 @@ const TodoPage = () => {
           <div className="space-y-2">
             {/* Doing */}
             {smartGroups.doing.length > 0 && (
-              <Section title="进行中" icon={<Play size={12} className="text-los-orange" />} count={smartGroups.doing.length}
+              <Section title={t("todo.column.doing")} icon={<Play size={12} className="text-los-orange" />} count={smartGroups.doing.length}
                 accent="border-l-los-orange" collapsed={collapsedSections.has("doing")} onToggle={() => toggleSection("doing")}>
                 {smartGroups.doing.map(todo => (
                   <TodoRow key={todo.id} todo={todo} onToggle={handleToggle} onMove={moveToStatus}
@@ -375,10 +387,10 @@ const TodoPage = () => {
               </Section>
             )}
             {/* Todo */}
-            <Section title="待办" icon={<List size={12} className="text-foreground" />} count={smartGroups.todo.length}
+            <Section title={t("todo.column.todo")} icon={<List size={12} className="text-foreground" />} count={smartGroups.todo.length}
               accent="border-l-primary" collapsed={collapsedSections.has("todo")} onToggle={() => toggleSection("todo")}>
               {smartGroups.todo.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">暂无待办 🎉 和罗盘聊聊或手动添加</p>
+                <p className="text-xs text-muted-foreground text-center py-4">{t("todo.empty.todo")}</p>
               ) : smartGroups.todo.map(todo => (
                 <TodoRow key={todo.id} todo={todo} onToggle={handleToggle} onMove={moveToStatus}
                   expanded={expandedId === todo.id} onExpand={() => setExpandedId(expandedId === todo.id ? null : todo.id)}
@@ -394,7 +406,7 @@ const TodoPage = () => {
             </Section>
             {/* Done */}
             {smartGroups.done.length > 0 && (
-              <Section title="已完成" icon={<Check size={12} className="text-primary" />} count={smartGroups.done.length}
+              <Section title={t("todo.column.done")} icon={<Check size={12} className="text-primary" />} count={smartGroups.done.length}
                 accent="border-l-primary/40" collapsed={collapsedSections.has("done")} onToggle={() => toggleSection("done")}>
                 {smartGroups.done.map(todo => (
                   <TodoRow key={todo.id} todo={todo} onToggle={handleToggle} onMove={moveToStatus}
@@ -418,7 +430,7 @@ const TodoPage = () => {
                 <p className="text-[8px] text-muted-foreground mb-2">{q.sub}</p>
                 <div className="space-y-1">
                   {q.items.length === 0 ? (
-                    <p className="text-[9px] text-muted-foreground/40">空</p>
+                    <p className="text-[9px] text-muted-foreground/40">{t("todo.matrix.empty")}</p>
                   ) : q.items.slice(0, 5).map(t => (
                     <div key={t.id} className="flex items-center gap-1.5">
                       <button onClick={() => handleToggle(t)} className="flex-shrink-0 p-2 -m-2">
@@ -449,7 +461,7 @@ const TodoPage = () => {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm font-mono text-primary">{fmtTime(trackingElapsed)}</span>
-            <button onClick={stopTracking} className="text-[10px] bg-muted text-muted-foreground px-2 py-1 rounded-lg hover:text-foreground">停止</button>
+            <button onClick={stopTracking} className="text-[10px] bg-muted text-muted-foreground px-2 py-1 rounded-lg hover:text-foreground">{t("todo.tracking.stop")}</button>
           </div>
         </div>
       )}
@@ -466,10 +478,10 @@ const TodoPage = () => {
           <div className="fixed inset-0 bg-black/30" onClick={() => setShowAdd(false)} />
           <div className="relative w-full bg-background border-t border-border rounded-t-2xl p-4 animate-in slide-in-from-bottom z-50">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-foreground">新建待办</span>
+              <span className="text-sm font-medium text-foreground">{t("todo.add.title")}</span>
               <button onClick={() => setShowAdd(false)}><X size={16} className="text-muted-foreground" /></button>
             </div>
-            <input value={newText} onChange={e => setNewText(e.target.value)} placeholder="输入任务内容..." autoFocus
+            <input value={newText} onChange={e => setNewText(e.target.value)} placeholder={t("todo.add.placeholder")} autoFocus
               onKeyDown={e => { if (e.key === "Enter") handleAddTodo(); }}
               className="w-full bg-muted border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary mb-3" />
             <div className="flex gap-1.5 mb-3">
@@ -483,7 +495,7 @@ const TodoPage = () => {
             </div>
             <button onClick={handleAddTodo} disabled={!newText.trim()}
               className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl text-sm disabled:opacity-30 transition">
-              添加
+              {t("todo.add.submit")}
             </button>
           </div>
         </div>
@@ -534,14 +546,14 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
       if (data.subTasks?.length) {
         onUpdate({ subTasks: [...(todo.subTasks || []), ...data.subTasks.map((s: any) => ({ id: crypto.randomUUID(), text: s.text, done: false }))] });
       } else {
-        toast.error("AI 没能拆出子任务，换个更具体的描述再试试", { id: "decompose-empty" });
+        toast.error(t("todo.toast.decompose_empty"), { id: "decompose-empty" });
       }
     } catch (e) {
       console.error("Decompose error:", e);
-      toast.error("拆解子任务失败，请检查网络后重试", { id: "decompose-error" });
+      toast.error(t("todo.toast.decompose_error"), { id: "decompose-error" });
     }
     setDecomposing(false);
-  }, [todo.text, todo.subTasks, onUpdate, defaultModelProfileId]);
+  }, [todo.text, todo.subTasks, onUpdate, defaultModelProfileId, t]);
 
   const prio = getPriority(todo.priority);
 
@@ -562,7 +574,7 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
           <div className="flex gap-1 mt-0.5 items-center flex-wrap">
             <span className={`w-1.5 h-1.5 rounded-full ${prio.dot}`} />
             {todo.dueDate && <span className="text-caption text-muted-foreground font-mono">{todo.dueDate.slice(5)}</span>}
-            {todo.tags?.map(tag => <span key={tag} className="text-label bg-primary/10 text-primary px-1.5 rounded">{tag}</span>)}
+            {todo.tags?.map(tag => <span key={tag} className="text-label bg-primary/10 text-primary px-1.5 rounded">{t(TAG_LABEL_KEYS[tag] || tag)}</span>)}
             {todo.subTasks?.length > 0 && <span className="text-label text-muted-foreground font-mono">{todo.subTasks.filter(s => s.done).length}/{todo.subTasks.length}</span>}
             {isTracking && trackingTime && <span className="text-caption font-mono text-primary">⏱ {trackingTime}</span>}
           </div>
@@ -570,12 +582,12 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
         {/* Quick actions - always visible */}
         <div className="flex items-center gap-0.5">
           {!isDone && !isDoing && (
-            <button onClick={() => onMove(todo, "doing")} className="p-1.5 rounded-lg hover:bg-muted transition text-muted-foreground hover:text-los-orange" title="开始">
+            <button onClick={() => onMove(todo, "doing")} className="p-1.5 rounded-lg hover:bg-muted transition text-muted-foreground hover:text-los-orange" title={t("todo.action.start")}>
               <Play size={12} />
             </button>
           )}
           {isDoing && (
-            <button onClick={() => onMove(todo, "done")} className="p-1.5 rounded-lg hover:bg-muted transition text-muted-foreground hover:text-primary" title="完成">
+            <button onClick={() => onMove(todo, "done")} className="p-1.5 rounded-lg hover:bg-muted transition text-muted-foreground hover:text-primary" title={t("todo.action.complete")}>
               <Check size={12} />
             </button>
           )}
@@ -602,21 +614,21 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
             {!isDone && (
               <>
                 <button onClick={onStartTracking} className="text-[9px] bg-muted text-muted-foreground px-2 py-1 rounded-lg flex items-center gap-1 hover:text-foreground">
-                  <Clock size={10} /> 计时
+                  <Clock size={10} /> {t("todo.action.timer")}
                 </button>
                 <button onClick={onPomodoro} className="text-[9px] bg-muted text-muted-foreground px-2 py-1 rounded-lg flex items-center gap-1 hover:text-foreground">
-                  <Timer size={10} /> 番茄钟
+                  <Timer size={10} /> {t("todo.action.pomodoro")}
                 </button>
                 <button onClick={handleDecompose} disabled={decomposing} className="text-[9px] bg-muted text-muted-foreground px-2 py-1 rounded-lg flex items-center gap-1 hover:text-primary">
-                  {decomposing ? <Loader2 size={10} className="animate-spin" /> : <Wand2 size={10} />} AI拆解
+                  {decomposing ? <Loader2 size={10} className="animate-spin" /> : <Wand2 size={10} />} {t("todo.action.decompose")}
                 </button>
               </>
             )}
             <button onClick={onEdit} className="text-[9px] bg-muted text-muted-foreground px-2 py-1 rounded-lg flex items-center gap-1 hover:text-foreground">
-              <Pencil size={10} /> 编辑
+              <Pencil size={10} /> {t("common.edit")}
             </button>
             {isDone && (
-              <button onClick={() => onMove(todo, "todo")} className="text-[9px] bg-muted text-muted-foreground px-2 py-1 rounded-lg hover:text-foreground">重新打开</button>
+              <button onClick={() => onMove(todo, "todo")} className="text-[9px] bg-muted text-muted-foreground px-2 py-1 rounded-lg hover:text-foreground">{t("todo.action.reopen")}</button>
             )}
           </div>
         </div>
@@ -637,12 +649,12 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
           </div>
           <input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)}
             className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none" />
-          <textarea value={editNote} onChange={e => setEditNote(e.target.value)} placeholder="备注" rows={2}
+          <textarea value={editNote} onChange={e => setEditNote(e.target.value)} placeholder={t("todo.note.placeholder")} rows={2}
             className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-xs text-foreground resize-none focus:outline-none" />
           <div className="flex gap-2">
             <button onClick={() => onUpdate({ text: editText, priority: editPriority, dueDate: editDueDate || undefined, note: editNote || undefined })}
-              className="flex-1 bg-primary text-primary-foreground py-1.5 rounded-lg text-xs">保存</button>
-            <button onClick={onDelete} className="px-3 py-1.5 text-xs text-destructive bg-destructive/10 rounded-lg">删除</button>
+              className="flex-1 bg-primary text-primary-foreground py-1.5 rounded-lg text-xs">{t("common.save")}</button>
+            <button onClick={onDelete} className="px-3 py-1.5 text-xs text-destructive bg-destructive/10 rounded-lg">{t("common.delete")}</button>
           </div>
         </div>
       )}
@@ -651,46 +663,57 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
 }
 
 /* Templates panel */
+// `name` is used internally as a matching/React key (see `applied === tmpl.name` below) and
+// stays a Chinese literal — display goes through TEMPLATE_LABEL_KEYS, mirroring CalendarPage's
+// CATEGORY_LABEL_KEYS pattern. Task text/tags are freshly generated content (not matched
+// against anything), so they're translated straight from their keys at apply time.
 const PLAN_TEMPLATES = [
   {
     name: "工作日", emoji: "💼",
     tasks: [
-      { text: "晨间回顾 & 计划", priority: "high" as const, tags: ["工作"], dueTime: "08:00" },
-      { text: "核心深度工作", priority: "urgent" as const, tags: ["工作"], dueTime: "09:00" },
-      { text: "午休 & 轻运动", priority: "normal" as const, tags: ["休息"], dueTime: "12:00" },
-      { text: "协作 & 会议", priority: "normal" as const, tags: ["工作"], dueTime: "14:00" },
-      { text: "总结复盘", priority: "high" as const, tags: ["学习"], dueTime: "17:00" },
+      { textKey: "todo.template.workday.task1", priority: "high" as const, tags: ["工作"], dueTime: "08:00" },
+      { textKey: "todo.template.workday.task2", priority: "urgent" as const, tags: ["工作"], dueTime: "09:00" },
+      { textKey: "todo.template.workday.task3", priority: "normal" as const, tags: ["休息"], dueTime: "12:00" },
+      { textKey: "todo.template.workday.task4", priority: "normal" as const, tags: ["工作"], dueTime: "14:00" },
+      { textKey: "todo.template.workday.task5", priority: "high" as const, tags: ["学习"], dueTime: "17:00" },
     ],
   },
   {
     name: "休息日", emoji: "🌴",
     tasks: [
-      { text: "自然醒 & 慢早餐", priority: "low" as const, tags: ["生活"], dueTime: "09:00" },
-      { text: "阅读/学习新技能", priority: "normal" as const, tags: ["学习"], dueTime: "10:00" },
-      { text: "运动健身", priority: "high" as const, tags: ["运动"], dueTime: "14:00" },
-      { text: "兴趣爱好", priority: "low" as const, tags: ["娱乐"], dueTime: "16:00" },
-      { text: "睡前复盘日记", priority: "high" as const, tags: ["学习"], dueTime: "22:00" },
+      { textKey: "todo.template.restday.task1", priority: "low" as const, tags: ["生活"], dueTime: "09:00" },
+      { textKey: "todo.template.restday.task2", priority: "normal" as const, tags: ["学习"], dueTime: "10:00" },
+      { textKey: "todo.template.restday.task3", priority: "high" as const, tags: ["运动"], dueTime: "14:00" },
+      { textKey: "todo.template.restday.task4", priority: "low" as const, tags: ["娱乐"], dueTime: "16:00" },
+      { textKey: "todo.template.restday.task5", priority: "high" as const, tags: ["学习"], dueTime: "22:00" },
     ],
   },
   {
     name: "冲刺日", emoji: "🚀",
     tasks: [
-      { text: "冥想 + 目标确认", priority: "high" as const, tags: ["工作"], dueTime: "07:00" },
-      { text: "深度工作 Block 1", priority: "urgent" as const, tags: ["工作"], dueTime: "08:00" },
-      { text: "深度工作 Block 2", priority: "urgent" as const, tags: ["工作"], dueTime: "11:30" },
-      { text: "创造性工作", priority: "high" as const, tags: ["工作"], dueTime: "15:00" },
-      { text: "复盘 & 奖励", priority: "normal" as const, tags: ["生活"], dueTime: "18:00" },
+      { textKey: "todo.template.sprintday.task1", priority: "high" as const, tags: ["工作"], dueTime: "07:00" },
+      { textKey: "todo.template.sprintday.task2", priority: "urgent" as const, tags: ["工作"], dueTime: "08:00" },
+      { textKey: "todo.template.sprintday.task3", priority: "urgent" as const, tags: ["工作"], dueTime: "11:30" },
+      { textKey: "todo.template.sprintday.task4", priority: "high" as const, tags: ["工作"], dueTime: "15:00" },
+      { textKey: "todo.template.sprintday.task5", priority: "normal" as const, tags: ["生活"], dueTime: "18:00" },
     ],
   },
 ];
 
+const TEMPLATE_LABEL_KEYS: Record<string, string> = {
+  "工作日": "todo.template.workday",
+  "休息日": "todo.template.restday",
+  "冲刺日": "todo.template.sprintday",
+};
+
 function TemplatesPanel({ addTodoToDate, todayKey }: { addTodoToDate: (d: string, t: TodoItem) => void; todayKey: string }) {
+  const { t } = useLanguage();
   const [applied, setApplied] = useState<string | null>(null);
 
   const apply = (tmpl: typeof PLAN_TEMPLATES[0]) => {
     tmpl.tasks.forEach(task => {
       addTodoToDate(todayKey, {
-        id: crypto.randomUUID(), text: task.text, status: "todo", priority: task.priority,
+        id: crypto.randomUUID(), text: t(task.textKey), status: "todo", priority: task.priority,
         tags: task.tags, subTasks: [], recur: "none", dueDate: todayKey, dueTime: task.dueTime,
         sourceDate: todayKey, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       });
@@ -701,14 +724,14 @@ function TemplatesPanel({ addTodoToDate, todayKey }: { addTodoToDate: (d: string
 
   return (
     <div className="bg-card border border-border rounded-xl p-3 space-y-2">
-      <p className="text-[10px] text-muted-foreground">一键套用模板到今天</p>
+      <p className="text-[10px] text-muted-foreground">{t("todo.template.hint")}</p>
       <div className="grid grid-cols-3 gap-1.5">
         {PLAN_TEMPLATES.map(tmpl => (
           <button key={tmpl.name} onClick={() => apply(tmpl)}
             className={`rounded-lg p-2.5 text-center transition ${applied === tmpl.name ? "bg-primary/10 border border-primary/30" : "bg-muted hover:bg-accent"}`}>
             <div className="text-xl mb-1">{tmpl.emoji}</div>
-            <div className="text-[10px] text-foreground">{tmpl.name}</div>
-            {applied === tmpl.name && <div className="text-[8px] text-primary mt-0.5">✓ 已套用</div>}
+            <div className="text-[10px] text-foreground">{t(TEMPLATE_LABEL_KEYS[tmpl.name] || tmpl.name)}</div>
+            {applied === tmpl.name && <div className="text-[8px] text-primary mt-0.5">✓ {t("todo.template.applied")}</div>}
           </button>
         ))}
       </div>
@@ -779,7 +802,7 @@ function InlineTimeline({ entries, allTodos, todayKey, updateTodo }: {
       });
     } catch (e) {
       console.error("Extract timeline error:", e);
-      toast.error("从日记提取时间线失败，请检查网络后重试", { id: "extract-timeline-error" });
+      toast.error(t("todo.toast.extract_timeline_error"), { id: "extract-timeline-error" });
     } finally { setLoading(false); setExtracted(true); }
   };
 
@@ -864,17 +887,17 @@ function InlineTimeline({ entries, allTodos, todayKey, updateTodo }: {
       {loading && (
         <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-center gap-2">
           <Loader2 size={14} className="animate-spin text-primary" />
-          <span className="text-[11px] text-muted-foreground">提取时间线…</span>
+          <span className="text-[11px] text-muted-foreground">{t("todo.timeline.extracting")}</span>
         </div>
       )}
 
       {!loading && blocks.length === 0 && (
         <div className="bg-card border border-border rounded-xl p-6 text-center space-y-2">
           <CalendarClock size={24} className="text-muted-foreground/30 mx-auto" />
-          <p className="text-xs text-muted-foreground">在首页记日记，时间线自动生成</p>
-          <p className="text-[10px] text-muted-foreground/50">或完成带时间标注的任务后这里也会显示</p>
+          <p className="text-xs text-muted-foreground">{t("todo.timeline.empty_hint1")}</p>
+          <p className="text-[10px] text-muted-foreground/50">{t("todo.timeline.empty_hint2")}</p>
           {hasMessages && (
-            <button onClick={extractTimeline} className="text-[10px] text-primary mt-1">从日记提取 →</button>
+            <button onClick={extractTimeline} className="text-[10px] text-primary mt-1">{t("todo.timeline.extract_cta")}</button>
           )}
         </div>
       )}
@@ -884,7 +907,7 @@ function InlineTimeline({ entries, allTodos, todayKey, updateTodo }: {
         <div className="bg-card border border-border rounded-xl p-3">
           <div className="flex items-center gap-2 mb-2">
             <Check size={12} className="text-primary" />
-            <span className="text-[11px] font-serif-sc text-foreground">今日已完成</span>
+            <span className="text-[11px] font-serif-sc text-foreground">{t("todo.timeline.today_completed")}</span>
           </div>
           <div className="space-y-1">
             {allTodos

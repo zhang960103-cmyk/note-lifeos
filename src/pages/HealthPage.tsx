@@ -6,6 +6,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays } from "date-fns";
 import {
@@ -43,6 +44,7 @@ const EMPTY: Omit<HealthMetrics, "date" | "source"> = {
 export default function HealthPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const today = localDateStr();
 
   const [metrics, setMetrics] = useState<HealthMetrics[]>([]);
@@ -108,7 +110,7 @@ export default function HealthPage() {
     // 表单，用户以为数据已经存了，实际云端什么都没有。
     if (error) {
       console.error("[HealthPage] 保存健康数据失败:", error);
-      toast.error("保存失败，请检查网络后重试");
+      toast.error(t("health.save_failed"));
       setSaving(false);
       return;
     }
@@ -127,7 +129,8 @@ export default function HealthPage() {
     });
   }, [metrics]);
 
-  const sourceLabel = (s: string) => s === "oura" ? "Oura Ring" : s === "strava" ? "Strava" : s === "huawei" ? "华为健康" : "手动";
+  const sourceLabel = (s: string) => s === "oura" ? "Oura Ring" : s === "strava" ? "Strava" : s === "huawei" ? t("health.source_huawei") : t("health.source_manual");
+  const energyLabel = (l: string) => l === "高" ? t("health.energy_high") : l === "低" ? t("health.energy_low") : t("health.energy_medium");
 
   return (
     <div className="flex flex-col h-full max-w-[700px] mx-auto">
@@ -137,7 +140,7 @@ export default function HealthPage() {
           <button onClick={() => navigate(-1)} className="touch-target text-muted-foreground hover:text-foreground rounded-xl" style={{transform:"scale(0.85)"}}>
             <ChevronLeft size={22} />
           </button>
-          <h1 className="font-serif-sc text-base text-foreground">健康数据</h1>
+          <h1 className="font-serif-sc text-base text-foreground">{t("health.title")}</h1>
         </div>
         <button onClick={() => setShowEdit(true)} className="touch-target text-primary hover:bg-primary/10 rounded-xl" style={{transform:"scale(0.85)"}}>
           <Plus size={20} />
@@ -149,15 +152,15 @@ export default function HealthPage() {
         {/* Today's metrics */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-caption text-muted-foreground">今日 {today}</p>
+            <p className="text-caption text-muted-foreground">{t("health.today")} {today}</p>
             {todayMetrics.source && <span className="text-label text-muted-foreground/60">{sourceLabel(todayMetrics.source)}</span>}
           </div>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { icon: <Moon size={14} className="text-los-blue" />, label: "睡眠时长", value: todayMetrics.sleepHrs ? `${todayMetrics.sleepHrs}h` : "—", sub: todayMetrics.sleepEff ? `效率${todayMetrics.sleepEff}%` : "" },
-              { icon: <Heart size={14} className="text-destructive" />, label: "HRV", value: todayMetrics.hrv || "—", sub: todayMetrics.rhr ? `静息${todayMetrics.rhr}bpm` : "" },
-              { icon: <Footprints size={14} className="text-los-green" />, label: "步数", value: todayMetrics.steps ? `${(todayMetrics.steps/1000).toFixed(1)}k` : "—", sub: todayMetrics.activeMin ? `活跃${todayMetrics.activeMin}分钟` : "" },
-              { icon: <Zap size={14} className="text-gold" />, label: "就绪度", value: todayMetrics.readinessScore || "—", sub: todayMetrics.energyLevel ? `精力${todayMetrics.energyLevel}` : "" },
+              { icon: <Moon size={14} className="text-los-blue" />, label: t("health.sleep_duration"), value: todayMetrics.sleepHrs ? `${todayMetrics.sleepHrs}h` : "—", sub: todayMetrics.sleepEff ? t("health.sleep_efficiency_sub", { value: todayMetrics.sleepEff }) : "" },
+              { icon: <Heart size={14} className="text-destructive" />, label: "HRV", value: todayMetrics.hrv || "—", sub: todayMetrics.rhr ? t("health.resting_hr_sub", { value: todayMetrics.rhr }) : "" },
+              { icon: <Footprints size={14} className="text-los-green" />, label: t("health.steps"), value: todayMetrics.steps ? `${(todayMetrics.steps/1000).toFixed(1)}k` : "—", sub: todayMetrics.activeMin ? t("health.active_min_sub", { value: todayMetrics.activeMin }) : "" },
+              { icon: <Zap size={14} className="text-gold" />, label: t("health.readiness"), value: todayMetrics.readinessScore || "—", sub: todayMetrics.energyLevel ? t("health.energy_sub", { value: energyLabel(todayMetrics.energyLevel) }) : "" },
             ].map((item, i) => (
               <div key={i} className="bg-card border border-border rounded-xl p-3">
                 <div className="flex items-center gap-1.5 mb-1">{item.icon}<span className="text-caption text-muted-foreground">{item.label}</span></div>
@@ -171,14 +174,14 @@ export default function HealthPage() {
         {/* 7-day trends */}
         {metrics.length > 0 && (
           <div>
-            <p className="text-caption text-muted-foreground mb-2">7天趋势</p>
+            <p className="text-caption text-muted-foreground mb-2">{t("health.trend_7day")}</p>
             <div className="space-y-3">
               <div className="bg-card border border-border rounded-xl p-3">
-                <p className="text-label text-muted-foreground mb-2">睡眠 (小时)</p>
+                <p className="text-label text-muted-foreground mb-2">{t("health.sleep_hours_chart")}</p>
                 <ResponsiveContainer width="100%" height={60}>
                   <AreaChart data={chartData} margin={{top:4,right:4,bottom:0,left:-20}}>
                     <XAxis dataKey="date" tick={{fontSize:9}} axisLine={false} tickLine={false} />
-                    <Tooltip formatter={(v: any) => [`${v}h`, "睡眠"]} />
+                    <Tooltip formatter={(v: any) => [`${v}h`, t("health.sleep_label")]} />
                     <Area type="monotone" dataKey="sleep" stroke="hsl(211,55%,60%)" fill="hsl(211,55%,60%,0.2)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -194,11 +197,11 @@ export default function HealthPage() {
                 </ResponsiveContainer>
               </div>
               <div className="bg-card border border-border rounded-xl p-3">
-                <p className="text-label text-muted-foreground mb-2">步数 (千步)</p>
+                <p className="text-label text-muted-foreground mb-2">{t("health.steps_chart")}</p>
                 <ResponsiveContainer width="100%" height={60}>
                   <AreaChart data={chartData} margin={{top:4,right:4,bottom:0,left:-20}}>
                     <XAxis dataKey="date" tick={{fontSize:9}} axisLine={false} tickLine={false} />
-                    <Tooltip formatter={(v: any) => [`${v}k步`, "步数"]} />
+                    <Tooltip formatter={(v: any) => [t("health.steps_chart_unit", { v }), t("health.steps")]} />
                     <Area type="monotone" dataKey="steps" stroke="hsl(152,41%,49%)" fill="hsl(152,41%,49%,0.2)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -209,14 +212,14 @@ export default function HealthPage() {
 
         {/* Data source connections */}
         <div>
-          <p className="text-caption text-muted-foreground mb-2">数据来源</p>
+          <p className="text-caption text-muted-foreground mb-2">{t("health.data_sources")}</p>
           <div className="space-y-2">
             {[
-              { id: "oura", name: "Oura Ring", desc: "睡眠评分、HRV、就绪度", color: "text-los-blue", available: true },
-              { id: "strava", name: "Strava", desc: "跑步、骑行、游泳记录", color: "text-los-orange", available: true },
-              { id: "huawei", name: "华为运动健康", desc: "导入导出CSV数据", color: "text-destructive", available: true },
-              { id: "apple", name: "Apple Health", desc: "需要 iOS 原生应用支持", color: "text-muted-foreground", available: false },
-              { id: "garmin", name: "Garmin Connect", desc: "需要 Garmin OAuth 配置", color: "text-muted-foreground", available: false },
+              { id: "oura", name: "Oura Ring", desc: t("health.oura_desc"), color: "text-los-blue", available: true },
+              { id: "strava", name: "Strava", desc: t("health.strava_desc"), color: "text-los-orange", available: true },
+              { id: "huawei", name: t("health.huawei_name"), desc: t("health.huawei_desc"), color: "text-destructive", available: true },
+              { id: "apple", name: "Apple Health", desc: t("health.apple_desc"), color: "text-muted-foreground", available: false },
+              { id: "garmin", name: "Garmin Connect", desc: t("health.garmin_desc"), color: "text-muted-foreground", available: false },
             ].map(source => {
               const connected = connectedSources.includes(source.id);
               return (
@@ -269,22 +272,22 @@ export default function HealthPage() {
                               });
                             }
                             if (failed > 0) {
-                              toast.error(`已导入 ${imported} 条，${failed} 条写入失败`);
+                              toast.error(t("health.import_partial_fail", { imported, failed }));
                             } else {
-                              toast.success(`已导入 ${imported} 条华为健康数据`);
+                              toast.success(t("health.import_success", { imported }));
                             }
                           };
                           input.click();
                         } else {
                           // OAuth - show instructions
-                          alert(`${source.name} 集成需要在 Supabase 配置 OAuth。\n\n请在设置中添加 ${source.id.toUpperCase()}_CLIENT_ID 和 ${source.id.toUpperCase()}_CLIENT_SECRET 环境变量后启用。`);
+                          alert(t("health.oauth_instructions", { name: source.name, id: source.id.toUpperCase(), id2: source.id.toUpperCase() }));
                         }
                       }}
                       className={`text-caption px-3 py-1.5 rounded-full border transition ${connected ? "bg-los-green/10 border-los-green/30 text-los-green" : "border-border text-muted-foreground hover:border-primary hover:text-primary"}`}>
-                      {connected ? <><Check size={10} className="inline mr-1" />已连接</> : <><Link size={10} className="inline mr-1" />连接</>}
+                      {connected ? <><Check size={10} className="inline mr-1" />{t("health.connected")}</> : <><Link size={10} className="inline mr-1" />{t("health.connect")}</>}
                     </button>
                   ) : (
-                    <span className="text-label text-muted-foreground/40">暂不支持</span>
+                    <span className="text-label text-muted-foreground/40">{t("health.not_supported")}</span>
                   )}
                 </div>
               );
@@ -299,18 +302,18 @@ export default function HealthPage() {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-end">
           <div className="w-full max-w-[600px] mx-auto bg-surface-1 rounded-t-2xl p-5 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-semibold text-foreground font-serif-sc">手动录入今日健康数据</p>
+              <p className="text-sm font-semibold text-foreground font-serif-sc">{t("health.manual_entry_title")}</p>
               <button onClick={() => setShowEdit(false)} className="text-muted-foreground"><ChevronLeft size={16} /></button>
             </div>
             <div className="space-y-3">
               {[
-                { key: "sleepHrs", label: "睡眠时长 (小时)", min: 0, max: 12, step: 0.5 },
-                { key: "sleepEff", label: "睡眠效率 (%)", min: 0, max: 100, step: 1 },
+                { key: "sleepHrs", label: t("health.field_sleep_hrs"), min: 0, max: 12, step: 0.5 },
+                { key: "sleepEff", label: t("health.field_sleep_eff"), min: 0, max: 100, step: 1 },
                 { key: "hrv", label: "HRV (ms)", min: 0, max: 200, step: 1 },
-                { key: "rhr", label: "静息心率 (bpm)", min: 30, max: 120, step: 1 },
-                { key: "steps", label: "步数", min: 0, max: 30000, step: 100 },
-                { key: "activeMin", label: "活跃分钟数", min: 0, max: 300, step: 5 },
-                { key: "readinessScore", label: "就绪评分 (0-100)", min: 0, max: 100, step: 1 },
+                { key: "rhr", label: t("health.field_rhr"), min: 30, max: 120, step: 1 },
+                { key: "steps", label: t("health.steps"), min: 0, max: 30000, step: 100 },
+                { key: "activeMin", label: t("health.field_active_min"), min: 0, max: 300, step: 5 },
+                { key: "readinessScore", label: t("health.field_readiness"), min: 0, max: 100, step: 1 },
               ].map(field => (
                 <div key={field.key}>
                   <div className="flex justify-between mb-1">
@@ -324,19 +327,19 @@ export default function HealthPage() {
                 </div>
               ))}
               <div>
-                <label className="text-caption text-muted-foreground">精力状态</label>
+                <label className="text-caption text-muted-foreground">{t("health.energy_status_label")}</label>
                 <div className="flex gap-2 mt-1.5">
                   {["高", "中", "低"].map(l => (
                     <button key={l} onClick={() => setEditForm(f => ({ ...f, energyLevel: l }))}
                       className={`flex-1 py-2 rounded-xl text-sm transition ${editForm.energyLevel === l ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                      {l}
+                      {energyLabel(l)}
                     </button>
                   ))}
                 </div>
               </div>
               <button onClick={saveMetrics} disabled={saving}
                 className="w-full py-3 bg-primary text-primary-foreground rounded-xl text-sm font-medium mt-2 disabled:opacity-50">
-                {saving ? "保存中…" : "保存今日数据"}
+                {saving ? t("health.saving") : t("health.save_today")}
               </button>
             </div>
           </div>

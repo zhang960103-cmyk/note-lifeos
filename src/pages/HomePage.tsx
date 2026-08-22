@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Send, Loader2, X, Clock, Settings, Mic, Plus, Zap, CalendarDays, AlertCircle, Search, Flame, FileText } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import JournalEditor from "@/components/JournalEditor";
-import { streamChat, extractMeta, type ChatMsg, type ExtractResult } from "@/lib/streamChat";
+import { streamChat, extractMeta, StreamChatError, type ChatMsg, type ExtractResult } from "@/lib/streamChat";
 import { recognizeIntent, detectPlanGaps, generateDayPlan, formatDayPlan } from "@/lib/intentEngine";
 import { extractTimeBlocks, hasTimeHints } from "@/lib/timeExtractor"; // 本地快速时间提取
 import { updateKRProgressFromGoalHints } from "@/pages/GoalsPage";
@@ -68,8 +68,14 @@ const HomePage = () => {
   const [showTagHint, setShowTagHint] = useState(false);
   const [extractFailed, setExtractFailed] = useState(false);
   const [retryMsgs, setRetryMsgs] = useState<ChatMsg[] | null>(null);
+  // BUG-01：手动"重试"按钮在请求未返回前禁用，避免连续点击对同一段内容重复
+  // 调用 extractMeta → 重复生成待办/财务记录。
+  const [isRetryingExtract, setIsRetryingExtract] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // 独立于 abortRef：手动重试可能发生在自动提取的 controller 早已用完之后，
+  // 需要自己的 controller 才能在组件卸载时正确取消这次重试请求。
+  const retryAbortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevTagCountRef = useRef(0);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -157,7 +163,9 @@ const HomePage = () => {
     : messages;
 
   // Fix 5: abort cleanup on unmount
-  useEffect(() => { return () => { abortRef.current?.abort(); }; }, []);
+  // BUG-01：卸载时一并取消手动重试请求，避免组件已卸载后 extractMeta 才 resolve/reject，
+  // 触发"在已卸载组件上 setState"的悬空回调。
+  useEffect(() => { return () => { abortRef.current?.abort(); retryAbortRef.current?.abort(); }; }, []);
 
   // UX 3: Tag hint
   useEffect(() => {
@@ -266,21 +274,32 @@ const HomePage = () => {
     const todayTodos = allTodos.filter(t => t.status === "todo" || t.status === "doing");
     const latestEnergy = energyLogs[0];
     const h = new Date().getHours();
-    const greeting = h < 12 ? "早上好" : h < 18 ? "下午好" : "晚上好";
+    const greeting = h < 12 ? t("home.briefing.morning") : h < 18 ? t("home.briefing.afternoon") : t("home.briefing.evening");
+    const weekdayKeys = ["home.weekday.sun", "home.weekday.mon", "home.weekday.tue", "home.weekday.wed", "home.weekday.thu", "home.weekday.fri", "home.weekday.sat"];
 
-    const briefingText = `${greeting}，帮我做一个今日简报：
-- 今天待办 ${todayTodos.length} 件${doingTodo ? `，正在专注：${doingTodo.text}` : ""}
-- 逾期未完成 ${overdueTodos.length} 件${overdueTodos.length > 0 ? `：${overdueTodos.slice(0, 2).map(t => t.text).join("、")}` : ""}
-- 当前精力状态：${latestEnergy ? `${latestEnergy.level}（${format(new Date(latestEnergy.timestamp), "HH:mm")}记录）` : "未记录"}
-- 今天是 ${format(new Date(), "M月d日")} ${["周日", "周一", "周二", "周三", "周四", "周五", "周六"][new Date().getDay()]}
-请给我一个简短的今日状态分析和最重要的一件事建议。`;
+    const focusPart = doingTodo ? t("home.briefing.focus_part", { text: doingTodo.text }) : "";
+    const overduePart = overdueTodos.length > 0 ? t("home.briefing.overdue_part", { list: overdueTodos.slice(0, 2).map(t => t.text).join(t("home.list_separator")) }) : "";
+    const energyStatus = latestEnergy
+      ? t("home.briefing.energy_detail", { level: latestEnergy.level, time: format(new Date(latestEnergy.timestamp), "HH:mm") })
+      : t("home.briefing.energy_none");
+
+    const briefingText = t("home.briefing.template", {
+      greeting,
+      todoCount: todayTodos.length,
+      focusPart,
+      overdueCount: overdueTodos.length,
+      overduePart,
+      energyStatus,
+      date: format(new Date(), t("calendar.date_format")),
+      weekday: t(weekdayKeys[new Date().getDay()]),
+    });
     sendMessage(briefingText);
   };
 
   const handleQuickMood = (mood: typeof QUICK_MOODS[0]) => {
     updateDayMeta(todayKey, { emotionTags: [mood.tag], emotionScore: mood.score });
 
-    sendMessage(`[快速情绪记录] ${mood.emoji} ${t(mood.labelKey)}`);
+    sendMessage(`${t("home.quick_mood_prefix")} ${mood.emoji} ${t(mood.labelKey)}`);
   };
 
   // 精力记录：ENERGY_LEVELS 常量和对应的多语言文案(home.energy.*)其实早就写好了，
@@ -288,7 +307,7 @@ const HomePage = () => {
   // 一直只有读(能量预警banner、AI简报)没有写。补上这个入口。
   const handleEnergyCheckIn = (lvl: typeof ENERGY_LEVELS[number]) => {
     addEnergyLog(ENERGY_LEVEL_TO_CN[lvl.value]);
-    toast.success(`已记录精力：${lvl.emoji} ${t(lvl.labelKey)}`, { id: "energy-checkin" });
+    toast.success(`${t("home.energy_recorded_prefix")}${lvl.emoji} ${t(lvl.labelKey)}`, { id: "energy-checkin" });
   };
 
   const todayLatestEnergy = useMemo(() => {
@@ -339,7 +358,7 @@ const HomePage = () => {
     const file = imageItem.getAsFile();
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) { // 2MB limit
-      alert("图片不能超过2MB");
+      alert(t("home.image_too_large"));
       return;
     }
     const reader = new FileReader();
@@ -351,7 +370,7 @@ const HomePage = () => {
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading || isProcessing) return;
     if (aiQuotaExceeded) {
-      addMessage({ role: "assistant" as const, content: `今天已达到每日 ${DAILY_LIMIT} 次对话上限，明天继续。如需更多，请升级到 Pro 版本。`, timestamp: new Date().toISOString() });
+      addMessage({ role: "assistant" as const, content: t("home.quota_exceeded", { limit: DAILY_LIMIT }), timestamp: new Date().toISOString() });
       return;
     }
     bumpAiCall();
@@ -361,7 +380,7 @@ const HomePage = () => {
       addMessage({ role: "user" as const, content: text, timestamp: new Date().toISOString() });
       addMessage({
         role: "assistant" as const,
-        content: `我听到你说的了。这些话让我很担心你现在的状态。\n\n你不需要独自承受这些——现在有人可以陪你：\n\n📞 **北京心理危机研究与干预中心**：010-82951332\n📞 **全国心理援助热线**：400-161-9995\n📞 **生命热线**：400-821-1215（24小时）\n\n你愿意告诉我，现在是什么让你有这种感受吗？我在这里陪你。`,
+        content: t("home.crisis.response"),
         timestamp: new Date().toISOString(),
       });
       setInput("");
@@ -377,8 +396,8 @@ const HomePage = () => {
       const isPlanDay = intentResult.intent === "plan_day";
       // 先给用户即时反馈
       const quickReply = isPlanDay
-        ? "好的，帮你安排今天！请告诉我今天要做的事情（可以一次说多件）："
-        : "好的，帮你规划本周！请列出这周最重要的几件事：";
+        ? t("home.plan.day_intro")
+        : t("home.plan.week_intro");
       setPlanMode(true);
       setPlanTasks([]);
       setIsProcessing(true);
@@ -412,12 +431,12 @@ const HomePage = () => {
         newTasks.filter(t => !/好了|就这些|没了/.test(t)).forEach(task => {
           addTodoToDate(todayKey, createTodoFromExtract({ text: task }, todayKey));
         });
-        setTodoToast(`📅 已创建 ${newTasks.length} 个待办并安排时间`);
+        setTodoToast(t("home.plan.todos_created", { count: newTasks.length }));
         setTimeout(() => setTodoToast(null), 3000);
       } else {
         // 继续收集，给出确认
         addMessage({ role: "user" as const, content: text, timestamp: new Date().toISOString() });
-        addMessage({ role: "assistant" as const, content: `好，记下了「${text}」。还有其他要安排的吗？说完告诉我"好了"，我来生成时间计划。`, timestamp: new Date().toISOString() });
+        addMessage({ role: "assistant" as const, content: t("home.plan.task_recorded", { text }), timestamp: new Date().toISOString() });
         setInput("");
       }
       return;
@@ -428,7 +447,10 @@ const HomePage = () => {
       // 注入当前时间块信息到context
       const currentHour = new Date().getHours();
       const remainingTodos = allTodos.filter(t => t.status === "todo");
-      const replanContext = `[突发重排请求] 当前时间：${currentHour}:00，今日剩余待办：${remainingTodos.map(t => t.text).join("、") || "无"}`;
+      const replanContext = t("home.replan.context", {
+        time: currentHour,
+        list: remainingTodos.map(t => t.text).join(t("home.list_separator")) || t("home.replan.none"),
+      });
       const enrichedText = `${text}\n\n${replanContext}`;
       // 走正常AI流程但带上重排上下文
       return sendMessage(enrichedText);
@@ -437,7 +459,7 @@ const HomePage = () => {
 
     setIsProcessing(true);
     // N4: If image was pasted, prepend a note to the text
-    const fullText = pastedImage ? `[附有图片] ${text}` : text;
+    const fullText = pastedImage ? `${t("home.image_attached_prefix")} ${text}` : text;
     const userMsg = { role: "user" as const, content: fullText, timestamp: new Date().toISOString() };
     if (pastedImage) setPastedImage(null); // Clear after sending
     addMessage(userMsg);
@@ -491,7 +513,9 @@ const HomePage = () => {
             .map(t => ({ id: t.id, text: t.text, status: t.status, priority: t.priority }));
           setExtractFailed(false);
           setRetryMsgs(msgsForExtract);
-          extractMeta(msgsForExtract, existingTodosForAI, accessToken).then(meta => {
+          // BUG-01：复用同一个 controller，页面卸载/用户中止生成时 extractMeta 会
+          // 跟着一起取消，而不是在后台继续跑、卸载后才 resolve。
+          extractMeta(msgsForExtract, existingTodosForAI, accessToken, controller.signal).then(meta => {
             if (meta.completedTodoIds?.length > 0) {
               meta.completedTodoIds.forEach(todoId => {
                 const todo = todosSnapshot.find(t => t.id === todoId);
@@ -499,7 +523,7 @@ const HomePage = () => {
                   toggleTodo(todo.sourceDate || todayKey, todoId);
                 }
               });
-              setTodoToast(`✅ 已标记 ${meta.completedTodoIds.length} 条任务完成`);
+              setTodoToast(t("home.todo_marked_done", { count: meta.completedTodoIds.length }));
               setTimeout(() => setTodoToast(null), 3000);
             }
 
@@ -516,7 +540,7 @@ const HomePage = () => {
               });
 
               if (todoItems.length > 0) {
-                setTodoToast(`已自动生成 ${todoItems.length} 条待办`);
+                setTodoToast(t("home.todos_auto_generated", { count: todoItems.length }));
                 setTimeout(() => setTodoToast(null), 3000);
               }
             }
@@ -532,9 +556,9 @@ const HomePage = () => {
                 });
               });
               const total = meta.financeHints.reduce((s, h) => s + h.amount, 0);
-              const types = meta.financeHints.map(h => h.type === "income" ? "收入" : "支出").join("、");
+              const types = meta.financeHints.map(h => h.type === "income" ? t("home.finance.income") : t("home.finance.expense")).join(t("home.list_separator"));
               setFinanceToast(true);
-              setTodoToast(`💰 已自动记录${types} ¥${total}`);
+              setTodoToast(t("home.finance_auto_recorded", { types, total }));
               setTimeout(() => { setFinanceToast(false); setTodoToast(null); }, 3000);
             }
 
@@ -547,7 +571,10 @@ const HomePage = () => {
             const combinedText = text + full;
             const hasTimeHints = /\d{1,2}[:：点时]\d{0,2}|上午|下午|凌晨|小时|分钟|半天|整天/.test(combinedText);
             autoExtractTimeBlocks(msgsForExtract);
-          }).catch(() => {
+          }).catch((err) => {
+            // BUG-01：用户主动取消 / 页面已卸载不算"提取失败"，不弹"记录未完成"提示——
+            // 那是用户自己的选择，不是 AI 出错，弹出来只会让人误以为出了 bug。
+            if (err instanceof StreamChatError && err.code === "EXTRACT_CANCELLED") return;
             setExtractFailed(true);
             setIsProcessing(false);
           });
@@ -558,9 +585,9 @@ const HomePage = () => {
       });
     } catch (e: any) {
       if (e.name !== "AbortError") {
-        const errorMsg = e.message || "网络错误，请检查连接";
+        const errorMsg = e.message || t("home.error.network");
         console.error("[sendMessage] Error:", { code: e.code, message: e.message, status: e.status, isRetryable: e.isRetryable });
-        addMessage({ role: "assistant", content: `抱歉，出了点问题。${errorMsg}`, timestamp: new Date().toISOString() });
+        addMessage({ role: "assistant", content: t("home.error.assistant_prefix", { error: errorMsg }), timestamp: new Date().toISOString() });
       }
       setStreamingContent("");
       setIsLoading(false);
@@ -598,7 +625,7 @@ const HomePage = () => {
       addTodoToDate(todayKey, todo); created++;
     });
     if (created > 0) {
-      setTodoToast(`⏱ 自动记录了 ${created} 个时间段`);
+      setTodoToast(t("home.time_blocks_recorded", { count: created }));
       setTimeout(() => setTodoToast(null), 3000);
     }
   }, [allTodos, todayKey, addTodoToDate]);
@@ -606,7 +633,7 @@ const HomePage = () => {
     // Feature 1: Go deeper
   const handleGoDeeper = (msgContent: string) => {
     const lastSentence = msgContent.split(/[。？！.?!\n]/).filter(Boolean).pop() || msgContent.slice(-30);
-    sendMessage(`请针对你刚才说的「${lastSentence}」，再往深处挖一层。`);
+    sendMessage(t("home.go_deeper_msg", { text: lastSentence }));
   };
 
   return (
@@ -614,21 +641,21 @@ const HomePage = () => {
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground font-mono-jb">{format(new Date(), "M月d日")}</span>
+          <span className="text-xs text-muted-foreground font-mono-jb">{format(new Date(), t("calendar.date_format"))}</span>
           {streak >= 3 && (
             <span className="flex items-center gap-0.5 text-[10px] text-los-orange font-mono-jb bg-los-orange/10 px-1.5 py-0.5 rounded-full">
-              <Flame size={10} />{streak}天
+              <Flame size={10} />{t("home.streak_days", { days: streak })}
             </span>
           )}
         </div>
         <div className="flex gap-0">
-          <button onClick={() => navigate("/search")} className="touch-target text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-surface-2" title="搜索日记">
+          <button onClick={() => navigate("/search")} className="touch-target text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-surface-2" title={t("home.title.search_journal")} aria-label={t("home.title.search_journal")}>
             <Search size={17} />
           </button>
-          <button onClick={() => navigate("/history")} className="touch-target text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-surface-2">
+          <button onClick={() => navigate("/history")} className="touch-target text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-surface-2" title={t("home.aria.history")} aria-label={t("home.aria.history")}>
             <Clock size={17} />
           </button>
-          <button onClick={() => navigate("/settings")} className="touch-target text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-surface-2" title={t("settings.title")}>
+          <button onClick={() => navigate("/settings")} className="touch-target text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-surface-2" title={t("settings.title")} aria-label={t("settings.title")}>
             <Settings size={17} />
           </button>
         </div>
@@ -643,21 +670,21 @@ const HomePage = () => {
               {/* #5: 最多展示1个优先卡片（漏洞>周信>能量预警>规划模式，按优先级取第一个）*/}
               {planMode ? (
                 <div className="bg-primary/10 border border-primary/30 rounded-xl px-4 py-3 mb-4 text-left">
-                  <p className="text-xs text-primary font-serif-sc mb-1">📅 规划模式 · 收集中</p>
+                  <p className="text-xs text-primary font-serif-sc mb-1">{t("home.plan_mode.banner")}</p>
                   {planTasks.length > 0 && (
                     <div className="space-y-1">
                       {planTasks.map((t, i) => <p key={i} className="text-caption text-foreground">✓ {t}</p>)}
                     </div>
                   )}
-                  <p className="text-caption text-muted-foreground mt-1.5">说完所有任务告诉我「好了」，生成时间计划</p>
+                  <p className="text-caption text-muted-foreground mt-1.5">{t("home.plan_mode.hint")}</p>
                 </div>
               ) : showGaps && gaps.length > 0 ? (
                 <div className="bg-los-orange/10 border border-los-orange/30 rounded-xl px-4 py-3 mb-4 text-left">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs text-los-orange font-serif-sc flex items-center gap-1">
-                      <AlertCircle size={12} /> 今日有 {gaps.length} 个待关注
+                      <AlertCircle size={12} /> {t("home.gaps.count", { count: gaps.length })}
                     </p>
-                    <button onClick={() => setShowGaps(false)} className="touch-target text-muted-foreground/50 hover:text-muted-foreground scale-75">
+                    <button onClick={() => setShowGaps(false)} className="touch-target text-muted-foreground/50 hover:text-muted-foreground scale-75" aria-label={t("common.close")}>
                       <X size={14} />
                     </button>
                   </div>
@@ -670,16 +697,16 @@ const HomePage = () => {
               ) : weeklyLetterReady ? (
                 <button onClick={handleOpenLetter}
                   className="w-full bg-gold/10 border border-gold-border rounded-xl px-4 py-3 mb-4 text-left hover:bg-gold/20 transition">
-                  <p className="text-xs text-gold font-serif-sc mb-1">📨 罗盘的来信</p>
-                  <p className="text-caption text-foreground leading-relaxed">本周复盘信已生成，点击查看</p>
-                  <span className="text-caption text-gold mt-1 inline-block">打开信件 →</span>
+                  <p className="text-xs text-gold font-serif-sc mb-1">{t("home.weekly_letter.banner_title")}</p>
+                  <p className="text-caption text-foreground leading-relaxed">{t("home.weekly_letter.banner_desc")}</p>
+                  <span className="text-caption text-gold mt-1 inline-block">{t("home.weekly_letter.banner_cta")}</span>
                 </button>
               ) : consecutiveLowDays >= 3 ? (
-                <button onClick={() => sendMessage("我已经连续低能量好几天了，帮我分析一下可能的原因？")}
+                <button onClick={() => sendMessage(t("home.energy_alert.msg"))}
                   className="w-full bg-los-red/10 border border-los-red/30 rounded-xl px-4 py-3 mb-4 text-left hover:bg-los-red/20 transition">
-                  <p className="text-xs text-los-red font-serif-sc mb-1">⚠️ 能量预警</p>
-                  <p className="text-caption text-foreground leading-relaxed">你已经连续{consecutiveLowDays}天低能量了</p>
-                  <span className="text-caption text-los-red mt-1 inline-block">聊聊怎么回事 →</span>
+                  <p className="text-xs text-los-red font-serif-sc mb-1">{t("home.energy_alert.title")}</p>
+                  <p className="text-caption text-foreground leading-relaxed">{t("home.energy_alert.body", { days: consecutiveLowDays })}</p>
+                  <span className="text-caption text-los-red mt-1 inline-block">{t("home.energy_alert.cta")}</span>
                 </button>
               ) : null}
 
@@ -691,9 +718,9 @@ const HomePage = () => {
               {!planMode && (
                 <button onClick={handleBriefing}
                   className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 mt-4 mb-4 text-left hover:bg-surface-3 transition">
-                  <p className="text-xs text-foreground font-serif-sc mb-0.5">🧭 今日简报</p>
-                  <p className="text-caption text-muted-foreground">一键了解今天的状态、待办和重点</p>
-                  <span className="text-caption text-gold mt-1 inline-block">获取简报 →</span>
+                  <p className="text-xs text-foreground font-serif-sc mb-0.5">{t("home.briefing.card_title")}</p>
+                  <p className="text-caption text-muted-foreground">{t("home.briefing.card_desc")}</p>
+                  <span className="text-caption text-gold mt-1 inline-block">{t("home.briefing.card_cta")}</span>
                 </button>
               )}
 
@@ -717,7 +744,7 @@ const HomePage = () => {
                 {QUICK_MOODS.map(mood => (
                   <button key={mood.tag} onClick={() => handleQuickMood(mood)}
                     className="w-11 h-11 rounded-full bg-surface-2 flex items-center justify-center text-xl hover:scale-110 hover:bg-surface-3 transition-all"
-                    title={t(mood.labelKey)}>
+                    title={t(mood.labelKey)} aria-label={t(mood.labelKey)}>
                     {mood.emoji}
                   </button>
                 ))}
@@ -732,7 +759,7 @@ const HomePage = () => {
                     return (
                       <button key={lvl.value} onClick={() => handleEnergyCheckIn(lvl)}
                         className={`w-11 h-11 rounded-full flex items-center justify-center text-xl transition-all ${active ? "bg-primary/15 ring-2 ring-primary" : "bg-surface-2 hover:scale-110 hover:bg-surface-3"}`}
-                        title={t(lvl.labelKey)}>
+                        title={t(lvl.labelKey)} aria-label={t(lvl.labelKey)}>
                         {lvl.emoji}
                       </button>
                     );
@@ -747,7 +774,7 @@ const HomePage = () => {
                 if (todayHabits.length === 0) return null;
                 return (
                   <div className="mt-4 bg-surface-2 border border-border rounded-xl px-4 py-3 text-left">
-                    <p className="text-caption text-muted-foreground mb-2">今日习惯</p>
+                    <p className="text-caption text-muted-foreground mb-2">{t("home.habits.today_title")}</p>
                     <div className="flex flex-wrap gap-2">
                       {todayHabits.map(habit => {
                         const checked = habit.checkIns.includes(todayKey);
@@ -767,7 +794,7 @@ const HomePage = () => {
                       })}
                     </div>
                     {todayHabits.every(h => h.checkIns.includes(todayKey)) && (
-                      <p className="text-caption text-los-green mt-2">🎉 今天的习惯全部完成了！</p>
+                      <p className="text-caption text-los-green mt-2">{t("home.habits.all_done")}</p>
                     )}
                   </div>
                 );
@@ -776,12 +803,12 @@ const HomePage = () => {
               {/* 今日一问 */}
               {dailyQuestion && (
                 <div className="mt-5 bg-surface-2 border border-border rounded-xl px-4 py-3 text-left">
-                  <p className="text-caption text-gold font-mono-jb mb-1">💭 今日一问 · {dailyQuestion.domain}</p>
+                  <p className="text-caption text-gold font-mono-jb mb-1">💭 {t("home.daily_question", { domain: dailyQuestion.domain })}</p>
                   <p className="text-xs text-foreground leading-relaxed mb-2">{dailyQuestion.question}</p>
                   <button onClick={() => setInput(dailyQuestion.question)}
                     className="text-caption text-gold hover:text-gold/80 transition-colors">
 
-                    回应这个问题 →
+                    {t("home.daily_question.cta")}
                   </button>
                 </div>
               )}
@@ -800,15 +827,15 @@ const HomePage = () => {
                     <div className="bg-surface-2 border border-border rounded-2xl p-2 w-64 shadow-xl" onClick={e => e.stopPropagation()}>
                       <button onClick={() => copyMsg(msg.content)}
                         className="w-full text-left text-sm text-foreground px-4 py-3 hover:bg-surface-3 rounded-xl transition">
-                        📋 复制文字
+                        {t("home.msg_menu.copy")}
                       </button>
                       <button onClick={() => { setInput(msg.content); setLongPressIdx(null); }}
                         className="w-full text-left text-sm text-foreground px-4 py-3 hover:bg-surface-3 rounded-xl transition">
-                        ✏️ 引用回复
+                        {t("home.msg_menu.quote")}
                       </button>
                       <button onClick={() => setLongPressIdx(null)}
                         className="w-full text-center text-sm text-muted-foreground px-4 py-3 hover:bg-surface-3 rounded-xl transition border-t border-border mt-1">
-                        取消
+                        {t("common.cancel")}
                       </button>
                     </div>
                   </div>
@@ -826,10 +853,19 @@ const HomePage = () => {
                   {msg.content}
                 </div>
                 {/* #11: Go Deeper — 字号提升到 11px */}
+                {/* BUG-10：文字本身只有约 19px 高，之前只有 px-1 的横向内边距，纵向
+                    完全没有触控冗余。用负外边距抵消正内边距的经典技巧扩大点击热区、
+                    同时不改变文字在消息列表里的视觉位置和行间距（如果直接加大
+                    padding 不做负边距抵消，每条 AI 消息下面都会多出一截空白，
+                    整个对话列表会明显变"松"——这是不希望看到的副作用）。这里选的
+                    -my-2.5/py-2.5 组合能把纵向热区从约 19px 提到约 39px，没有完全
+                    打满 44px（再加大负边距会导致相邻消息气泡的点击热区开始重叠，
+                    风险大于收益），这是一个需要你确认是否接受的折中，详见验收报告。 */}
                 {msg.role === "assistant" && !isLoading && (
                   <button
                     onClick={() => handleGoDeeper(msg.content)}
-                    className="text-caption text-muted-foreground/50 hover:text-gold cursor-pointer px-1 mt-1 transition-colors"
+                    className="text-caption text-muted-foreground/50 hover:text-gold cursor-pointer -mx-1 -my-2.5 px-2 py-2.5 mt-1 transition-colors"
+                    aria-label={t("home.go_deeper_aria")}
                   >
                     {t("home.go_deeper")}
                   </button>
@@ -873,37 +909,74 @@ const HomePage = () => {
         <div className="absolute bottom-20 left-4 right-4 bg-los-orange/95 text-white text-xs px-4 py-3 rounded-xl flex items-start gap-2 z-50 animate-in fade-in shadow-lg">
           <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
           <div className="flex-1">
-            <p className="font-medium">自动记录未完成</p>
-            <p className="opacity-80 mt-0.5">你刚才说的内容，AI 分析时出错，待办/财务可能没有被自动记录。</p>
+            <p className="font-medium">{t("home.extract_failed.title")}</p>
+            <p className="opacity-80 mt-0.5">{t("home.extract_failed.desc")}</p>
           </div>
           <div className="flex gap-2 flex-shrink-0">
             <button
+              disabled={isRetryingExtract}
               onClick={async () => {
-                if (!retryMsgs) return;
+                // BUG-01：请求在途时禁用按钮本身已经能挡住"手指连点"；这里再加一层
+                // ref 判断兜底，双保险防止同一段内容被并发调用两次而产生重复待办/财务。
+                if (!retryMsgs || isRetryingExtract) return;
+                setIsRetryingExtract(true);
                 setExtractFailed(false);
-                const { data: { session } } = await supabase.auth.getSession();
-                const accessToken = session?.access_token;
-                const existingTodosForAI = allTodos
-                  .filter(t => t.status !== "dropped")
-                  .map(t => ({ id: t.id, text: t.text, status: t.status, priority: t.priority }));
-                extractMeta(retryMsgs, existingTodosForAI, accessToken).then(meta => {
-                  if (meta.emotionTags.length || meta.topicTags.length || meta.todos?.length) {
+                const retryController = new AbortController();
+                retryAbortRef.current = retryController;
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  const accessToken = session?.access_token;
+                  const existingTodosForAI = allTodos
+                    .filter(t => t.status !== "dropped")
+                    .map(t => ({ id: t.id, text: t.text, status: t.status, priority: t.priority }));
+                  const meta = await extractMeta(retryMsgs, existingTodosForAI, accessToken, retryController.signal);
+
+                  if (meta.completedTodoIds?.length > 0) {
+                    meta.completedTodoIds.forEach(todoId => {
+                      const todo = allTodos.find(t => t.id === todoId);
+                      if (todo && todo.status !== "done") {
+                        toggleTodo(todo.sourceDate || todayKey, todoId);
+                      }
+                    });
+                  }
+
+                  const todoItems: TodoItem[] = (meta.todos || []).map(t => createTodoFromExtract(t, todayKey));
+                  if (meta.emotionTags.length || meta.topicTags.length || todoItems.length) {
                     updateDayMeta(todayKey, {
                       emotionTags: meta.emotionTags,
                       topicTags: meta.topicTags,
-                      todos: meta.todos?.length ? meta.todos.map(t => createTodoFromExtract(t, todayKey)) : undefined,
+                      todos: todoItems.length > 0 ? todoItems : undefined,
                       emotionScore: meta.emotionScore || undefined,
                     });
-                    setTodoToast("✅ 重试成功，已记录");
-                    setTimeout(() => setTodoToast(null), 3000);
                   }
-                }).catch(() => setExtractFailed(true));
+
+                  // 重试路径此前遗漏了 financeHints——之前重试只补得回待办/情绪标签，
+                  // 补不回支出/收入，与 BUG-01"确保待办与财务自动归档"的验收标准不符。
+                  if (meta.financeHints && meta.financeHints.length > 0) {
+                    meta.financeHints.forEach(hint => {
+                      addFinanceEntry({ date: todayKey, type: hint.type, amount: hint.amount, category: hint.category, note: hint.note });
+                    });
+                  }
+
+                  if (meta.goalHints && meta.goalHints.length > 0 && user) {
+                    updateKRProgressFromGoalHints(meta.goalHints, user.id);
+                  }
+
+                  setTodoToast(t("home.retry_success"));
+                  setTimeout(() => setTodoToast(null), 3000);
+                } catch (err) {
+                  // 用户主动取消/组件卸载：不再弹回"记录未完成"提示，安静结束即可。
+                  if (err instanceof StreamChatError && err.code === "EXTRACT_CANCELLED") return;
+                  setExtractFailed(true);
+                } finally {
+                  setIsRetryingExtract(false);
+                }
               }}
-              className="bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-lg font-medium"
+              className="bg-white/20 hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed px-2.5 py-1 rounded-lg font-medium"
             >
-              重试
+              {isRetryingExtract ? t("home.retrying") : t("home.retry")}
             </button>
-            <button onClick={() => setExtractFailed(false)} className="opacity-60 hover:opacity-100 p-1">
+            <button onClick={() => setExtractFailed(false)} className="opacity-60 hover:opacity-100 p-1" aria-label={t("common.close")}>
               <X size={12} />
             </button>
           </div>
@@ -934,28 +1007,34 @@ const HomePage = () => {
         <div className="flex gap-1.5 items-end">
           {/* Tools toggle */}
           <div className="relative flex-shrink-0">
+            {/* BUG-10：这几个输入区图标按钮之前是 p-2（8px）+ 18px 图标 = 34×34px，
+                低于常见 44×44px 触控建议，移动端容易误触/漏触。改成 p-3.5（14px）
+                后视觉尺寸变成 46×46px，够到最小建议值；这会让输入区图标看起来比
+                之前略大一圈，是一处可见的视觉变化，不是纯粹的无形修复。 */}
             <button
               onClick={() => setShowToolMenu(v => !v)}
-              className={`p-2 rounded-full transition-all ${showToolMenu ? "bg-primary text-primary-foreground rotate-45" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+              className={`p-3.5 rounded-full transition-all ${showToolMenu ? "bg-primary text-primary-foreground rotate-45" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+              aria-label={t("home.aria.tool_menu")} aria-expanded={showToolMenu}
             >
               <Plus size={18} />
             </button>
             {showToolMenu && (
               <div className="absolute bottom-12 left-0 bg-popover border border-border rounded-xl shadow-lg p-1.5 flex gap-1 z-50 animate-in fade-in slide-in-from-bottom-2">
-                <button onClick={() => { setShowToolMenu(false); navigate("/calendar"); }} className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg hover:bg-accent transition" title="日历">
-                  <CalendarDays size={16} className="text-primary" /><span className="text-caption text-muted-foreground">日历</span>
+                <button onClick={() => { setShowToolMenu(false); navigate("/calendar"); }} className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg hover:bg-accent transition" title={t("tab.calendar")} aria-label={t("tab.calendar")}>
+                  <CalendarDays size={16} className="text-primary" /><span className="text-caption text-muted-foreground">{t("tab.calendar")}</span>
                 </button>
-                <button onClick={() => { setShowToolMenu(false); navigate("/todos"); }} className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg hover:bg-accent transition" title="待办">
-                  <Zap size={16} className="text-primary" /><span className="text-caption text-muted-foreground">待办</span>
+                <button onClick={() => { setShowToolMenu(false); navigate("/todos"); }} className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg hover:bg-accent transition" title={t("tab.todo")} aria-label={t("tab.todo")}>
+                  <Zap size={16} className="text-primary" /><span className="text-caption text-muted-foreground">{t("tab.todo")}</span>
                 </button>
               </div>
             )}
           </div>
           {pastedImage && (
             <div className="relative mb-2">
-              <img src={pastedImage} alt="附件" className="max-h-32 rounded-xl object-contain border border-border" />
+              <img src={pastedImage} alt={t("home.attachment_alt")} className="max-h-32 rounded-xl object-contain border border-border" />
               <button onClick={() => setPastedImage(null)}
-                className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5 text-muted-foreground hover:text-foreground">
+                className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                aria-label={t("home.aria.remove_image")}>
                 <X size={12} />
               </button>
             </div>
@@ -969,13 +1048,13 @@ const HomePage = () => {
                 onChange={setJournalContent}
                 onSave={(html) => {
                   const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-                  if (text) sendMessage(`[日记] ${text}`);
+                  if (text) sendMessage(`${t("home.journal_prefix")} ${text}`);
                   setJournalContent(""); setJournalMode(false);
                 }}
-                placeholder="今天想写什么…支持 **加粗**、# 标题、[ ] 任务清单"
+                placeholder={t("home.journal.placeholder")}
               />
               <button onClick={() => setJournalMode(false)} className="mt-1 text-caption text-muted-foreground hover:text-foreground">
-                返回对话模式
+                {t("home.journal.back_to_chat")}
               </button>
             </div>
           ) : (
@@ -985,7 +1064,7 @@ const HomePage = () => {
               onChange={handleInput}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder={planMode ? `已记录 ${planTasks.length} 件，继续说，或说"好了"生成计划…` : t("home.input.placeholder")}
+              placeholder={planMode ? t("home.plan.placeholder", { count: planTasks.length }) : t("home.input.placeholder")}
               rows={2}
               className={`flex-1 bg-muted border rounded-2xl px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none transition-colors leading-relaxed ${planMode ? "border-primary/50 bg-primary/5" : "border-border focus:border-primary"}`}
               style={{ minHeight: "44px", maxHeight: "120px" }}
@@ -994,22 +1073,24 @@ const HomePage = () => {
           {canUseVoice && !journalMode && (
             <button
               onClick={() => setShowVoice(true)}
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition flex-shrink-0"
+              className="p-3.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition flex-shrink-0"
+              title={t("home.aria.voice_input")} aria-label={t("home.aria.voice_input")}
             >
               <Mic size={18} />
             </button>
           )}
           {!journalMode && (
             <button onClick={() => setJournalMode(true)}
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition flex-shrink-0"
-              title="切换到日记模式（富文本）">
+              className="p-3.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition flex-shrink-0"
+              title={t("home.title.journal_mode")} aria-label={t("home.title.journal_mode")}>
               <FileText size={18} />
             </button>
           )}
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || isLoading || isProcessing}
-            className="bg-primary text-primary-foreground rounded-full p-2 disabled:opacity-20 hover:bg-primary/90 transition-all flex-shrink-0"
+            className="bg-primary text-primary-foreground rounded-full p-3.5 disabled:opacity-20 hover:bg-primary/90 transition-all flex-shrink-0"
+            aria-label={t("home.aria.send")}
           >
             {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
           </button>
@@ -1021,7 +1102,7 @@ const HomePage = () => {
         <div className="absolute inset-x-0 bottom-0 bg-surface-1 border-t border-border rounded-t-2xl p-5 z-50 animate-in slide-in-from-bottom max-h-[50vh] flex flex-col">
           <div className="flex justify-between items-center mb-3">
             <span className="text-xs text-foreground font-serif-sc">{t("home.focus.title")}</span>
-            <button onClick={() => setShowFocusPicker(false)} className="text-muted-foreground">
+            <button onClick={() => setShowFocusPicker(false)} className="text-muted-foreground" aria-label={t("common.close")}>
               <X size={16} />
             </button>
           </div>

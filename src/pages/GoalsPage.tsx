@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Plus, Trash2, ChevronDown, ChevronUp, Target } from "lucide-react";
 import { CardSkeleton } from "@/components/SkeletonLoaders";
 import { toast } from "sonner";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface KeyResult {
   id: string;
@@ -66,6 +67,7 @@ export async function updateKRProgressFromGoalHints(
 const GoalsPage = () => {
   const { allTodos } = useLifeOs();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -125,7 +127,7 @@ const GoalsPage = () => {
       setShowCreate(false);
     } else {
       console.error("[GoalsPage] 创建目标失败:", error);
-      toast.error("创建目标失败，请检查网络后重试");
+      toast.error(t("goals.toast.create_failed"));
     }
   }, [newTitle, newKRs, user]);
 
@@ -139,7 +141,7 @@ const GoalsPage = () => {
     if (error) {
       console.error("[GoalsPage] 删除目标失败:", error);
       setGoals(prevGoals);
-      toast.error("删除失败，请重试");
+      toast.error(t("goals.toast.delete_failed"));
     }
   }, [goals]);
 
@@ -157,7 +159,7 @@ const GoalsPage = () => {
       if (error) {
         console.error("[GoalsPage] 更新KR进度失败:", error);
         setGoals(prevGoals);
-        toast.error("进度更新失败，请重试");
+        toast.error(t("goals.toast.progress_failed"));
       }
     }
   }, [goals]);
@@ -184,14 +186,14 @@ const GoalsPage = () => {
     <div className="h-full overflow-y-auto px-4 max-w-[600px] mx-auto pb-4">
       <div className="py-4 flex items-center justify-between">
         <div>
-          <h1 className="font-serif-sc text-lg text-foreground">🎯 目标系统</h1>
-          <p className="text-[10px] text-muted-foreground">季度OKR · {getCurrentQuarter()}</p>
+          <h1 className="font-serif-sc text-lg text-foreground">🎯 {t("goals.title")}</h1>
+          <p className="text-[10px] text-muted-foreground">{t("goals.subtitle")} · {getCurrentQuarter()}</p>
         </div>
         <button
           onClick={() => setShowCreate(!showCreate)}
           className="bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-full flex items-center gap-1"
         >
-          <Plus size={12} /> 新目标
+          <Plus size={12} /> {t("goals.new_goal")}
         </button>
       </div>
 
@@ -200,21 +202,21 @@ const GoalsPage = () => {
           <input
             value={newTitle}
             onChange={e => setNewTitle(e.target.value)}
-            placeholder="目标名称（如：建立内容创作系统）"
+            placeholder={t("goals.title_placeholder")}
             className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground mb-3 focus:outline-none focus:border-primary"
           />
-          <p className="text-[10px] text-muted-foreground mb-2">关键结果（KR）</p>
+          <p className="text-[10px] text-muted-foreground mb-2">{t("goals.kr_label")}</p>
           {newKRs.map((kr, i) => (
             <input
               key={i}
               value={kr}
               onChange={e => { const next = [...newKRs]; next[i] = e.target.value; setNewKRs(next); }}
-              placeholder={`KR${i + 1}（如：每周发布2篇文章）`}
+              placeholder={t("goals.kr_placeholder", { n: i + 1 })}
               className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-xs text-foreground mb-1.5 focus:outline-none focus:border-primary"
             />
           ))}
           <button onClick={createGoal} className="w-full bg-primary text-primary-foreground text-xs py-2 rounded-lg mt-2">
-            创建目标
+            {t("goals.create")}
           </button>
         </div>
       )}
@@ -222,8 +224,8 @@ const GoalsPage = () => {
       {goalsWithLinked.length === 0 ? (
         <div className="text-center py-16">
           <Target size={32} className="text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-xs text-muted-foreground">还没有设定目标</p>
-          <p className="text-[10px] text-muted-foreground/60 mt-1">设定季度大目标，AI会自动关联你的待办</p>
+          <p className="text-xs text-muted-foreground">{t("goals.empty_title")}</p>
+          <p className="text-[10px] text-muted-foreground/60 mt-1">{t("goals.empty_desc")}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -256,7 +258,7 @@ const GoalsPage = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-foreground">{kr.text}</span>
                           <span className="text-[9px] text-muted-foreground font-mono-jb">
-                            {kr.linkedTodoCount > 0 ? `${kr.linkedTodoCount} 关联 · 自动追踪` : "0 关联"}
+                            {kr.linkedTodoCount > 0 ? t("goals.kr_linked", { count: kr.linkedTodoCount }) : t("goals.kr_no_link")}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -273,7 +275,7 @@ const GoalsPage = () => {
                       </div>
                     ))}
                     <button onClick={() => deleteGoal(goal.id)} className="text-[10px] text-muted-foreground hover:text-destructive flex items-center gap-1 mt-2">
-                      <Trash2 size={11} /> 删除目标
+                      <Trash2 size={11} /> {t("goals.delete")}
                     </button>
                   </div>
                 )}

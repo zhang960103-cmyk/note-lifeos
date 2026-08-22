@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, addDays } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line, CartesianGrid } from "recharts";
@@ -34,6 +35,25 @@ const TAG_TO_CATEGORY: Record<string, string> = {
   "休息": "休息", "放松": "休息", "冥想": "休息",
 };
 
+// Category display labels — matching logic elsewhere stays keyed on the Chinese
+// values above; this lookup only controls what's rendered on screen.
+const CATEGORY_LABEL_KEYS: Record<string, string> = {
+  "工作": "time_stats.category_work",
+  "学习": "time_stats.category_study",
+  "生活": "time_stats.category_life",
+  "运动": "time_stats.category_exercise",
+  "社交": "time_stats.category_social",
+  "娱乐": "time_stats.category_entertainment",
+  "休息": "time_stats.category_rest",
+  "通勤": "time_stats.category_commute",
+  "其他": "time_stats.category_other",
+};
+
+const WEEKDAY_LABEL_KEYS = [
+  "time_stats.weekday_mon", "time_stats.weekday_tue", "time_stats.weekday_wed",
+  "time_stats.weekday_thu", "time_stats.weekday_fri", "time_stats.weekday_sat", "time_stats.weekday_sun",
+];
+
 type TimeRange = "today" | "week" | "month";
 type TimeBlock = {
   activity: string;
@@ -48,6 +68,8 @@ export default function TimeStatsPage() {
   const navigate = useNavigate();
   const { entries, allTodos, energyLogs } = useLifeOs();
   const { user } = useAuth();
+  const { t } = useLanguage();
+  const categoryLabel = (cat: string) => t(CATEGORY_LABEL_KEYS[cat] || cat);
   const [mainTab, setMainTab] = useState<"stats" | "insights">("stats");
   const [range, setRange] = useState<TimeRange>("week");
   const [showQuickEntry, setShowQuickEntry] = useState(false);
@@ -132,10 +154,10 @@ export default function TimeStatsPage() {
     const HIGH_VALUE_TAGS = ["工作", "学习", "运动", "阅读", "写作", "项目", "课程", "目标", "创作"];
     const LOW_ENERGY_TAGS = ["通勤", "会议", "家务", "杂事", "等待", "刷手机", "娱乐", "游戏", "其他"];
     const quadrants = {
-      "drive":    { label: "驱动区", desc: "高价值·充能", emoji: "🚀", color: "hsl(142,60%,45%)", items: [] as string[], minutes: 0 },
-      "delegate": { label: "委托区", desc: "高价值·消耗", emoji: "⚡", color: "hsl(39,58%,53%)", items: [] as string[], minutes: 0 },
-      "delight":  { label: "愉悦区", desc: "低价值·充能", emoji: "✨", color: "hsl(210,60%,50%)", items: [] as string[], minutes: 0 },
-      "drain":    { label: "消耗区", desc: "低价值·消耗", emoji: "🔋", color: "hsl(0,65%,55%)", items: [] as string[], minutes: 0 },
+      "drive":    { label: t("time_stats.quadrant_drive_label"), desc: t("time_stats.quadrant_drive_desc"), emoji: "🚀", color: "hsl(142,60%,45%)", items: [] as string[], minutes: 0 },
+      "delegate": { label: t("time_stats.quadrant_delegate_label"), desc: t("time_stats.quadrant_delegate_desc"), emoji: "⚡", color: "hsl(39,58%,53%)", items: [] as string[], minutes: 0 },
+      "delight":  { label: t("time_stats.quadrant_delight_label"), desc: t("time_stats.quadrant_delight_desc"), emoji: "✨", color: "hsl(210,60%,50%)", items: [] as string[], minutes: 0 },
+      "drain":    { label: t("time_stats.quadrant_drain_label"), desc: t("time_stats.quadrant_drain_desc"), emoji: "🔋", color: "hsl(0,65%,55%)", items: [] as string[], minutes: 0 },
     };
     filteredTodos.forEach(t => {
       const isHighValue = HIGH_VALUE_TAGS.some(tag => t.tags?.includes(tag) || t.text.includes(tag));
@@ -151,7 +173,7 @@ export default function TimeStatsPage() {
       quadrants[quadrant].minutes += mins;
     });
     return quadrants;
-  }, [filteredTodos]);
+  }, [filteredTodos, t]);
 
   const streak = useMemo(() => {
     let count = 0;
@@ -266,9 +288,9 @@ export default function TimeStatsPage() {
         }
         return null;
       }).filter(Boolean);
-      return { date: dateStr, label: ["一", "二", "三", "四", "五", "六", "日"][i], blocks };
+      return { date: dateStr, label: t(WEEKDAY_LABEL_KEYS[i]), blocks };
     });
-  }, [allTodos]);
+  }, [allTodos, t]);
 
   const getHeatColor = (count: number) => {
     if (count === 0) return "hsl(var(--muted))";
@@ -280,7 +302,7 @@ export default function TimeStatsPage() {
   };
 
   const scoreColor = productivityScore >= 70 ? "text-los-green" : productivityScore >= 40 ? "text-primary" : "text-destructive";
-  const scoreLabel = productivityScore >= 70 ? "高效" : productivityScore >= 40 ? "正常" : "待提升";
+  const scoreLabel = productivityScore >= 70 ? t("time_stats.score_high") : productivityScore >= 40 ? t("time_stats.score_normal") : t("time_stats.score_low");
 
   return (
     <div className="flex flex-col h-full max-w-[700px] mx-auto">
@@ -289,11 +311,11 @@ export default function TimeStatsPage() {
         <div className="flex-1 flex gap-1 bg-muted rounded-xl p-0.5">
           <button onClick={() => setMainTab("stats")}
             className={`flex-1 text-xs py-1.5 rounded-lg transition font-medium ${mainTab === "stats" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>
-            📊 时间统计
+            📊 {t("time_stats.tab_stats")}
           </button>
           <button onClick={() => setMainTab("insights")}
             className={`flex-1 text-xs py-1.5 rounded-lg transition font-medium ${mainTab === "insights" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>
-            💡 AI 洞察
+            💡 {t("time_stats.tab_insights")}
           </button>
         </div>
         {mainTab === "stats" && (
@@ -322,7 +344,7 @@ export default function TimeStatsPage() {
       {showSearch && (
         <div className="px-4 mb-2">
           <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-            placeholder="搜索活动、备注、标签..."
+            placeholder={t("time_stats.search_placeholder")}
             autoFocus
             className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary" />
           {searchResults.length > 0 && (
@@ -344,15 +366,15 @@ export default function TimeStatsPage() {
           {(["today", "week", "month"] as TimeRange[]).map(key => (
             <button key={key} onClick={() => setRange(key)}
               className={`text-xs px-3 py-1.5 rounded-md transition ${range === key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>
-              {key === "today" ? "今天" : key === "week" ? "本周" : "本月"}
+              {key === "today" ? t("time_stats.range_today") : key === "week" ? t("time_stats.range_week") : t("time_stats.range_month")}
             </button>
           ))}
         </div>
         <div className="flex gap-1 bg-muted rounded-lg p-0.5">
           <button onClick={() => setViewMode("overview")}
-            className={`text-[10px] px-2 py-1.5 rounded-md transition ${viewMode === "overview" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>概览</button>
+            className={`text-[10px] px-2 py-1.5 rounded-md transition ${viewMode === "overview" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>{t("time_stats.view_overview")}</button>
           <button onClick={() => setViewMode("week")}
-            className={`text-[10px] px-2 py-1.5 rounded-md transition ${viewMode === "week" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>周视图</button>
+            className={`text-[10px] px-2 py-1.5 rounded-md transition ${viewMode === "week" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>{t("time_stats.view_week")}</button>
         </div>
       </div>
 
@@ -364,7 +386,7 @@ export default function TimeStatsPage() {
           <div className="bg-card border border-border rounded-xl p-3">
             <div className="flex items-center gap-2 mb-2">
               <CalendarClock size={13} className="text-primary" />
-              <span className="text-[11px] font-serif-sc text-foreground">周时间色块</span>
+              <span className="text-[11px] font-serif-sc text-foreground">{t("time_stats.week_blocks_title")}</span>
             </div>
             <div className="flex gap-[2px]">
               <div className="flex flex-col justify-between text-[6px] text-muted-foreground pr-0.5" style={{ height: 160 }}>
@@ -407,10 +429,10 @@ export default function TimeStatsPage() {
             </div>
             <div className="flex-1 grid grid-cols-2 gap-1.5">
               {[
-                { icon: <Target size={9} className="text-primary" />, label: "完成率", value: `${stats.total > 0 ? Math.round(stats.done / stats.total * 100) : 0}%` },
-                { icon: <Flame size={9} className="text-los-orange" />, label: "连续", value: `${streak}天` },
-                { icon: <Zap size={9} className="text-los-blue" />, label: "情绪", value: stats.avgEmotion },
-                { icon: <Clock size={9} className="text-los-green" />, label: "活跃", value: `${stats.activeDays}天` },
+                { icon: <Target size={9} className="text-primary" />, label: t("time_stats.stat_completion_rate"), value: `${stats.total > 0 ? Math.round(stats.done / stats.total * 100) : 0}%` },
+                { icon: <Flame size={9} className="text-los-orange" />, label: t("time_stats.stat_streak"), value: t("time_stats.count_days", { n: streak }) },
+                { icon: <Zap size={9} className="text-los-blue" />, label: t("time_stats.stat_emotion"), value: stats.avgEmotion },
+                { icon: <Clock size={9} className="text-los-green" />, label: t("time_stats.stat_active"), value: t("time_stats.count_days", { n: stats.activeDays }) },
               ].map((s, i) => (
                 <div key={i} className="flex items-center gap-1">
                   {s.icon}
@@ -427,8 +449,8 @@ export default function TimeStatsPage() {
           <div className="bg-card border border-border rounded-xl p-3">
             <div className="flex items-center gap-2 mb-1.5">
               <CalendarClock size={11} className="text-primary" />
-              <span className="text-[10px] font-serif-sc text-foreground">活跃热力图</span>
-              <span className="ml-auto text-[7px] text-muted-foreground">近 8 周</span>
+              <span className="text-[10px] font-serif-sc text-foreground">{t("time_stats.heatmap_title")}</span>
+              <span className="ml-auto text-[7px] text-muted-foreground">{t("time_stats.heatmap_range")}</span>
             </div>
             <div className="flex gap-[2px] overflow-x-auto">
               {heatmapData.map((week, wi) => (
@@ -442,12 +464,12 @@ export default function TimeStatsPage() {
               ))}
             </div>
             <div className="flex items-center justify-end gap-1 mt-1">
-              <span className="text-[6px] text-muted-foreground">少</span>
+              <span className="text-[6px] text-muted-foreground">{t("time_stats.heat_low")}</span>
               {[0, 0.2, 0.4, 0.65, 0.9].map((op, i) => (
                 <div key={i} className="w-[6px] h-[6px] rounded-[1px]"
                   style={{ background: i === 0 ? "hsl(var(--muted))" : `hsl(var(--primary) / ${op})` }} />
               ))}
-              <span className="text-[6px] text-muted-foreground">多</span>
+              <span className="text-[6px] text-muted-foreground">{t("time_stats.heat_high")}</span>
             </div>
           </div>
         </div>
@@ -458,7 +480,7 @@ export default function TimeStatsPage() {
           <div className="bg-card border border-border rounded-xl p-3">
             <div className="flex items-center gap-2 mb-1.5">
               <Clock size={11} className="text-primary" />
-              <span className="text-[10px] font-serif-sc text-foreground">时间分布</span>
+              <span className="text-[10px] font-serif-sc text-foreground">{t("time_stats.distribution_title")}</span>
             </div>
             {categoryData.length > 0 ? (
               <div className="flex items-center gap-2.5">
@@ -476,7 +498,7 @@ export default function TimeStatsPage() {
                     <span className="text-sm font-mono-jb font-bold text-foreground">
                       {(() => { const tot = categoryData.reduce((s, c) => s + c.value, 0); return tot >= 60 ? Math.round(tot / 60) + 'h' : tot + 'm'; })()}
                     </span>
-                    <span className="text-[6px] text-muted-foreground">时长</span>
+                    <span className="text-[6px] text-muted-foreground">{t("time_stats.duration_label")}</span>
                   </div>
                 </div>
                 <div className="flex-1 space-y-1">
@@ -487,7 +509,7 @@ export default function TimeStatsPage() {
                     return (
                       <div key={d.name} className="flex items-center gap-1.5">
                         <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: CATEGORY_COLORS[d.name] || CATEGORY_COLORS["其他"] }} />
-                        <span className="text-[9px] text-foreground flex-1">{d.name}</span>
+                        <span className="text-[9px] text-foreground flex-1">{categoryLabel(d.name)}</span>
                         <span className="text-[8px] font-mono-jb text-muted-foreground">{timeStr} {pct}%</span>
                       </div>
                     );
@@ -495,7 +517,7 @@ export default function TimeStatsPage() {
                 </div>
               </div>
             ) : (
-              <p className="text-[10px] text-muted-foreground/50 text-center py-3">暂无数据</p>
+              <p className="text-[10px] text-muted-foreground/50 text-center py-3">{t("time_stats.no_data")}</p>
             )}
           </div>
 
@@ -505,7 +527,7 @@ export default function TimeStatsPage() {
               <>
                 <div className="flex items-center gap-2 mb-1.5">
                   <Battery size={11} className="text-los-green" />
-                  <span className="text-[10px] font-serif-sc text-foreground">精力曲线</span>
+                  <span className="text-[10px] font-serif-sc text-foreground">{t("time_stats.energy_curve_title")}</span>
                 </div>
                 <ResponsiveContainer width="100%" height={80}>
                   <LineChart data={(() => {
@@ -517,7 +539,7 @@ export default function TimeStatsPage() {
                       .map(l => ({ time: format(new Date(l.timestamp), "M/d"), level: levelToNum(l.level) }));
                   })()}>
                     <XAxis dataKey="time" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 7 }} axisLine={false} tickLine={false} />
-                    <YAxis domain={[0, 3]} ticks={[1, 2, 3]} tickFormatter={(v: number) => ['', '低', '中', '高'][v] || ''}
+                    <YAxis domain={[0, 3]} ticks={[1, 2, 3]} tickFormatter={(v: number) => ['', t("time_stats.energy_level_low"), t("time_stats.energy_level_medium"), t("time_stats.energy_level_high")][v] || ''}
                       tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 7 }} axisLine={false} tickLine={false} width={20} />
                     <Line type="monotone" dataKey="level" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 2 }} />
                   </LineChart>
@@ -528,9 +550,9 @@ export default function TimeStatsPage() {
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
                     <span className="text-xs">💫</span>
-                    <span className="text-[10px] font-serif-sc text-foreground">情绪波动</span>
+                    <span className="text-[10px] font-serif-sc text-foreground">{t("time_stats.emotion_trend_title")}</span>
                   </div>
-                  <button onClick={() => navigate("/insights")} className="text-[8px] text-primary">详细 →</button>
+                  <button onClick={() => navigate("/insights")} className="text-[8px] text-primary">{t("time_stats.detail_link")} →</button>
                 </div>
                 <div className="flex items-end gap-[2px] h-[60px]">
                   {emotionTrend.slice(-14).map((d, i) => (
@@ -547,7 +569,7 @@ export default function TimeStatsPage() {
               </>
             ) : (
               <div className="flex items-center justify-center h-full">
-                <p className="text-[10px] text-muted-foreground/50">暂无精力/情绪数据</p>
+                <p className="text-[10px] text-muted-foreground/50">{t("time_stats.no_energy_emotion_data")}</p>
               </div>
             )}
           </div>
@@ -563,7 +585,7 @@ export default function TimeStatsPage() {
             <div className="bg-card border border-border rounded-xl p-3">
               <div className="flex items-center gap-2 mb-1.5">
                 <TrendingUp size={11} className="text-primary" />
-                <span className="text-[10px] font-serif-sc text-foreground">每日分类</span>
+                <span className="text-[10px] font-serif-sc text-foreground">{t("time_stats.daily_category_title")}</span>
               </div>
               <div className="h-[90px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -572,7 +594,7 @@ export default function TimeStatsPage() {
                     <YAxis tick={{ fontSize: 7, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
                     <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 9 }} />
                     {activeCats.map(cat => (
-                      <Bar key={cat} dataKey={cat} stackId="a" fill={CATEGORY_COLORS[cat] || CATEGORY_COLORS["其他"]} radius={0} />
+                      <Bar key={cat} dataKey={cat} name={categoryLabel(cat)} stackId="a" fill={CATEGORY_COLORS[cat] || CATEGORY_COLORS["其他"]} radius={0} />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
@@ -585,14 +607,18 @@ export default function TimeStatsPage() {
             <div className="bg-card border border-primary/20 rounded-xl p-3 flex flex-col justify-center">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs">📊</span>
-                <span className="text-[10px] font-serif-sc text-foreground">洞察</span>
+                <span className="text-[10px] font-serif-sc text-foreground">{t("time_stats.insight_title")}</span>
               </div>
               <p className="text-[10px] text-foreground/90 leading-relaxed">
-                这{range === "today" ? "天" : range === "week" ? "周" : "月"}你在「{stats.topCategory}」上花了最多精力
-                {stats.done > 0 && `，完成了 ${stats.done} 项任务`}。
-                {productivityScore >= 70 && " 效率非常棒！🎯"}
-                {productivityScore >= 40 && productivityScore < 70 && " 节奏不错，可以再聚焦一些。"}
-                {productivityScore < 40 && " 试试集中精力在最重要的事上？"}
+                {t("time_stats.insight_top_category", {
+                  period: range === "today" ? t("time_stats.period_day") : range === "week" ? t("time_stats.period_week") : t("time_stats.period_month"),
+                  category: categoryLabel(stats.topCategory),
+                })}
+                {stats.done > 0 && t("time_stats.insight_completed_tasks", { n: stats.done })}
+                {t("time_stats.punct_period")}
+                {productivityScore >= 70 && t("time_stats.insight_high_score")}
+                {productivityScore >= 40 && productivityScore < 70 && t("time_stats.insight_mid_score")}
+                {productivityScore < 40 && t("time_stats.insight_low_score")}
               </p>
             </div>
           )}
@@ -604,9 +630,9 @@ export default function TimeStatsPage() {
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
                 <span className="text-xs">💫</span>
-                <span className="text-[10px] font-serif-sc text-foreground">情绪波动</span>
+                <span className="text-[10px] font-serif-sc text-foreground">{t("time_stats.emotion_trend_title")}</span>
               </div>
-              <button onClick={() => navigate("/insights")} className="text-[8px] text-primary">详细 →</button>
+              <button onClick={() => navigate("/insights")} className="text-[8px] text-primary">{t("time_stats.detail_link")} →</button>
             </div>
             <div className="flex items-end gap-[2px] h-[28px]">
               {emotionTrend.slice(-14).map((d, i) => (
@@ -628,8 +654,8 @@ export default function TimeStatsPage() {
           <div className="bg-card border border-border rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-sm">🎯</span>
-              <span className="text-[11px] font-serif-sc text-foreground">时间价值矩阵</span>
-              <span className="text-[9px] text-muted-foreground ml-auto">高价值·充能 = 优先</span>
+              <span className="text-[11px] font-serif-sc text-foreground">{t("time_stats.drip_matrix_title")}</span>
+              <span className="text-[9px] text-muted-foreground ml-auto">{t("time_stats.drip_matrix_hint")}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {(["drive", "delegate", "delight", "drain"] as const).map(key => {
@@ -646,14 +672,14 @@ export default function TimeStatsPage() {
                     <div className="text-[9px] text-muted-foreground mb-1.5">{q.desc}</div>
                     <div className="text-[9px] text-muted-foreground">
                       {q.minutes >= 60 ? `${Math.round(q.minutes / 60)}h` : `${q.minutes}m`}
-                      {q.items.length > 0 && ` · ${q.items.slice(0, 2).join("、")}${q.items.length > 2 ? "…" : ""}`}
+                      {q.items.length > 0 && ` · ${q.items.slice(0, 2).join(t("time_stats.list_separator"))}${q.items.length > 2 ? "…" : ""}`}
                     </div>
                   </div>
                 );
               })}
             </div>
             <p className="text-[9px] text-muted-foreground mt-2 text-center">
-              🚀驱动区时间多 = 你在做最有意义的事 · 🔋消耗区时间多 = 考虑委托或减少
+              {t("time_stats.drip_matrix_footer")}
             </p>
           </div>
         )}
@@ -671,6 +697,7 @@ const ACTION_KEYWORDS = ["建议", "试试", "推荐", "可以", "行动", "做"
 
 function InsightsTab({ entries, userId }: { entries: any[]; userId?: string }) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<"insights" | "patterns">("patterns");
@@ -730,7 +757,7 @@ function InsightsTab({ entries, userId }: { entries: any[]; userId?: string }) {
         {(["patterns", "insights"] as const).map(k => (
           <button key={k} onClick={() => setActiveTab(k)}
             className={`text-xs px-3 py-1.5 rounded-full transition ${activeTab === k ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-            {k === "patterns" ? "情绪模式" : "行动建议"}
+            {k === "patterns" ? t("time_stats.insights_tab_patterns") : t("time_stats.insights_tab_actions")}
           </button>
         ))}
       </div>
@@ -738,7 +765,7 @@ function InsightsTab({ entries, userId }: { entries: any[]; userId?: string }) {
       <div className="px-4 mb-3">
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索洞察..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("time_stats.insights_search_placeholder")}
             className="w-full bg-muted border border-border rounded-xl pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none" />
         </div>
       </div>
@@ -746,7 +773,7 @@ function InsightsTab({ entries, userId }: { entries: any[]; userId?: string }) {
       {activeTab === "patterns" && (
         <div className="px-4 space-y-3">
           {patternWords.length === 0 ? (
-            <p className="text-caption text-muted-foreground text-center py-8">积累更多日记后，情绪模式会出现在这里</p>
+            <p className="text-caption text-muted-foreground text-center py-8">{t("time_stats.patterns_empty")}</p>
           ) : (
             <>
               <div className="flex flex-wrap gap-2">
@@ -757,8 +784,8 @@ function InsightsTab({ entries, userId }: { entries: any[]; userId?: string }) {
                 ))}
               </div>
               <div className="bg-card border border-border rounded-xl p-4">
-                <p className="text-caption text-muted-foreground mb-1">最近30天最常出现的情绪状态</p>
-                <p className="text-sm text-foreground">你最多感到「{patternWords[0]?.[0] || "—"}」，出现 {patternWords[0]?.[1] || 0} 次。</p>
+                <p className="text-caption text-muted-foreground mb-1">{t("time_stats.patterns_desc")}</p>
+                <p className="text-sm text-foreground">{t("time_stats.patterns_top", { emotion: patternWords[0]?.[0] || "—", count: patternWords[0]?.[1] || 0 })}</p>
               </div>
             </>
           )}
@@ -770,8 +797,8 @@ function InsightsTab({ entries, userId }: { entries: any[]; userId?: string }) {
           {filtered.length === 0 ? (
             <div className="text-center py-10">
               <MessageCircle size={28} className="mx-auto mb-2 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">还没有 AI 行动建议</p>
-              <p className="text-caption text-muted-foreground mt-1">和导师多聊几次，这里会出现可执行的建议</p>
+              <p className="text-sm text-muted-foreground">{t("time_stats.actions_empty_title")}</p>
+              <p className="text-caption text-muted-foreground mt-1">{t("time_stats.actions_empty_desc")}</p>
             </div>
           ) : filtered.map(ins => (
             <div key={ins.id} className="bg-card border border-border rounded-xl p-4">
@@ -800,6 +827,7 @@ import { useEffect } from "react";
 /* ─── Diary Timeline - auto-extracted with editable blocks ─── */
 function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
   const { allTodos, updateTodo, todayKey, defaultModelProfileId } = useLifeOs();
+  const { t } = useLanguage();
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [loading, setLoading] = useState(false);
   const [extracted, setExtracted] = useState(false);
@@ -856,7 +884,7 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
       // 之前这里不设 extracted=true，失败时下面 "timeBlocks.length===0 && !extracted" 的兜底分支
       // 永远进不去，会直接 return null——整个模块从界面上消失，用户看不到任何提示也无法重试。
       setExtracted(true);
-      toast.error("从日记提取时间线失败，请检查网络后重试", { id: "extract-timeline-error" });
+      toast.error(t("time_stats.extract_error"), { id: "extract-timeline-error" });
     } finally {
       setLoading(false);
     }
@@ -888,7 +916,7 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
     return (
       <div className="bg-card border border-border rounded-2xl p-4 flex items-center justify-center gap-2">
         <Loader2 size={14} className="animate-spin text-primary" />
-        <span className="text-[11px] text-muted-foreground">提取时间线…</span>
+        <span className="text-[11px] text-muted-foreground">{t("time_stats.extracting_timeline")}</span>
       </div>
     );
   }
@@ -896,8 +924,8 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
   if (timeBlocks.length === 0 && extracted) {
     return (
       <div className="bg-card border border-border rounded-2xl p-3 text-center">
-        <p className="text-[11px] text-muted-foreground/50">日记中未发现时间信息</p>
-        <button onClick={extractTimeline} className="text-[10px] text-primary mt-1">重新提取</button>
+        <p className="text-[11px] text-muted-foreground/50">{t("time_stats.no_timeline_found")}</p>
+        <button onClick={extractTimeline} className="text-[10px] text-primary mt-1">{t("time_stats.re_extract")}</button>
       </div>
     );
   }
@@ -911,12 +939,12 @@ function DiaryTimeline({ entries, today }: { entries: any[]; today: string }) {
     <div className="bg-card border border-primary/20 rounded-2xl p-3">
       <div className="flex items-center gap-2 mb-1">
         <CalendarClock size={12} className="text-primary" />
-        <span className="text-[11px] font-serif-sc text-foreground">今日时间线</span>
+        <span className="text-[11px] font-serif-sc text-foreground">{t("time_stats.today_timeline_title")}</span>
         <span className="ml-auto text-[9px] text-muted-foreground font-mono-jb">{totalHours}h</span>
-        <button onClick={extractTimeline} className="text-[9px] text-muted-foreground/50 hover:text-primary">刷新</button>
+        <button onClick={extractTimeline} className="text-[9px] text-muted-foreground/50 hover:text-primary">{t("time_stats.refresh")}</button>
       </div>
       {summary && <p className="text-[10px] text-muted-foreground mb-2">{summary}</p>}
-      {matchedCount > 0 && <p className="text-[9px] text-los-green mb-2">✅ 已匹配 {matchedCount} 条待办用时</p>}
+      {matchedCount > 0 && <p className="text-[9px] text-los-green mb-2">{t("time_stats.matched_todos", { n: matchedCount })}</p>}
 
       {/* Compact stacked bar */}
       <div className="h-[4px] rounded-full bg-muted mb-2 flex overflow-hidden">
@@ -975,6 +1003,7 @@ function AiAnalysis({
   entries: any[];
 }) {
   const { defaultModelProfileId } = useLifeOs();
+  const { t } = useLanguage();
   const [analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -1001,7 +1030,7 @@ function AiAnalysis({
         { memoryContext, patterns, modelProfileId: defaultModelProfileId }
       );
       setAnalysis(data);
-    } catch { setError("AI 分析暂不可用"); } finally { setLoading(false); }
+    } catch { setError(t("time_stats.ai_analysis_unavailable")); } finally { setLoading(false); }
   };
 
   if (!analysis && !loading) {
@@ -1009,7 +1038,7 @@ function AiAnalysis({
       <button onClick={runAnalysis}
         className="w-full bg-card border border-border rounded-2xl p-3 flex items-center justify-center gap-2 text-[11px] text-muted-foreground hover:text-primary hover:border-primary/30 transition">
         <Sparkles size={13} />
-        <span className="font-serif-sc">AI 深度分析</span>
+        <span className="font-serif-sc">{t("time_stats.ai_deep_analysis")}</span>
       </button>
     );
   }
@@ -1018,7 +1047,7 @@ function AiAnalysis({
     return (
       <div className="bg-card border border-border rounded-2xl p-4 flex items-center justify-center gap-2">
         <Loader2 size={14} className="animate-spin text-primary" />
-        <span className="text-[11px] text-muted-foreground">分析中…</span>
+        <span className="text-[11px] text-muted-foreground">{t("time_stats.analyzing")}</span>
       </div>
     );
   }
@@ -1027,7 +1056,7 @@ function AiAnalysis({
     return (
       <div className="bg-card border border-border rounded-2xl p-3 text-center">
         <p className="text-[11px] text-destructive">{error}</p>
-        <button onClick={runAnalysis} className="text-[10px] text-primary mt-1">重试</button>
+        <button onClick={runAnalysis} className="text-[10px] text-primary mt-1">{t("time_stats.retry")}</button>
       </div>
     );
   }
@@ -1036,8 +1065,8 @@ function AiAnalysis({
     <div className="bg-card border border-primary/20 rounded-2xl p-3 space-y-2">
       <div className="flex items-center gap-2">
         <Sparkles size={12} className="text-primary" />
-        <span className="text-[11px] font-serif-sc text-foreground">罗盘分析</span>
-        <button onClick={runAnalysis} className="ml-auto text-[9px] text-muted-foreground/50 hover:text-primary">刷新</button>
+        <span className="text-[11px] font-serif-sc text-foreground">{t("time_stats.compass_analysis")}</span>
+        <button onClick={runAnalysis} className="ml-auto text-[9px] text-muted-foreground/50 hover:text-primary">{t("time_stats.refresh")}</button>
       </div>
       {analysis.summary && <p className="text-[11px] text-foreground/90 leading-relaxed">{analysis.summary}</p>}
       {analysis.insights?.map((ins: any, i: number) => (
@@ -1051,7 +1080,7 @@ function AiAnalysis({
       ))}
       {analysis.suggestions?.length > 0 && (
         <div className="border-t border-border pt-2 space-y-1">
-          <span className="text-[9px] text-muted-foreground">💡 建议</span>
+          <span className="text-[9px] text-muted-foreground">💡 {t("time_stats.suggestions_label")}</span>
           {analysis.suggestions.map((s: any, i: number) => (
             <p key={i} className="text-[10px] text-foreground pl-3">{s.action}</p>
           ))}

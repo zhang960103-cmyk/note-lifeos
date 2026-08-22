@@ -44,7 +44,12 @@ export interface ExtractResult {
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/life-mentor-chat`;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const DEFAULT_MAX_RETRIES = 1;
-const DEFAULT_TIMEOUT_MS = 12000; // 12s 适合移动端弱网
+// BUG-01：QA 实测发现新会话/edge function 冷启动时 extractMeta 经常在 12s 内
+// 收不到响应而触发 AbortError。原逻辑把这类超时错误当成"不可重试"直接判失败
+// （isRetryableError 只认 StreamChatError/TypeError，不认 DOMException AbortError），
+// 且失败后又把异常吞掉、悄悄返回空结果——两个问题叠加导致待办/财务经常抽取不到。
+// 这里把超时窗口放宽到 20s，同时在下面让"超时触发的 abort"显式可重试。
+const DEFAULT_TIMEOUT_MS = 20000;
 const INITIAL_RETRY_DELAY_MS = 1000;
 const CURRENT_PROJECT_REF = (() => {
   try {
@@ -71,6 +76,25 @@ class StreamChatError extends Error {
   }
 }
 
+function isPlainRecord(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+// BUG-01 输入校验：AI 抽取结果不可信任，逐条校验后再允许落库（待办/财务）。
+// 结构不完整或数值不合理的条目直接丢弃，而不是"尽量兜底塞进去"——
+// 宁可少记一条，也不能凭空产生一条金额是 NaN/负数、或空文本的待办/流水。
+function isValidTodoHint(t: unknown): t is { text: string; priority?: string; dueDate?: string; tags?: string[]; category?: string } {
+  return isPlainRecord(t) && typeof t.text === "string" && t.text.trim().length > 0;
+}
+
+function isValidFinanceHint(h: unknown): h is { type: "income" | "expense"; amount: number; category: string; note: string } {
+  if (!isPlainRecord(h)) return false;
+  if (h.type !== "income" && h.type !== "expense") return false;
+  if (typeof h.amount !== "number" || !Number.isFinite(h.amount) || h.amount <= 0) return false;
+  if (typeof h.category !== "string" || !h.category.trim()) return false;
+  return true;
+}
+
 function validateExtractResult(data: unknown): ExtractResult {
   const defaults: ExtractResult = {
     emotionTags: [],
@@ -90,25 +114,28 @@ function validateExtractResult(data: unknown): ExtractResult {
   const obj = data as Record<string, unknown>;
 
   try {
+    const droppedTodos = Array.isArray(obj.todos) ? obj.todos.filter(t => !isValidTodoHint(t)) : [];
+    const droppedFinance = Array.isArray(obj.financeHints) ? obj.financeHints.filter(h => !isValidFinanceHint(h)) : [];
+    if (droppedTodos.length || droppedFinance.length) {
+      console.warn("[extractMeta] 丢弃了不合法的抽取条目（缺字段/金额非法等），不会落库:", { droppedTodos, droppedFinance });
+    }
+
     return {
-      emotionTags: Array.isArray(obj.emotionTags) 
+      emotionTags: Array.isArray(obj.emotionTags)
         ? obj.emotionTags.filter(t => typeof t === 'string')
         : [],
-      topicTags: Array.isArray(obj.topicTags) 
+      topicTags: Array.isArray(obj.topicTags)
         ? obj.topicTags.filter(t => typeof t === 'string')
         : [],
-      todos: Array.isArray(obj.todos) ? obj.todos : [],
-      completedTodoIds: Array.isArray(obj.completedTodoIds) 
+      todos: Array.isArray(obj.todos) ? obj.todos.filter(isValidTodoHint) : [],
+      completedTodoIds: Array.isArray(obj.completedTodoIds)
         ? obj.completedTodoIds.filter(id => typeof id === 'string')
         : [],
-      emotionScore: typeof obj.emotionScore === "number" 
+      emotionScore: typeof obj.emotionScore === "number"
         ? Math.max(0, Math.min(10, obj.emotionScore))
         : 5,
-      financeHints: Array.isArray(obj.financeHints) 
-        ? obj.financeHints.filter(h => 
-            h && typeof h === 'object' && 
-            ('type' in h) && ('amount' in h) && ('category' in h)
-          )
+      financeHints: Array.isArray(obj.financeHints)
+        ? obj.financeHints.filter(isValidFinanceHint)
         : [],
       goalHints: Array.isArray(obj.goalHints) ? obj.goalHints : [],
     };
@@ -341,20 +368,41 @@ async function processStream(
 // Extract Meta Function
 // ════════════════════════════════════════
 
+// BUG-01 根因（三处叠加）：
+// 1) 超时通过内部 timeoutController.abort() 触发的是原生 DOMException("AbortError")，
+//    既不是 StreamChatError 也不是 TypeError，isRetryableError() 对它一律返回 false——
+//    也就是说"12s 收不到响应"这条 QA 复现路径实际上从未真正重试过，第一次超时就直接判死。
+// 2) 重试耗尽或不可重试时，旧代码 return validateExtractResult(null)——用一个"看起来正常"
+//    的空结果 resolve，调用方 .then() 照样执行、只是 todos/financeHints 全是空数组，
+//    .catch() 分支（驱动"自动记录未完成，点此重试"提示条）永远不会被触发。
+// 3) 没有 signal 参数，调用方（HomePage）无法在页面卸载/用户主动停止生成时真正取消这次
+//    请求；卸载后 promise 迟迟才 resolve/reject，容易在已卸载组件上触发状态更新。
+// 三处一并修复：外部 signal 可取消且能与"超时"区分；超时 abort 显式可重试；
+// 重试耗尽后一律 throw，不再返回伪装成功的空结果。
 export async function extractMeta(
   messages: ChatMsg[],
   existingTodos?: Array<{ id: string; text: string; status: string; priority: string }>,
-  accessToken?: string
+  accessToken?: string,
+  signal?: AbortSignal
 ): Promise<ExtractResult> {
   validateEnvironment();
+
+  if (signal?.aborted) {
+    throw new StreamChatError("EXTRACT_CANCELLED", "提取已取消", undefined, false);
+  }
 
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= DEFAULT_MAX_RETRIES; attempt++) {
-    try {
-      const timeoutController = new AbortController();
-      const timeoutId = setTimeout(() => timeoutController.abort(), DEFAULT_TIMEOUT_MS);
+    const timeoutController = new AbortController();
+    let timedOut = false;
+    let externallyCancelled = false;
+    const timeoutId = setTimeout(() => { timedOut = true; timeoutController.abort(); }, DEFAULT_TIMEOUT_MS);
+    // iOS Safari 17.3 以下不支持 AbortSignal.any()，手动转发外部取消信号。
+    const onExternalAbort = () => { externallyCancelled = true; timeoutController.abort(); };
+    signal?.addEventListener("abort", onExternalAbort, { once: true });
 
+    try {
       const authToken = getPreferredAuthToken(accessToken);
 
       let resp = await fetch(CHAT_URL, {
@@ -374,6 +422,7 @@ export async function extractMeta(
       }
 
       clearTimeout(timeoutId);
+      signal?.removeEventListener("abort", onExternalAbort);
 
       if (!resp.ok) {
         const errorData = await resp.json().catch(() => ({}));
@@ -383,23 +432,49 @@ export async function extractMeta(
         );
       }
 
-      const data = await resp.json();
+      let data: unknown;
+      try {
+        data = await resp.json();
+      } catch (parseErr) {
+        // 解析失败与网络/超时失败是两类不同问题：AI 这次生成的 JSON 本身就是坏的，
+        // 但换一次生成很可能就是好的，所以仍然标记为可重试，而不是直接判定失败。
+        throw new StreamChatError("EXTRACT_PARSE_ERROR", "AI 返回的数据无法解析", resp.status, true);
+      }
       return validateExtractResult(data);
     } catch (err) {
+      clearTimeout(timeoutId);
+      signal?.removeEventListener("abort", onExternalAbort);
       lastError = err as Error;
 
-      if (attempt < DEFAULT_MAX_RETRIES && isRetryableError(err)) {
+      const isAbort = err instanceof DOMException && err.name === "AbortError";
+
+      if (isAbort && externallyCancelled) {
+        // 用户主动取消 / 组件已卸载：这不是"提取失败"，不重试、不进入失败分支，
+        // 直接抛出可辨识的错误，调用方据此决定不再显示"记录未完成"提示。
+        throw new StreamChatError("EXTRACT_CANCELLED", "提取已取消", undefined, false);
+      }
+
+      const retryable = isAbort && timedOut ? true : isRetryableError(err);
+
+      if (attempt < DEFAULT_MAX_RETRIES && retryable) {
         const delayMs = getRetryDelay(attempt);
-        console.warn(`[extractMeta] Attempt ${attempt + 1} failed, retrying in ${delayMs}ms:`, lastError.message);
+        console.warn(`[extractMeta] Attempt ${attempt + 1} failed (${isAbort ? "timeout" : (err as StreamChatError)?.code || "error"}), retrying in ${delayMs}ms:`, lastError.message);
         await new Promise(resolve => setTimeout(resolve, delayMs));
+        if (signal?.aborted) {
+          throw new StreamChatError("EXTRACT_CANCELLED", "提取已取消", undefined, false);
+        }
       } else {
-        console.error("[extractMeta] Failed:", lastError);
-        return validateExtractResult(null);
+        // 重试耗尽后必须把错误往外抛，让调用方能区分"AI 判断这段话没什么可提取的
+        // （resolve 一个空结果）"和"这次提取请求彻底失败了（reject）"。绝不能在这里
+        // 用 validateExtractResult(null) 伪装成功，否则待办/财务永远不会真正落库，
+        // 而界面上写好的重试提示条也永远不会被触发。
+        console.error("[extractMeta] Failed after retries:", lastError);
+        throw lastError;
       }
     }
   }
 
-  return validateExtractResult(null);
+  throw lastError ?? new StreamChatError("EXTRACT_UNKNOWN", "extractMeta failed", undefined, false);
 }
 
 // ════════════════════════════════════════

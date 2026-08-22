@@ -1,107 +1,124 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { ChevronRight, Mic, Brain, BarChart3, Wallet, Target, Check } from "lucide-react";
 
-const EXAMPLE_PROMPTS = [
-  "今天开了3小时会，感觉很低效，有点焦虑",
-  "帮我安排今天：要写周报、回10封邮件、健身",
-  "花了80块吃饭，又买了本书150块",
-  "刚跟领导谈完，感觉方向不对，不知道怎么办",
-];
+type T = (key: string) => string;
 
-const FEATURES = [
-  { icon: <Mic size={20} className="text-gold" />, title: "说话就记录", desc: "语音或打字，AI自动整理成日记、待办、财务" },
-  { icon: <Brain size={20} className="text-gold" />, title: "人生导师", desc: "不只是工具，是陪你想清楚的成长伙伴" },
-  { icon: <BarChart3 size={20} className="text-gold" />, title: "时间去哪了", desc: "自动统计你的时间分布，发现被消耗的地方" },
-  { icon: <Wallet size={20} className="text-gold" />, title: "钱去哪了", desc: "说话自动记账，预算、订阅、借还一体管理" },
-  { icon: <Target size={20} className="text-gold" />, title: "每周复盘", desc: "AI写给你的成长信，发现你自己看不到的模式" },
-];
+function getExamplePrompts(t: T) {
+  return [
+    t("onboarding.slide2.example1"),
+    t("onboarding.slide2.example2"),
+    t("onboarding.slide2.example3"),
+    t("onboarding.slide2.example4"),
+  ];
+}
+
+function getFeatures(t: T) {
+  return [
+    { icon: <Mic size={20} className="text-gold" />, title: t("onboarding.feature1.title"), desc: t("onboarding.feature1.desc") },
+    { icon: <Brain size={20} className="text-gold" />, title: t("onboarding.feature2.title"), desc: t("onboarding.feature2.desc") },
+    { icon: <BarChart3 size={20} className="text-gold" />, title: t("onboarding.feature3.title"), desc: t("onboarding.feature3.desc") },
+    { icon: <Wallet size={20} className="text-gold" />, title: t("onboarding.feature4.title"), desc: t("onboarding.feature4.desc") },
+    { icon: <Target size={20} className="text-gold" />, title: t("onboarding.feature5.title"), desc: t("onboarding.feature5.desc") },
+  ];
+}
 
 // R3: Activation tasks — guide user to complete 3 key actions in first session
-const ACTIVATION_TASKS = [
-  {
-    id: "first_entry",
-    label: "说出今天发生的一件事",
-    hint: "随便说，不需要完整",
-    action: "/",
-    examples: ["今天开会开了3小时，有点累", "吃了顿好吃的火锅，心情不错", "项目遇到问题，有点焦虑"],
-  },
-  {
-    id: "first_todo",
-    label: "记录一件今天要做的事",
-    hint: "AI会自动提取并创建待办",
-    action: "/todos",
-    examples: ["今天要回10封邮件", "下午3点要开会", "要写周报"],
-  },
-  {
-    id: "first_wheel",
-    label: "做一次生命之轮打分",
-    hint: "评估你7个维度的当前状态",
-    action: "/wheel",
-    examples: [],
-  },
-];
+function getActivationTasks(t: T) {
+  return [
+    {
+      id: "first_entry",
+      label: t("onboarding.task1.label"),
+      hint: t("onboarding.task1.hint"),
+      action: "/",
+      examples: [t("onboarding.task1.example1"), t("onboarding.task1.example2"), t("onboarding.task1.example3")],
+    },
+    {
+      id: "first_todo",
+      label: t("onboarding.task2.label"),
+      hint: t("onboarding.task2.hint"),
+      action: "/todos",
+      examples: [t("onboarding.task2.example1"), t("onboarding.task2.example2"), t("onboarding.task2.example3")],
+    },
+    {
+      id: "first_wheel",
+      label: t("onboarding.task3.label"),
+      hint: t("onboarding.task3.hint"),
+      action: "/wheel",
+      examples: [],
+    },
+  ];
+}
 
-const STEPS = [
-  {
-    title: "你的私人生命导师",
-    subtitle: "不是工具，是陪你成长的伙伴",
-    content: (
-      <div className="space-y-2 mt-4">
-        {FEATURES.map((f, i) => (
-          <div key={i} className="flex items-start gap-3 bg-surface-2 border border-border rounded-xl p-3">
-            <div className="mt-0.5">{f.icon}</div>
-            <div><p className="text-xs font-semibold text-foreground">{f.title}</p>
-              <p className="text-[10px] text-muted-foreground leading-[1.6]">{f.desc}</p></div>
-          </div>
-        ))}
-      </div>
-    ),
-  },
-  {
-    title: "你只需要说话",
-    subtitle: "任何格式，任何时候，AI处理一切",
-    content: (
-      <div className="mt-4 space-y-2">
-        <p className="text-[10px] text-muted-foreground mb-3">比如这样说：</p>
-        {EXAMPLE_PROMPTS.map((p, i) => (
-          <div key={i} className="bg-surface-2 border border-border rounded-xl px-4 py-3">
-            <p className="text-xs text-foreground leading-[1.7]">「{p}」</p>
-          </div>
-        ))}
-        <p className="text-[10px] text-muted-foreground mt-3 text-center">说完之后，导师会回应你，同时自动记录所有信息</p>
-      </div>
-    ),
-  },
-  {
-    title: "关于你的数据",
-    subtitle: "你的内容，只属于你",
-    content: (
-      <div className="mt-4 space-y-3">
-        <div className="bg-primary/10 border border-primary/30 rounded-xl p-4">
-          <p className="text-xs font-semibold text-foreground mb-2">🔒 你的日记只属于你</p>
-          <p className="text-[11px] text-foreground/80 leading-[1.7]">你输入的内容存储在你的账号里，不会公开分享，不用于广告。AI处理你的内容是为了更好地帮助你，仅此而已。</p>
+function getSteps(t: T, features: ReturnType<typeof getFeatures>, examplePrompts: string[]) {
+  return [
+    {
+      title: t("onboarding.slide1.title"),
+      subtitle: t("onboarding.slide1.subtitle"),
+      content: (
+        <div className="space-y-2 mt-4">
+          {features.map((f, i) => (
+            <div key={i} className="flex items-start gap-3 bg-surface-2 border border-border rounded-xl p-3">
+              <div className="mt-0.5">{f.icon}</div>
+              <div><p className="text-xs font-semibold text-foreground">{f.title}</p>
+                <p className="text-[10px] text-muted-foreground leading-[1.6]">{f.desc}</p></div>
+            </div>
+          ))}
         </div>
-        <div className="bg-surface-2 border border-border rounded-xl p-4">
-          <p className="text-xs font-semibold text-foreground mb-2">💡 最好的起点</p>
-          <p className="text-[11px] text-foreground/80 leading-[1.7]">今天就写第一条——不需要完整，不需要整理，随便说说今天发生了什么就行。</p>
+      ),
+    },
+    {
+      title: t("onboarding.slide2.title"),
+      subtitle: t("onboarding.slide2.subtitle"),
+      content: (
+        <div className="mt-4 space-y-2">
+          <p className="text-[10px] text-muted-foreground mb-3">{t("onboarding.slide2.intro")}</p>
+          {examplePrompts.map((p, i) => (
+            <div key={i} className="bg-surface-2 border border-border rounded-xl px-4 py-3">
+              <p className="text-xs text-foreground leading-[1.7]">「{p}」</p>
+            </div>
+          ))}
+          <p className="text-[10px] text-muted-foreground mt-3 text-center">{t("onboarding.slide2.footer")}</p>
         </div>
-      </div>
-    ),
-  },
-  {
-    title: "快速上手",
-    subtitle: "完成这3件事，让导师真正了解你",
-    content: null, // rendered separately with navigate support
-  },
-];
+      ),
+    },
+    {
+      title: t("onboarding.slide3.title"),
+      subtitle: t("onboarding.slide3.subtitle"),
+      content: (
+        <div className="mt-4 space-y-3">
+          <div className="bg-primary/10 border border-primary/30 rounded-xl p-4">
+            <p className="text-xs font-semibold text-foreground mb-2">🔒 {t("onboarding.slide3.privacy_title")}</p>
+            <p className="text-[11px] text-foreground/80 leading-[1.7]">{t("onboarding.slide3.privacy_body")}</p>
+          </div>
+          <div className="bg-surface-2 border border-border rounded-xl p-4">
+            <p className="text-xs font-semibold text-foreground mb-2">💡 {t("onboarding.slide3.start_title")}</p>
+            <p className="text-[11px] text-foreground/80 leading-[1.7]">{t("onboarding.slide3.start_body")}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: t("onboarding.slide4.title"),
+      subtitle: t("onboarding.slide4.subtitle"),
+      content: null, // rendered separately with navigate support
+    },
+  ];
+}
 
 export default function Onboarding() {
+  const { t } = useLanguage();
   const [step, setStep] = useState(0);
   const [done, setDone] = useState<Set<string>>(new Set());
   const { completeOnboarding } = useLifeOs();
   const navigate = useNavigate();
+
+  const FEATURES = getFeatures(t);
+  const EXAMPLE_PROMPTS = getExamplePrompts(t);
+  const ACTIVATION_TASKS = getActivationTasks(t);
+  const STEPS = getSteps(t, FEATURES, EXAMPLE_PROMPTS);
 
   const next = () => {
     if (step < STEPS.length - 1) { setStep(step + 1); return; }
@@ -158,7 +175,7 @@ export default function Onboarding() {
             ))}
             <button onClick={() => completeOnboarding()}
               className="w-full mt-2 text-center text-caption text-muted-foreground hover:text-foreground transition py-2">
-              稍后再做，先进入应用
+              {t("onboarding.button.later")}
             </button>
           </div>
         ) : (
@@ -173,7 +190,7 @@ export default function Onboarding() {
               ))}
             </div>
             <button onClick={next} className="flex items-center gap-1.5 bg-gold text-background px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gold/90 transition-all">
-              {step < STEPS.length - 1 ? "下一步" : "开始使用"}
+              {step < STEPS.length - 1 ? t("onboarding.button.next") : t("onboarding.button.start")}
               <ChevronRight size={14} />
             </button>
           </div>
@@ -182,7 +199,7 @@ export default function Onboarding() {
         {step === 0 && (
           <button onClick={() => { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); completeOnboarding(); }}
             className="w-full mt-3 text-center text-[10px] text-muted-foreground hover:text-foreground transition">
-            跳过介绍，直接开始
+            {t("onboarding.button.skip")}
           </button>
         )}
       </div>

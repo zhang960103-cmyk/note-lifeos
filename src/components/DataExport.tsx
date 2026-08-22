@@ -65,7 +65,7 @@ export default function DataExport() {
       // 之前这里没有catch，Blob/下载被浏览器拒绝(存储空间不足、隐私模式限制等)
       // 时会是完全静默的失败——按钮转完圈之后什么都没发生，用户不知道要不要重试。
       console.error("[DataExport] JSON导出失败:", e);
-      alert(`导出失败：${e?.message || "未知错误"}\n\n可能是浏览器存储权限受限或空间不足，请检查后重试。`);
+      alert(`${t("data_export.fail_prefix")}${e?.message || t("data_export.unknown_error")}\n\n${t("data_export.fail_hint")}`);
     } finally {
       setExporting(false);
     }
@@ -75,7 +75,14 @@ export default function DataExport() {
     setExporting(true);
     try {
       // 导出待办为 CSV
-      const headers = ["日期", "任务", "状态", "优先级", "标签", "备注"];
+      const headers = [
+        t("data_export.csv_header.date"),
+        t("data_export.csv_header.task"),
+        t("data_export.csv_header.status"),
+        t("data_export.csv_header.priority"),
+        t("data_export.csv_header.tags"),
+        t("data_export.csv_header.note"),
+      ];
       const rows = allTodos.map(t => [
         t.sourceDate || t.createdAt.split("T")[0],
         `"${t.text.replace(/"/g, '""')}"`,
@@ -94,7 +101,7 @@ export default function DataExport() {
       URL.revokeObjectURL(url);
     } catch (e: any) {
       console.error("[DataExport] CSV导出失败:", e);
-      alert(`导出失败：${e?.message || "未知错误"}\n\n可能是浏览器存储权限受限或空间不足，请检查后重试。`);
+      alert(`${t("data_export.fail_prefix")}${e?.message || t("data_export.unknown_error")}\n\n${t("data_export.fail_hint")}`);
     } finally {
       setExporting(false);
     }

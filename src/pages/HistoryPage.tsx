@@ -1,11 +1,13 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { CheckSquare, Square, ChevronDown, ChevronUp, Trash2, FileText, AlertTriangle } from "lucide-react";
 import { format, parseISO, subDays, eachDayOfInterval, startOfYear, getDay } from "date-fns";
 
 const HistoryPage = () => {
   const { entries, toggleTodo, deleteEntry, monthFinanceStats } = useLifeOs();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -89,56 +91,101 @@ const HistoryPage = () => {
     >
       <div className="py-4 flex items-center justify-between">
         <div>
-          <h1 className="font-serif-sc text-lg text-foreground">回顾</h1>
-          <span className="text-[10px] text-muted-foreground font-mono-jb">{entries.length} 天记录</span>
+          <h1 className="font-serif-sc text-lg text-foreground">{t("history.title")}</h1>
+          <span className="text-[10px] text-muted-foreground font-mono-jb">{t("history.days_count", { count: entries.length })}</span>
         </div>
         <button
           onClick={() => navigate("/review")}
           className="flex items-center gap-1.5 text-gold text-xs bg-gold-light px-3 py-1.5 rounded-full hover:bg-gold/20 transition"
         >
-          <FileText size={14} /> 生成复盘信
+          <FileText size={14} /> {t("history.generate_review")}
         </button>
       </div>
 
-      {/* 365-day Emotion Heatmap */}
+      {/* BUG-09 根因：这个热力图之前对全年（含头尾占位）每一天都渲染一个真实
+          <button>，其中占位格是用 opacity-0 藏起来的、完全不可见、也没有任何名
+          称的按钮——一年下来大约 389 个可聚焦控件挤在一起，键盘用户要按几百次
+          Tab 才能跳过这个区块，触摸也几乎不可能精确点中某一个 8×8px 的格子。
+          修复思路（不是完全重做视觉设计，而是把"能不能被 Tab 到"和"点了有没有
+          意义"对齐）：
+            1. 占位格（不属于统计区间内的日期）改成 aria-hidden 的纯 <div>，
+               彻底退出可访问树和 Tab 顺序；
+            2. 当天没有日记的格子也改成不可聚焦的 <div>（保留视觉着色和
+               title 提示，但点了本来就没反应，不该占一个 Tab 停靠点）；
+            3. 只有"这天真的写过日记"的格子才保留成 <button>，并且用
+               aria-label（而不是只有 title）给出完整可读的日期+分数；
+            4. 整个区块包一层 role="group" + aria-label 汇总说明（一共统计
+               了多少天、其中多少天有记录），外加一个视觉隐藏、聚焦时才显示的
+               "跳过热力图"链接，键盘用户可以一次性跳到热力图后面的内容。
+          8×8px 的格子尺寸本身没有放大到 44×44px——一年 365 天要放大到这个尺寸
+          会让整个热力图宽度超过 16000px，直接失去"一眼看全年"的产品意图；这是
+          一个视觉密度 vs 触控热区的真实取舍，具体怎么权衡建议由你决定，我在下面
+          的报告里会单独说明。 */}
+      <a href="#history-heatmap-end" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-gold focus:text-background focus:px-3 focus:py-1.5 focus:rounded-lg focus:text-xs">
+        {t("history.skip_heatmap")}
+      </a>
       <div className="bg-surface-2 border border-border rounded-xl p-4 mb-4">
-        <h2 className="text-xs text-muted-foreground font-mono-jb mb-3">情绪热力图 · 过去365天</h2>
+        <h2 className="text-xs text-muted-foreground font-mono-jb mb-3">{t("history.heatmap_title")}</h2>
         <div className="overflow-x-auto scrollbar-none">
-          <div className="flex gap-[2px]" style={{ minWidth: `${weeks.length * 10}px` }}>
+          <div
+            className="flex gap-[2px]"
+            style={{ minWidth: `${weeks.length * 10}px` }}
+            role="group"
+            aria-label={t("history.heatmap_summary", { total: heatmapData.length, withEntry: heatmapData.filter(d => d.hasEntry).length })}
+          >
             {weeks.map((week, wi) => (
               <div key={wi} className="flex flex-col gap-[2px]">
-                {week.map((day, di) => (
-                  <button
-                    key={di}
-                    onClick={() => day.date && day.hasEntry && setSelectedDate(day.date === selectedDate ? null : day.date)}
-                    className={`w-[8px] h-[8px] rounded-[1px] transition-all ${getHeatColor(day.score, day.hasEntry)} ${
-                      day.date === selectedDate ? "ring-1 ring-gold scale-150" : ""
-                    } ${!day.date ? "opacity-0" : ""}`}
-                    title={day.date ? `${day.date} ${day.score ? `(${day.score}/10)` : "无记录"}` : ""}
-                  />
-                ))}
+                {week.map((day, di) => {
+                  if (!day.date) {
+                    // 占位格：不代表任何真实日期，彻底移出可访问树和 Tab 顺序
+                    return <div key={di} aria-hidden="true" className="w-[8px] h-[8px] rounded-[1px] opacity-0" />;
+                  }
+                  if (!day.hasEntry) {
+                    // 没有日记的日期：保留视觉着色和 title 提示，但不给 Tab 停靠点
+                    // （点了本来就没有任何反应）
+                    return (
+                      <div
+                        key={di}
+                        className={`w-[8px] h-[8px] rounded-[1px] transition-all ${getHeatColor(day.score, day.hasEntry)}`}
+                        title={`${day.date} ${t("history.no_record")}`}
+                      />
+                    );
+                  }
+                  return (
+                    <button
+                      key={di}
+                      onClick={() => setSelectedDate(day.date === selectedDate ? null : day.date)}
+                      className={`w-[8px] h-[8px] rounded-[1px] transition-all ${getHeatColor(day.score, day.hasEntry)} ${
+                        day.date === selectedDate ? "ring-1 ring-gold scale-150" : ""
+                      }`}
+                      title={`${day.date} ${day.score ? `(${day.score}/10)` : t("history.no_record")}`}
+                      aria-label={`${day.date}${day.score !== null ? ` ${day.score}/10` : ""}`}
+                    />
+                  );
+                })}
               </div>
             ))}
           </div>
         </div>
         {/* Legend */}
         <div className="flex items-center gap-2 mt-2 text-[8px] text-muted-foreground">
-          <span>低</span>
+          <span>{t("history.legend_low")}</span>
           <span className="w-2 h-2 bg-los-red/60 rounded-[1px]" />
           <span className="w-2 h-2 bg-los-orange/60 rounded-[1px]" />
           <span className="w-2 h-2 bg-gold/60 rounded-[1px]" />
           <span className="w-2 h-2 bg-los-green/60 rounded-[1px]" />
           <span className="w-2 h-2 bg-los-green rounded-[1px]" />
-          <span>高</span>
-          <span className="ml-2">□ 无记录</span>
+          <span>{t("history.legend_high")}</span>
+          <span className="ml-2">□ {t("history.no_record")}</span>
         </div>
       </div>
+      <div id="history-heatmap-end" />
 
       {/* Selected day detail */}
       {selectedEntry && (
         <div className="bg-surface-2 border border-gold-border rounded-xl p-4 mb-4 animate-in fade-in">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-foreground font-serif-sc">{format(parseISO(selectedEntry.date), "M月d日")}</span>
+            <span className="text-xs text-foreground font-serif-sc">{format(parseISO(selectedEntry.date), t("history.date_format"))}</span>
             <span className="text-xs text-gold font-mono-jb">{selectedEntry.emotionScore}/10</span>
           </div>
           {selectedEntry.emotionTags.length > 0 && (
@@ -151,26 +198,26 @@ const HistoryPage = () => {
           {selectedEntry.messages.filter(m => m.role === "user").slice(0, 2).map((m, i) => (
             <p key={i} className="text-xs text-muted-foreground leading-[1.8] truncate">{m.content.slice(0, 80)}</p>
           ))}
-          <button onClick={() => setSelectedDate(null)} className="text-[10px] text-gold mt-2">关闭 ×</button>
+          <button onClick={() => setSelectedDate(null)} className="text-[10px] text-gold mt-2">{t("history.close")} ×</button>
         </div>
       )}
 
       {/* Finance Panel */}
       {(monthFinanceStats.count > 0) && (
         <div className="bg-surface-2 border border-border rounded-xl p-4 mb-4">
-          <h2 className="text-xs text-muted-foreground font-mono-jb mb-3">本月财务</h2>
+          <h2 className="text-xs text-muted-foreground font-mono-jb mb-3">{t("history.finance_title")}</h2>
           <div className="grid grid-cols-3 gap-2 mb-3">
             <div className="text-center">
               <div className="text-lg text-los-green font-mono-jb">¥{monthFinanceStats.income}</div>
-              <div className="text-[8px] text-muted-foreground">收入</div>
+              <div className="text-[8px] text-muted-foreground">{t("history.income")}</div>
             </div>
             <div className="text-center">
               <div className="text-lg text-los-orange font-mono-jb">¥{monthFinanceStats.expense}</div>
-              <div className="text-[8px] text-muted-foreground">支出</div>
+              <div className="text-[8px] text-muted-foreground">{t("history.expense")}</div>
             </div>
             <div className="text-center">
               <div className="text-lg text-gold font-mono-jb">¥{monthFinanceStats.net}</div>
-              <div className="text-[8px] text-muted-foreground">净值</div>
+              <div className="text-[8px] text-muted-foreground">{t("history.net_value")}</div>
             </div>
           </div>
           {recentFinance.length > 0 && (
@@ -196,21 +243,21 @@ const HistoryPage = () => {
       {entries.length === 0 ? (
         <div className="text-center py-16">
           <div className="text-3xl mb-3">📝</div>
-          <p className="text-sm text-muted-foreground leading-[1.8] text-center">开始记录的第一天，往往是改变的起点。</p>
+          <p className="text-sm text-muted-foreground leading-[1.8] text-center">{t("history.empty_state")}</p>
         </div>
       ) : (
         <div className="space-y-2">
           {entries.map(entry => {
             const isExpanded = expandedId === entry.id;
             const userMsgs = entry.messages.filter(m => m.role === "user");
-            const preview = userMsgs[0]?.content.slice(0, 60) || "无内容";
+            const preview = userMsgs[0]?.content.slice(0, 60) || t("history.no_content");
 
             return (
               <div key={entry.id} className="bg-surface-2 border border-border rounded-xl overflow-hidden">
                 <button onClick={() => setExpandedId(isExpanded ? null : entry.id)} className="w-full flex items-center gap-3 px-4 py-3 text-left">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-[10px] text-muted-foreground font-mono-jb">{format(parseISO(entry.date), "M月d日")}</span>
+                      <span className="text-[10px] text-muted-foreground font-mono-jb">{format(parseISO(entry.date), t("history.date_format"))}</span>
                       <span className="text-[10px] text-gold font-mono-jb">{entry.emotionScore}/10</span>
                     </div>
                     <p className="text-xs text-foreground truncate">{preview}</p>
@@ -263,9 +310,9 @@ const HistoryPage = () => {
                       }`}
                     >
                       {confirmDeleteId === entry.id ? (
-                        <><AlertTriangle size={11} /> 确认删除？再点一次</>
+                        <><AlertTriangle size={11} /> {t("history.confirm_delete")}</>
                       ) : (
-                        <><Trash2 size={11} /> 删除</>
+                        <><Trash2 size={11} /> {t("history.delete")}</>
                       )}
                     </button>
                   </div>

@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { ChevronLeft, Search, FileText, CheckSquare, DollarSign, X } from "lucide-react";
 
 type ResultType = "todo" | "diary" | "finance";
@@ -17,6 +18,7 @@ interface SearchResult {
 export default function SearchPage() {
   const navigate = useNavigate();
   const { allTodos, entries, financeEntries } = useLifeOs();
+  const { t: tr } = useLanguage();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ResultType | "all">("all");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -41,7 +43,7 @@ export default function SearchPage() {
           title: t.text,
           snippet: t.note ? t.note.slice(0, 60) : t.tags?.join(", ") || "",
           date: t.dueDate || t.sourceDate || t.createdAt.slice(0, 10),
-          meta: t.status === "done" ? "已完成" : t.status === "doing" ? "进行中" : "待办",
+          meta: t.status === "done" ? tr("search.status_done") : t.status === "doing" ? tr("search.status_doing") : tr("search.status_pending"),
         });
       });
     }
@@ -56,7 +58,7 @@ export default function SearchPage() {
         out.push({
           type: "diary",
           id: e.id,
-          title: `${e.date} 的日记`,
+          title: tr("search.diary_entry_title", { date: e.date }),
           snippet: matchMsg?.content.slice(0, 80) || "",
           date: e.date,
           meta: e.emotionTags.slice(0, 3).join("、") || "",
@@ -74,9 +76,9 @@ export default function SearchPage() {
           type: "finance",
           id: f.id,
           title: f.note || f.category,
-          snippet: `${f.type === "income" ? "收入" : "支出"} ¥${f.amount} · ${f.category}`,
+          snippet: `${f.type === "income" ? tr("search.income") : tr("search.expense")} ¥${f.amount} · ${f.category}`,
           date: f.date,
-          meta: f.type === "income" ? "收入" : "支出",
+          meta: f.type === "income" ? tr("search.income") : tr("search.expense"),
         });
       });
     }
@@ -97,7 +99,7 @@ export default function SearchPage() {
     return <DollarSign size={12} className="text-los-green" />;
   };
 
-  const typeLabel = (t: ResultType) => t === "todo" ? "待办" : t === "diary" ? "日记" : "财务";
+  const typeLabel = (type: ResultType) => type === "todo" ? tr("search.filter_todo") : type === "diary" ? tr("search.filter_diary") : tr("search.filter_finance");
 
   return (
     <div className="flex flex-col h-full max-w-[700px] mx-auto">
@@ -112,7 +114,7 @@ export default function SearchPage() {
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="搜索日记、待办、财务…"
+            placeholder={tr("search.input_placeholder")}
             className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
           />
           {query && (
@@ -128,7 +130,7 @@ export default function SearchPage() {
         {(["all", "diary", "todo", "finance"] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
             className={`text-caption px-3 py-1 rounded-full transition ${filter === f ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
-            {f === "all" ? "全部" : f === "diary" ? "📔 日记" : f === "todo" ? "✅ 待办" : "💰 财务"}
+            {f === "all" ? tr("search.filter_all") : f === "diary" ? `📔 ${tr("search.filter_diary")}` : f === "todo" ? `✅ ${tr("search.filter_todo")}` : `💰 ${tr("search.filter_finance")}`}
           </button>
         ))}
       </div>
@@ -138,14 +140,14 @@ export default function SearchPage() {
         {query.length === 0 && (
           <div className="text-center py-12">
             <Search size={32} className="mx-auto mb-3 text-muted-foreground/20" />
-            <p className="text-sm text-muted-foreground">搜索日记、待办和财务记录</p>
-            <p className="text-caption text-muted-foreground/60 mt-1">支持关键词、标签、金额</p>
+            <p className="text-sm text-muted-foreground">{tr("search.empty_state_title")}</p>
+            <p className="text-caption text-muted-foreground/60 mt-1">{tr("search.empty_state_subtitle")}</p>
           </div>
         )}
 
         {query.length > 0 && results.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-sm text-muted-foreground">没有找到「{query}」相关内容</p>
+            <p className="text-sm text-muted-foreground">{tr("search.no_results", { query })}</p>
           </div>
         )}
 
@@ -172,7 +174,7 @@ export default function SearchPage() {
                 </div>
               </button>
             ))}
-            <p className="text-label text-center text-muted-foreground/40 py-3">共 {results.length} 条结果</p>
+            <p className="text-label text-center text-muted-foreground/40 py-3">{tr("search.results_count", { count: results.length })}</p>
           </div>
         )}
       </div>

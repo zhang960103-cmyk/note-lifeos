@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from "react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // 这个组件之前只在 App.tsx 最外层包了一次——意味着任何一个页面内部的渲染错误，
 // 都会把最外层这一整棵组件树全部卸载掉(React的默认行为)，包括Toaster、底部
@@ -33,29 +34,44 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       const isPageScope = this.props.scope === "page";
       return (
-        <div className={`${isPageScope ? "h-full" : "fixed inset-0"} flex flex-col items-center justify-center gap-4 p-6 bg-background text-center`}>
-          <span className="text-4xl">😵</span>
-          <p className="text-foreground text-sm font-serif-sc">这个页面出了点问题</p>
-          <p className="text-muted-foreground text-caption max-w-xs leading-relaxed">
-            不用担心，你的日记、待办、账单数据都安全地存在云端，没有受影响。
-          </p>
-          <div className="flex gap-2">
-            <button
-              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition"
-              onClick={this.handleRetry}
-            >
-              重试
-            </button>
-            <button
-              className="px-4 py-2 rounded-xl bg-muted text-muted-foreground text-sm hover:bg-accent transition"
-              onClick={() => { window.location.href = "/"; }}
-            >
-              回首页
-            </button>
-          </div>
-        </div>
+        <ErrorFallback
+          isPageScope={isPageScope}
+          onRetry={this.handleRetry}
+          onHome={() => { window.location.href = "/"; }}
+        />
       );
     }
     return this.props.children;
   }
+}
+
+// Class components can't call hooks directly, so the fallback UI (which needs
+// useLanguage() for the retry/home copy) is split out into its own function
+// component and rendered from ErrorBoundary.render() above — this is still
+// mounted inside LanguageProvider's tree (see App.tsx), so the hook works fine.
+function ErrorFallback({ isPageScope, onRetry, onHome }: { isPageScope: boolean; onRetry: () => void; onHome: () => void }) {
+  const { t } = useLanguage();
+  return (
+    <div className={`${isPageScope ? "h-full" : "fixed inset-0"} flex flex-col items-center justify-center gap-4 p-6 bg-background text-center`}>
+      <span className="text-4xl">😵</span>
+      <p className="text-foreground text-sm font-serif-sc">{t("error_boundary.title")}</p>
+      <p className="text-muted-foreground text-caption max-w-xs leading-relaxed">
+        {t("error_boundary.desc")}
+      </p>
+      <div className="flex gap-2">
+        <button
+          className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition"
+          onClick={onRetry}
+        >
+          {t("error_boundary.retry")}
+        </button>
+        <button
+          className="px-4 py-2 rounded-xl bg-muted text-muted-foreground text-sm hover:bg-accent transition"
+          onClick={onHome}
+        >
+          {t("error_boundary.home")}
+        </button>
+      </div>
+    </div>
+  );
 }

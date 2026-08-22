@@ -9,26 +9,28 @@ import DataExport from "@/components/DataExport";
 import DataImport, { FinanceCsvImport } from "@/components/DataImport";
 import GlobalSearch from "@/components/GlobalSearch";
 import { useModelProfiles, type ModelProfile } from "@/hooks/useModelProfiles";
-import { isEncryptionEnabled, setEncryptionEnabled, setEncryptionPassword } from "@/lib/crypto";
+// BUG-02：加密开关已禁用（详见下方"日记内容加密"区块），这里只保留 setEncryptionEnabled
+// 用于一次性清理旧版本残留的"已开启"标记，避免误导性状态留在 localStorage 里。
+import { isEncryptionEnabled, setEncryptionEnabled } from "@/lib/crypto";
 
 const APP_VERSION = "2.2.0";
 
 const CURRENCY_OPTIONS = [
-  { key: "CNY", symbol: "¥", label: "人民币 (CNY)" },
-  { key: "USD", symbol: "$", label: "美元 (USD)" },
-  { key: "AED", symbol: "د.إ", label: "迪拉姆 (AED)" },
-  { key: "EUR", symbol: "€", label: "欧元 (EUR)" },
-  { key: "GBP", symbol: "£", label: "英镑 (GBP)" },
-  { key: "JPY", symbol: "¥", label: "日元 (JPY)" },
-  { key: "KRW", symbol: "₩", label: "韩元 (KRW)" },
-  { key: "RUB", symbol: "₽", label: "卢布 (RUB)" },
+  { key: "CNY", symbol: "¥" },
+  { key: "USD", symbol: "$" },
+  { key: "AED", symbol: "د.إ" },
+  { key: "EUR", symbol: "€" },
+  { key: "GBP", symbol: "£" },
+  { key: "JPY", symbol: "¥" },
+  { key: "KRW", symbol: "₩" },
+  { key: "RUB", symbol: "₽" },
 ];
 
-const USAGE_TAG_LABELS: Record<string, { icon: string; label: string }> = {
-  chat: { icon: "💬", label: "日记/对话" },
-  cheap: { icon: "⚡", label: "效率/整理" },
-  private: { icon: "🔒", label: "本地/私有" },
-  extract: { icon: "🔍", label: "数据提取" },
+const USAGE_TAG_ICONS: Record<string, string> = {
+  chat: "💬",
+  cheap: "⚡",
+  private: "🔒",
+  extract: "🔍",
 };
 
 export default function SettingsPage() {
@@ -53,10 +55,16 @@ export default function SettingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newProfile, setNewProfile] = useState({ name: "", description: "", base_url: "", model: "", api_key_encrypted: "", usage_tag: "chat", is_default: false, version: "1.0", status: "active" });
-  // 加密开关的读写走的是localStorage而不是React state，按钮点了之后UI不会自动
-  // 重新渲染——这个计数器纯粹是拿来强制触发一次re-render，让上面按钮的文字/颜色
-  // 跟着localStorage里的最新值刷新。
-  const [, setEncryptionUiTick] = useState(0);
+
+  // BUG-02：加密开关已改为禁用状态，不再需要 React state 交互。这里做一次性清理：
+  // 如果用户在旧版本里点开过"已开启"，localStorage 里会留一个从未真正生效过的
+  // diary_encryption_<userId> 标记；不清理的话，将来真正接通加密时容易被这个
+  // 陈旧标记误导成"这个用户已经加密过"。
+  useEffect(() => {
+    if (user && isEncryptionEnabled(user.id)) {
+      setEncryptionEnabled(false, user.id);
+    }
+  }, [user]);
 
   // Load profile
   useEffect(() => {
@@ -70,9 +78,20 @@ export default function SettingsPage() {
       });
   }, [user]);
 
+  // BUG-06：之前这里直接 `await signOut()`，没有 loading 状态也没有 catch——如果
+  // signOut() 挂起或抛错，用户点完按钮后完全看不出任何反应，只能一直等。现在加上
+  // 进行中状态（禁用按钮+提示文案）和错误提示；signOut() 本身的超时/兜底逻辑见
+  // useAuth.ts。
+  const [signingOut, setSigningOut] = useState(false);
   const handleSignOut = async () => {
-    if (confirm(t("auth.confirm_logout"))) {
+    if (!confirm(t("auth.confirm_logout"))) return;
+    setSigningOut(true);
+    try {
       await signOut();
+    } catch (e: any) {
+      alert(e?.message || t("settings.logout_error"));
+    } finally {
+      setSigningOut(false);
     }
   };
 
@@ -95,23 +114,18 @@ export default function SettingsPage() {
 
   const handleClearLocalOnly = () => {
     if (!user) return;
-    const confirmed = confirm(
-      "仅清空本设备本地数据？\n\n" +
-      "云端的日记、待办、财务记录、生命之轮数据不会受影响，其他设备登录同一账号仍能看到。\n\n" +
-      "⚠️ 但预算、订阅提醒、借还记录、项目分组这4类数据目前只存在本设备本地、从未同步到云端——清空后这4类数据会永久丢失，无法通过云端恢复。\n\n" +
-      "确认清空吗？"
-    );
+    const confirmed = confirm(t("settings.clear_local_confirm"));
     if (!confirmed) return;
     clearLocalKeysFor(user.id);
-    alert("本设备本地数据已清空。云端日记/待办/财务等数据不受影响，账号仍保持登录。");
+    alert(t("settings.clear_local_done"));
   };
 
   const handleDeleteAccount = async () => {
-    const confirmed = confirm("⚠️ 确认删除云端全部数据？\n\n这将永久删除您在云端的所有日记、待办、财务记录、生命之轮数据。此操作不可撤销。\n\n请再次确认：您真的要删除吗？");
+    const confirmed = confirm(t("settings.delete_account_confirm"));
     if (!confirmed) return;
-    const reconfirm = window.prompt("请输入您的邮箱地址确认删除：");
+    const reconfirm = window.prompt(t("settings.delete_account_email_prompt"));
     if (!user || reconfirm?.trim() !== user.email) {
-      alert("邮箱地址不匹配，删除操作已取消。");
+      alert(t("settings.delete_account_email_mismatch"));
       return;
     }
     try {
@@ -137,15 +151,15 @@ export default function SettingsPage() {
       clearLocalKeysFor(user.id);
 
       if (failedTables.length > 0) {
-        alert(`部分数据删除失败（${failedTables.join("、")}），请检查网络后重新尝试删除账号，或联系支持处理残留数据。为安全起见暂不会退出登录。`);
+        alert(t("settings.delete_account_partial_fail", { tables: failedTables.join(", ") }));
         return;
       }
 
       await signOut();
-      alert("账号云端数据已删除，已退出登录。\n\n注意：出于安全限制，登录凭证（邮箱/密码）本身需要联系支持才能彻底注销；您的日记、待办等业务数据已经全部清除。感谢您使用罗盘。");
+      alert(t("settings.delete_account_success"));
     } catch (e) {
       console.error("[删除账号] 异常:", e);
-      alert("删除失败，请重试。如问题持续，请联系支持。");
+      alert(t("settings.delete_account_error"));
     }
   };
 
@@ -167,6 +181,12 @@ export default function SettingsPage() {
     await addProfile(newProfile);
     setNewProfile({ name: "", description: "", base_url: "", model: "", api_key_encrypted: "", usage_tag: "chat", is_default: false, version: "1.0", status: "active" });
     setShowAddForm(false);
+  };
+
+  const getUsageTagInfo = (tag: string) => {
+    const icon = USAGE_TAG_ICONS[tag] || "🔧";
+    const label = USAGE_TAG_ICONS[tag] ? t(`settings.usage_tag.${tag}`) : tag;
+    return { icon, label };
   };
 
   const currentLang = LANGUAGES.find(l => l.key === lang);
@@ -194,7 +214,7 @@ export default function SettingsPage() {
         <button onClick={() => setShowSearch(true)}
           className="w-full bg-muted border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 hover:bg-accent transition">
           <Search size={14} className="text-muted-foreground" />
-          <span className="text-xs text-muted-foreground flex-1 text-left">{t("settings.search_placeholder") || "搜索日记、待办..."}</span>
+          <span className="text-xs text-muted-foreground flex-1 text-left">{t("settings.search_placeholder")}</span>
         </button>
 
         {/* Account */}
@@ -206,8 +226,20 @@ export default function SettingsPage() {
                 {displayName?.charAt(0) || user?.email?.charAt(0).toUpperCase() || "U"}
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <p className="text-xs text-foreground truncate">{displayName || user?.email || t("settings.not_logged_in")}</p>
-                <p className="text-[9px] text-muted-foreground">{t("settings.logged_in")}</p>
+                {/* BUG-05 根因：访客(匿名)账号在 Supabase 里也是一个真实的 `user` 对象
+                    （只是没有 email），旧代码用 `user?.email || t("settings.not_logged_in")`
+                    做名字兜底，导致访客看到名字栏显示"未登录"；但状态栏又不看 email
+                    是否存在、无条件写死显示"已登录"——同一张卡片同时出现"未登录"和
+                    "已登录"两个互斥状态，用户完全无法判断数据有没有绑定账号。
+                    修复：用 Supabase 提供的 `user.is_anonymous` 字段明确区分访客，
+                    访客统一展示"访客（仅本地数据）"，不再套用"未登录/已登录"这套
+                    只适用于真实账号的文案。 */}
+                <p className="text-xs text-foreground truncate">
+                  {user?.is_anonymous ? t("settings.guest_name") : (displayName || user?.email || t("settings.not_logged_in"))}
+                </p>
+                <p className="text-[9px] text-muted-foreground">
+                  {user?.is_anonymous ? t("settings.guest_status") : t("settings.logged_in")}
+                </p>
               </div>
               {profileSaved && <Check size={14} className="text-los-green" />}
               <ChevronRight size={14} className="text-muted-foreground" />
@@ -215,24 +247,25 @@ export default function SettingsPage() {
             {showProfile && (
               <div className="p-3 border-b border-border space-y-2">
                 <div>
-                  <p className="text-[10px] text-muted-foreground mb-0.5">{t("settings.nickname") || "昵称"}</p>
-                  <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="输入昵称"
+                  <p className="text-[10px] text-muted-foreground mb-0.5">{t("settings.nickname")}</p>
+                  <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder={t("settings.nickname_placeholder")}
                     className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary" />
                 </div>
-                <button onClick={saveProfile} className="text-xs bg-primary text-primary-foreground px-4 py-1.5 rounded-lg">{t("settings.save") || "保存"}</button>
+                <button onClick={saveProfile} className="text-xs bg-primary text-primary-foreground px-4 py-1.5 rounded-lg">{t("settings.save")}</button>
               </div>
             )}
-            <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent transition">
+            <button onClick={handleSignOut} disabled={signingOut}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent transition disabled:opacity-50">
               <LogOut size={14} className="text-destructive" />
-              <span className="text-xs text-destructive">{t("settings.logout")}</span>
+              <span className="text-xs text-destructive">{signingOut ? t("settings.logging_out") : t("settings.logout")}</span>
             </button>
             <button onClick={handleClearLocalOnly} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent transition border-t border-border">
               <Trash2 size={14} className="text-muted-foreground" />
-              <span className="text-xs text-foreground">仅清空本设备本地数据</span>
+              <span className="text-xs text-foreground">{t("settings.clear_local_only")}</span>
             </button>
             <button onClick={handleDeleteAccount} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-destructive/5 transition border-t border-border">
               <Trash2 size={14} className="text-destructive/70" />
-              <span className="text-xs text-destructive/70">删除云端全部数据</span>
+              <span className="text-xs text-destructive/70">{t("settings.delete_cloud_data")}</span>
             </button>
           </div>
         </section>
@@ -242,7 +275,7 @@ export default function SettingsPage() {
           <div className="bg-card border border-border rounded-xl">
             <button onClick={() => window.location.href = "/privacy"} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent transition">
               <Shield size={14} className="text-muted-foreground" />
-              <span className="text-xs text-foreground flex-1">隐私政策</span>
+              <span className="text-xs text-foreground flex-1">{t("settings.privacy_policy")}</span>
               <ChevronRight size={12} className="text-muted-foreground" />
             </button>
           </div>
@@ -250,7 +283,7 @@ export default function SettingsPage() {
 
         {/* Language & Currency */}
         <section>
-          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{t("settings.regional") || "地区与语言"}</p>
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{t("settings.regional")}</p>
           <div className="bg-card border border-border rounded-xl">
             <div className="relative">
               <button onClick={() => { setShowLangPicker(!showLangPicker); setShowCurrencyPicker(false); }}
@@ -278,7 +311,7 @@ export default function SettingsPage() {
               <button onClick={() => { setShowCurrencyPicker(!showCurrencyPicker); setShowLangPicker(false); }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition rounded-b-xl">
                 <span className="text-sm w-[14px] text-center">{currentCurrency?.symbol}</span>
-                <span className="text-xs text-foreground flex-1">{currentCurrency?.label}</span>
+                <span className="text-xs text-foreground flex-1">{currentCurrency ? t(`settings.currency.${currentCurrency.key}`) : ""}</span>
                 <ChevronRight size={14} className="text-muted-foreground" />
               </button>
               {showCurrencyPicker && (
@@ -288,7 +321,7 @@ export default function SettingsPage() {
                     {CURRENCY_OPTIONS.map(c => (
                       <button key={c.key} onClick={() => saveCurrency(c.key)}
                         className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-accent ${currency === c.key ? "text-primary bg-accent" : "text-foreground"}`}>
-                        <span className="text-sm w-5 text-center">{c.symbol}</span><span>{c.label}</span>
+                        <span className="text-sm w-5 text-center">{c.symbol}</span><span>{t(`settings.currency.${c.key}`)}</span>
                         {currency === c.key && <Check size={12} className="ml-auto text-primary" />}
                       </button>
                     ))}
@@ -304,7 +337,7 @@ export default function SettingsPage() {
           <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{t("settings.appearance")}</p>
           <div className="bg-card border border-border rounded-xl p-3 space-y-3">
             {/* #7: 浅色模式尚未完整适配，暂时隐藏切换，只保留强调色选择 */}
-            <p className="text-caption text-muted-foreground">主题色</p>
+            <p className="text-caption text-muted-foreground">{t("settings.accent")}</p>
             <div className="grid grid-cols-3 gap-1.5">
               {ACCENT_OPTIONS.map(a => (
                 <button key={a.key} onClick={() => setAccent(a.key)}
@@ -319,15 +352,15 @@ export default function SettingsPage() {
 
         {/* AI Model Profiles */}
         <section>
-          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">AI 模型</p>
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{t("settings.ai_models")}</p>
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             {/* Simple card selection - only active profiles */}
             {modelsLoading ? (
-              <div className="px-4 py-6 text-center text-xs text-muted-foreground">加载中...</div>
+              <div className="px-4 py-6 text-center text-xs text-muted-foreground">{t("common.loading")}</div>
             ) : (
               <div className="p-3 space-y-2">
                 {activeProfiles.map(p => {
-                  const tagInfo = USAGE_TAG_LABELS[p.usage_tag] || { icon: "🔧", label: p.usage_tag };
+                  const tagInfo = getUsageTagInfo(p.usage_tag);
                   const isActive = p.is_default;
                   return (
                     <button key={p.id} onClick={() => setDefault(p.id)}
@@ -342,7 +375,7 @@ export default function SettingsPage() {
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-foreground">{p.name}</span>
                             {isActive && (
-                              <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">默认</span>
+                              <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">{t("settings.default_badge")}</span>
                             )}
                           </div>
                           <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{p.description}</p>
@@ -364,7 +397,7 @@ export default function SettingsPage() {
               <div className="border-t border-border p-3 space-y-2">
                 <div className="flex items-center gap-1.5 mb-1">
                   <FlaskConical size={12} className="text-warning" />
-                  <span className="text-[10px] font-medium text-warning">实验中</span>
+                  <span className="text-[10px] font-medium text-warning">{t("settings.canary_zone")}</span>
                 </div>
                 {canaryProfiles.map(p => (
                   <div key={p.id} className="p-2.5 rounded-xl border border-dashed border-warning/40 bg-warning/5 space-y-2">
@@ -378,15 +411,15 @@ export default function SettingsPage() {
                     <div className="flex gap-1.5">
                       <button onClick={() => promoteCanary(p.id)}
                         className="flex items-center gap-1 text-[9px] bg-primary/10 text-primary px-2 py-1 rounded-lg hover:bg-primary/20 transition">
-                        <ArrowUpCircle size={10} /> 上线
+                        <ArrowUpCircle size={10} /> {t("settings.promote")}
                       </button>
                       <button onClick={() => setDefault(p.id)}
                         className="flex items-center gap-1 text-[9px] bg-accent text-foreground px-2 py-1 rounded-lg hover:bg-muted transition">
-                        <Check size={10} /> 试用
+                        <Check size={10} /> {t("settings.trial")}
                       </button>
                       <button onClick={() => deleteProfile(p.id)}
                         className="flex items-center gap-1 text-[9px] text-destructive px-2 py-1 rounded-lg hover:bg-destructive/10 transition">
-                        <Trash2 size={10} /> 删除
+                        <Trash2 size={10} /> {t("common.delete")}
                       </button>
                     </div>
                   </div>
@@ -399,14 +432,14 @@ export default function SettingsPage() {
               <div className="border-t border-border p-3 space-y-1.5">
                 <div className="flex items-center gap-1.5 mb-1">
                   <Archive size={12} className="text-muted-foreground" />
-                  <span className="text-[10px] text-muted-foreground">已归档</span>
+                  <span className="text-[10px] text-muted-foreground">{t("settings.archived")}</span>
                 </div>
                 {deprecatedProfiles.map(p => (
                   <div key={p.id} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-muted/30">
                     <span className="text-[10px] text-muted-foreground">{p.name} <span className="opacity-60">v{p.version}</span></span>
                     <button onClick={() => rollback(p.id)}
                       className="flex items-center gap-1 text-[9px] text-foreground bg-accent px-2 py-1 rounded-lg hover:bg-muted transition">
-                      <RotateCcw size={9} /> 回滚
+                      <RotateCcw size={9} /> {t("settings.rollback")}
                     </button>
                   </div>
                 ))}
@@ -417,7 +450,7 @@ export default function SettingsPage() {
             <button onClick={() => setShowAdvanced(!showAdvanced)}
               className="w-full flex items-center justify-center gap-1.5 px-4 py-2 border-t border-border text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent transition">
               {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-              高级设置
+              {t("settings.advanced_settings")}
             </button>
 
             {/* Advanced panel */}
@@ -449,40 +482,43 @@ export default function SettingsPage() {
                     </div>
                     {editingId === p.id && (
                       <div className="space-y-1.5">
-                        <FieldInput label="名称" value={p.name}
+                        <FieldInput label={t("settings.field_name")} value={p.name}
                           onChange={v => updateProfile(p.id, { name: v })} />
-                        <FieldInput label="说明" value={p.description}
+                        <FieldInput label={t("settings.field_description")} value={p.description}
                           onChange={v => updateProfile(p.id, { description: v })} />
-                        <FieldInput label="Base URL" value={p.base_url} placeholder="留空使用默认网关"
+                        <FieldInput label="Base URL" value={p.base_url} placeholder={t("settings.base_url_placeholder")}
                           onChange={v => updateProfile(p.id, { base_url: v })} />
-                        <FieldInput label="模型" value={p.model} placeholder="google/gemini-2.5-pro"
+                        <FieldInput label={t("settings.field_model")} value={p.model} placeholder="google/gemini-2.5-pro"
                           onChange={v => updateProfile(p.id, { model: v })} />
-                        <FieldInput label="API Key" value={p.api_key_encrypted ? "••••••" : ""} placeholder="留空使用默认密钥" type="password"
+                        <FieldInput label="API Key" value={p.api_key_encrypted ? "••••••" : ""} placeholder={t("settings.api_key_placeholder")} type="password"
                           onChange={v => { if (v !== "••••••") updateProfile(p.id, { api_key_encrypted: v ? btoa(v) : "" }); }} />
-                        <FieldInput label="版本" value={p.version} placeholder="1.0"
+                        <FieldInput label={t("settings.field_version")} value={p.version} placeholder="1.0"
                           onChange={v => updateProfile(p.id, { version: v })} />
                         <div>
-                          <p className="text-[9px] text-muted-foreground mb-0.5">状态</p>
+                          <p className="text-[9px] text-muted-foreground mb-0.5">{t("settings.field_status")}</p>
                           <div className="flex gap-1">
                             {(['active', 'canary', 'deprecated'] as const).map(s => (
                               <button key={s} onClick={() => updateProfile(p.id, { status: s })}
-                                className={`text-[9px] px-2 py-1 rounded-lg transition ${p.status === s ? 
+                                className={`text-[9px] px-2 py-1 rounded-lg transition ${p.status === s ?
                                   s === 'active' ? 'bg-los-green/20 text-los-green' : s === 'canary' ? 'bg-warning/20 text-warning' : 'bg-muted text-muted-foreground'
                                   : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
-                                {s === 'active' ? '✅ 上线' : s === 'canary' ? '🧪 实验' : '📦 归档'}
+                                {s === 'active' ? t("settings.status_active") : s === 'canary' ? t("settings.status_canary") : t("settings.status_deprecated")}
                               </button>
                             ))}
                           </div>
                         </div>
                         <div>
-                          <p className="text-[9px] text-muted-foreground mb-0.5">用途标签</p>
+                          <p className="text-[9px] text-muted-foreground mb-0.5">{t("settings.usage_tag_label")}</p>
                           <div className="flex gap-1 flex-wrap">
-                            {Object.entries(USAGE_TAG_LABELS).map(([tag, info]) => (
-                              <button key={tag} onClick={() => updateProfile(p.id, { usage_tag: tag })}
-                                className={`text-[9px] px-2 py-1 rounded-lg transition ${p.usage_tag === tag ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
-                                {info.icon} {info.label}
-                              </button>
-                            ))}
+                            {Object.keys(USAGE_TAG_ICONS).map(tag => {
+                              const info = getUsageTagInfo(tag);
+                              return (
+                                <button key={tag} onClick={() => updateProfile(p.id, { usage_tag: tag })}
+                                  className={`text-[9px] px-2 py-1 rounded-lg transition ${p.usage_tag === tag ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+                                  {info.icon} {info.label}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -493,50 +529,50 @@ export default function SettingsPage() {
                 {/* Add new profile */}
                 {showAddForm ? (
                   <div className="bg-muted/50 border border-dashed border-primary/30 rounded-xl p-3 space-y-1.5">
-                    <p className="text-xs font-medium text-foreground mb-2">新增模型预设</p>
-                    <FieldInput label="名称" value={newProfile.name} placeholder="我的自定义模型"
+                    <p className="text-xs font-medium text-foreground mb-2">{t("settings.add_model_profile")}</p>
+                    <FieldInput label={t("settings.field_name")} value={newProfile.name} placeholder={t("settings.custom_model_placeholder")}
                       onChange={v => setNewProfile(p => ({ ...p, name: v }))} />
-                    <FieldInput label="说明" value={newProfile.description} placeholder="用途简介"
+                    <FieldInput label={t("settings.field_description")} value={newProfile.description} placeholder={t("settings.description_placeholder")}
                       onChange={v => setNewProfile(p => ({ ...p, description: v }))} />
                     <FieldInput label="Base URL" value={newProfile.base_url} placeholder="https://api.openclaw.ai/v1"
                       onChange={v => setNewProfile(p => ({ ...p, base_url: v }))} />
-                    <FieldInput label="模型" value={newProfile.model} placeholder="deepseek-chat"
+                    <FieldInput label={t("settings.field_model")} value={newProfile.model} placeholder="deepseek-chat"
                       onChange={v => setNewProfile(p => ({ ...p, model: v }))} />
                     <FieldInput label="API Key" value={newProfile.api_key_encrypted} placeholder="sk-..." type="password"
                       onChange={v => setNewProfile(p => ({ ...p, api_key_encrypted: v ? btoa(v) : "" }))} />
                     <div>
-                      <p className="text-[9px] text-muted-foreground mb-0.5">初始状态</p>
+                      <p className="text-[9px] text-muted-foreground mb-0.5">{t("settings.initial_status")}</p>
                       <div className="flex gap-1">
                         <button onClick={() => setNewProfile(p => ({ ...p, status: 'canary' }))}
                           className={`text-[9px] px-2 py-1 rounded-lg transition ${newProfile.status === 'canary' ? 'bg-warning/20 text-warning' : 'bg-muted text-muted-foreground'}`}>
-                          🧪 实验（仅自己可见）
+                          {t("settings.status_canary_hint")}
                         </button>
                         <button onClick={() => setNewProfile(p => ({ ...p, status: 'active' }))}
                           className={`text-[9px] px-2 py-1 rounded-lg transition ${newProfile.status === 'active' ? 'bg-los-green/20 text-los-green' : 'bg-muted text-muted-foreground'}`}>
-                          ✅ 直接上线
+                          {t("settings.status_active_hint")}
                         </button>
                       </div>
                     </div>
                     <div className="flex gap-2 pt-1">
                       <button onClick={handleAddProfile} disabled={!newProfile.name || !newProfile.model}
                         className="flex-1 text-xs bg-primary text-primary-foreground py-1.5 rounded-lg disabled:opacity-50">
-                        保存
+                        {t("common.save")}
                       </button>
                       <button onClick={() => setShowAddForm(false)}
                         className="text-xs text-muted-foreground px-3 py-1.5 hover:text-foreground">
-                        取消
+                        {t("common.cancel")}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <button onClick={() => setShowAddForm(true)}
                     className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-border rounded-xl text-xs text-muted-foreground hover:text-foreground hover:border-muted-foreground/30 transition">
-                    <Plus size={12} /> 新增模型预设
+                    <Plus size={12} /> {t("settings.add_model_profile")}
                   </button>
                 )}
 
                 <p className="text-[8px] text-muted-foreground/60 text-center">
-                  支持 OpenAI 兼容格式 · 留空 Base URL 使用内置网关 · 新模型建议先标记为🧪实验
+                  {t("settings.model_profile_hint")}
                 </p>
               </div>
             )}
@@ -545,7 +581,7 @@ export default function SettingsPage() {
 
         {/* Data */}
         <section>
-          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">数据管理</p>
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{t("settings.data_management")}</p>
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <DataExport />
             <div className="border-t border-border">
@@ -559,14 +595,14 @@ export default function SettingsPage() {
 
         {/* P2: Encryption + R1: Quota */}
         <section>
-          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">隐私与使用</p>
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-mono-jb">{t("settings.privacy_usage")}</p>
           <div className="bg-card border border-border rounded-xl overflow-hidden divide-y divide-border">
             {/* AI 调用配额 */}
             <div className="px-4 py-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-foreground">今日 AI 对话次数</span>
+                <span className="text-xs text-foreground">{t("settings.ai_calls_today")}</span>
                 <span className="text-xs font-mono-jb text-muted-foreground">
-                  {isPrivateModelActive ? "不限（私有模型）" : `${aiCallCountToday} / 30`}
+                  {isPrivateModelActive ? t("settings.unlimited_private_model") : `${aiCallCountToday} / 30`}
                 </span>
               </div>
               <div className="mt-1.5 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -575,46 +611,30 @@ export default function SettingsPage() {
               </div>
               <p className="text-[9px] text-muted-foreground mt-1">
                 {isPrivateModelActive
-                  ? "当前默认模型标记为🔒私有，不占用云端每日额度"
-                  : "每日 30 次免费，次日自动重置"}
+                  ? t("settings.private_model_note")
+                  : t("settings.daily_quota_reset_note")}
               </p>
             </div>
-            {/* 日记加密 */}
+            {/* 日记加密 — BUG-02：日记的创建/读取/搜索/导出/同步全链路里没有任何一处
+                真正调用过 encryptText/decryptText（全仓搜索确认，crypto.ts 是一个完整但
+                完全没被接入的孤立模块）。旧版开关仍然可点、可切换"已开启/已关闭"、还会弹
+                window.prompt() 收密码——用户很容易只看到"已开启"的绿色徽标就以为数据已被
+                保护，根本不会往下看那行小字说明。安全整改的第一原则是"界面展示要跟实际存储
+                行为一致"，所以这里不做"警告 + 仍可开启"的中间状态，而是把开关本身禁用掉，
+                彻底删除 AES-256 的承诺文案，明确标注功能尚未提供。 */}
             <div className="px-4 py-3">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-foreground">日记内容加密</span>
-                <button
-                  onClick={() => {
-                    if (!user) return;
-                    const current = isEncryptionEnabled(user.id);
-                    if (!current) {
-                      const pw = window.prompt("设置加密密码（请牢记，丢失后无法找回）：");
-                      if (pw && pw.length >= 6) {
-                        setEncryptionEnabled(true, user.id);
-                        setEncryptionPassword(pw, user.id);
-                        setEncryptionUiTick(v => v + 1);
-                        alert("⚠️ 密码已保存在本设备。但请注意：目前这个开关还只是记录了你的设置意愿，日记内容的实际加密上传还没有接通（详见下方说明），新写的日记暂时不会真的变成密文。");
-                      } else if (pw !== null) {
-                        alert("密码至少6位");
-                      }
-                    } else {
-                      if (confirm("关闭加密标记？")) {
-                        setEncryptionEnabled(false, user.id);
-                        setEncryptionUiTick(v => v + 1);
-                      }
-                    }
-                  }}
-                  className={`text-[10px] px-3 py-1 rounded-full transition ${
-                    user && isEncryptionEnabled(user.id)
-                      ? "bg-los-green/20 text-los-green"
-                      : "bg-muted text-muted-foreground"
-                  }`}
+                <span className="text-xs text-foreground">{t("settings.diary_encryption")}</span>
+                <span
+                  aria-disabled="true"
+                  title={t("settings.encryption_disabled_title")}
+                  className="text-[10px] px-3 py-1 rounded-full bg-muted text-muted-foreground/60 cursor-not-allowed select-none"
                 >
-                  {user && isEncryptionEnabled(user.id) ? "已开启" : "已关闭"}
-                </button>
+                  {t("settings.coming_soon")}
+                </span>
               </div>
-              <p className="text-[9px] text-los-orange">
-                ⚠️ 底层 AES-256 加密函数已经写好，但还没有接到日记的实际读写流程上——开启这个开关目前不会真正加密你的日记内容。这是本次审计发现的问题，接通它涉及"加密后AI还能不能分析日记内容"这类产品取舍，需要你确认方案后再实现。
+              <p className="text-[9px] text-muted-foreground">
+                {t("settings.encryption_disabled_desc")}
               </p>
             </div>
           </div>

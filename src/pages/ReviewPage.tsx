@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLifeOs } from "@/contexts/LifeOsContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_DOMAINS } from "@/types/lifeOs";
@@ -17,6 +18,7 @@ const ReviewPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { entries, wheelScores, allTodos, monthFinanceStats, habits, energyLogs, defaultModelProfileId } = useLifeOs();
+  const { t } = useLanguage();
   const { user } = useAuth();
   const [letter, setLetter] = useState<string | null>(null);
   const [letterType, setLetterType] = useState<"weekly" | "monthly" | null>(null);
@@ -236,7 +238,7 @@ ${recentContent}
       });
     } catch (e: any) {
       if (controller.signal.aborted) return; // 主动取消，不当作失败展示
-      setLetter(`抱歉，生成失败了。${e.message || ""}`);
+      setLetter(`${t("review.generation_failed")}${e.message || ""}`);
       setIsGenerating(false);
     }
   }, [weekEntries, monthEntries, buildSummary, monthFinanceStats, wheelScores, user]);
@@ -262,19 +264,19 @@ ${recentContent}
     <div className="grid grid-cols-4 gap-2 mb-3">
       <div className="text-center">
         <div className="text-lg text-gold font-serif-sc">{stats.count}</div>
-        <div className="text-[8px] text-muted-foreground">天</div>
+        <div className="text-[8px] text-muted-foreground">{t("review.stat_days")}</div>
       </div>
       <div className="text-center">
         <div className="text-lg text-gold font-serif-sc">{stats.avgEmotion}</div>
-        <div className="text-[8px] text-muted-foreground">情绪</div>
+        <div className="text-[8px] text-muted-foreground">{t("review.stat_emotion")}</div>
       </div>
       <div className="text-center">
         <div className="text-lg text-gold font-serif-sc">{stats.todoTotal > 0 ? Math.round((stats.todoDone / stats.todoTotal) * 100) : 0}%</div>
-        <div className="text-[8px] text-muted-foreground">完成率</div>
+        <div className="text-[8px] text-muted-foreground">{t("review.stat_completion_rate")}</div>
       </div>
       <div className="text-center">
         <div className="text-lg text-los-red font-serif-sc">{stats.overdueTodos.length}</div>
-        <div className="text-[8px] text-muted-foreground">逾期</div>
+        <div className="text-[8px] text-muted-foreground">{t("review.stat_overdue")}</div>
       </div>
     </div>
   );
@@ -285,20 +287,20 @@ ${recentContent}
       onTouchEnd={(e) => { const delta = e.changedTouches[0].clientX - touchStart; if (touchStart < 30 && delta > 70) navigate(-1); }}
     >
       <div className="py-4">
-        <h1 className="font-serif-sc text-lg text-foreground">复盘</h1>
+        <h1 className="font-serif-sc text-lg text-foreground">{t("review.title")}</h1>
       </div>
 
       {weekStats.count === 0 && monthStats.count === 0 && (
         <div className="text-center py-12">
-          <p className="text-sm text-muted-foreground leading-[1.8]">当你有 3 天以上的记录，罗盘就能开始帮你回顾了。</p>
+          <p className="text-sm text-muted-foreground leading-[1.8]">{t("review.empty_state")}</p>
         </div>
       )}
       <div className="bg-surface-2 border border-border rounded-xl p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs text-foreground">本周</h2>
+          <h2 className="text-xs text-foreground">{t("review.this_week")}</h2>
           <button onClick={() => generateLetter("weekly")} disabled={isGenerating || weekStats.count === 0}
             className="flex items-center gap-1 text-[10px] text-gold font-mono-jb disabled:opacity-30">
-            <Mail size={12} /> 生成周信
+            <Mail size={12} /> {t("review.generate_weekly")}
           </button>
         </div>
         <StatBlock stats={weekStats} />
@@ -314,10 +316,10 @@ ${recentContent}
       {/* Monthly */}
       <div className="bg-surface-2 border border-border rounded-xl p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs text-foreground">本月</h2>
+          <h2 className="text-xs text-foreground">{t("review.this_month")}</h2>
           <button onClick={() => generateLetter("monthly")} disabled={isGenerating || monthStats.count === 0}
             className="flex items-center gap-1 text-[10px] text-gold font-mono-jb disabled:opacity-30">
-            <Mail size={12} /> 生成月报
+            <Mail size={12} /> {t("review.generate_monthly")}
           </button>
         </div>
         <StatBlock stats={monthStats} />
@@ -328,7 +330,7 @@ ${recentContent}
         <div className="bg-surface-2 border border-gold-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-sm">📮</span>
-            <span className="text-xs text-foreground">{letterType === "weekly" ? "周信" : "月报"}</span>
+            <span className="text-xs text-foreground">{letterType === "weekly" ? t("review.weekly_letter") : t("review.monthly_report")}</span>
             {isGenerating && <Loader2 size={12} className="animate-spin text-gold ml-auto" />}
             {!isGenerating && (
               <div className="ml-auto flex gap-2">
@@ -339,14 +341,14 @@ ${recentContent}
                     setTimeout(() => setCopied(false), 2000);
                   }}
                   className="text-muted-foreground/60 hover:text-gold transition-colors"
-                  title="复制全文"
+                  title={t("review.copy_full_text")}
                 >
                   {copied ? <Check size={11} className="text-los-green" /> : <Copy size={11} />}
                 </button>
                 <button
                   onClick={() => generateLetter(letterType || "weekly")}
                   className="text-muted-foreground/40 hover:text-gold transition-colors"
-                  title="重新生成"
+                  title={t("review.regenerate")}
                 >
                   <RotateCcw size={11} />
                 </button>
@@ -354,7 +356,7 @@ ${recentContent}
             )}
           </div>
           <p className="text-[13px] text-foreground/90 leading-[1.8] whitespace-pre-line">{letter}</p>
-          {!isGenerating && <p className="text-[11px] text-muted-foreground mt-4 italic">—— 罗盘</p>}
+          {!isGenerating && <p className="text-[11px] text-muted-foreground mt-4 italic">{t("review.signature")}</p>}
         </div>
       )}
     </div>

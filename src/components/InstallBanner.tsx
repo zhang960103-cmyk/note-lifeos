@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const InstallBanner = () => {
+  const { t } = useLanguage();
   const [show, setShow] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
@@ -39,7 +41,7 @@ const InstallBanner = () => {
       <div className="max-w-[500px] mx-auto bg-surface-2 border border-gold-border rounded-xl px-4 py-3 flex items-center gap-3">
         <span className="text-sm">🧭</span>
         <button onClick={install} className="flex-1 text-left text-xs text-foreground">
-          添加到主屏幕，随时打开
+          {t("install_banner.cta")}
         </button>
         <button onClick={dismiss} className="text-muted-foreground hover:text-foreground transition-colors">
           <X size={16} />

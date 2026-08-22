@@ -9,10 +9,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { getCurrencySymbol } from "@/lib/currencyUtils";
 import type { BillingCycle } from "@/types/lifeOs";
 import { toast } from "sonner";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const COLORS = ["hsl(39,58%,53%)", "hsl(0,65%,55%)", "hsl(142,60%,45%)", "hsl(210,60%,50%)", "hsl(280,55%,55%)", "hsl(30,50%,45%)"];
 const EXPENSE_CATEGORIES = ["餐饮", "购物", "交通", "娱乐", "住房", "医疗", "学习", "旅行", "其他"];
-const BILLING_LABELS: Record<BillingCycle, string> = { monthly: "月付", yearly: "年付", quarterly: "季付" };
 type WealthTab = "records" | "budget" | "subscriptions" | "ious";
 
 // 金额校验：拒绝空值/非数字/负数/无穷大，避免 Number("") / Number("abc") 产出
@@ -33,9 +33,15 @@ function defaultNextDateFor(cycle: BillingCycle): string {
 }
 
 export default function WealthPage() {
+  const { t } = useLanguage();
   const { financeEntries, deleteFinanceEntry, updateFinanceEntry, energyLogs } = useLifeOs();
   const { user } = useAuth();
   const uid = user?.id || "guest";
+  const BILLING_LABELS: Record<BillingCycle, string> = {
+    monthly: t("wealth.billing_monthly"),
+    yearly: t("wealth.billing_yearly"),
+    quarterly: t("wealth.billing_quarterly"),
+  };
   const [tab, setTab] = useState<WealthTab>("records");
   const [period, setPeriod] = useState<"week" | "month" | "all">("month");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -116,7 +122,7 @@ export default function WealthPage() {
   const handleAddBudget = () => {
     const limit = parsePositiveAmount(budgetLimit);
     if (!budgetCategory || limit === null) {
-      toast.error("请输入一个大于0的月度上限金额", { id: "budget-invalid" });
+      toast.error(t("wealth.err_budget_invalid"), { id: "budget-invalid" });
       return;
     }
     addBudget({ category: budgetCategory, emoji: "💰", limit, period: "monthly" });
@@ -125,7 +131,7 @@ export default function WealthPage() {
   const handleAddSub = () => {
     const amount = parsePositiveAmount(subAmount);
     if (!subName.trim() || amount === null) {
-      toast.error("请填写名称，并输入一个大于0的金额", { id: "sub-invalid" });
+      toast.error(t("wealth.err_sub_invalid"), { id: "sub-invalid" });
       return;
     }
     addSubscription({ name: subName.trim(), emoji: "📱", amount, billingCycle: subCycle, nextDate: subNextDate, category: "娱乐", active: true });
@@ -134,7 +140,7 @@ export default function WealthPage() {
   const handleAddIou = () => {
     const amount = parsePositiveAmount(iouAmount);
     if (!iouPerson.trim() || amount === null || !iouReason.trim()) {
-      toast.error("请填写对方、原因，并输入一个大于0的金额", { id: "iou-invalid" });
+      toast.error(t("wealth.err_iou_invalid"), { id: "iou-invalid" });
       return;
     }
     addIou({ direction: iouDir, person: iouPerson.trim(), amount, reason: iouReason.trim(), status: "pending" });
@@ -142,22 +148,22 @@ export default function WealthPage() {
   };
 
   const TABS = [
-    { key: "records" as WealthTab, icon: <Wallet size={12} />, label: "账单" },
-    { key: "budget" as WealthTab, icon: <Target size={12} />, label: "预算" },
-    { key: "subscriptions" as WealthTab, icon: <CreditCard size={12} />, label: "订阅" },
-    { key: "ious" as WealthTab, icon: <Users size={12} />, label: "借还" },
+    { key: "records" as WealthTab, icon: <Wallet size={12} />, label: t("wealth.tab_bills") },
+    { key: "budget" as WealthTab, icon: <Target size={12} />, label: t("wealth.tab_budget") },
+    { key: "subscriptions" as WealthTab, icon: <CreditCard size={12} />, label: t("wealth.tab_subscriptions") },
+    { key: "ious" as WealthTab, icon: <Users size={12} />, label: t("wealth.tab_ious") },
   ];
 
   return (
     <div className="h-full overflow-y-auto max-w-[600px] mx-auto pb-4">
       <div className="px-4 py-4 flex items-center justify-between">
         <div>
-          <h1 className="font-serif-sc text-lg text-foreground">财富</h1>
-          <p className="text-[10px] text-muted-foreground">钱去哪了 · 欠了谁 · 订了什么</p>
+          <h1 className="font-serif-sc text-lg text-foreground">{t("wealth.title")}</h1>
+          <p className="text-[10px] text-muted-foreground">{t("wealth.header_subtitle")}</p>
         </div>
         {dueSoon.length > 0 && (
           <div className="flex items-center gap-1 text-[9px] text-los-orange bg-los-orange/10 px-2 py-1 rounded-full">
-            <Bell size={10} /> {dueSoon.length}个订阅即将到期
+            <Bell size={10} /> {t("wealth.subs_due_soon", { count: dueSoon.length })}
           </div>
         )}
       </div>
@@ -165,17 +171,17 @@ export default function WealthPage() {
       <div className="grid grid-cols-3 gap-2 px-4 mb-3">
         <div className="bg-card border border-border rounded-xl p-2.5 text-center">
           <div className="text-sm text-los-green font-mono-jb">{sym}{stats.income}</div>
-          <div className="text-[8px] text-muted-foreground">本月收入</div>
+          <div className="text-[8px] text-muted-foreground">{t("wealth.income_this_month")}</div>
         </div>
         <div className="bg-card border border-border rounded-xl p-2.5 text-center">
           <div className="text-sm text-los-orange font-mono-jb">{sym}{stats.expense}</div>
-          <div className="text-[8px] text-muted-foreground">本月支出</div>
+          <div className="text-[8px] text-muted-foreground">{t("wealth.expense_this_month")}</div>
         </div>
         <div className="bg-card border border-border rounded-xl p-2.5 text-center">
           <div className={`text-sm font-mono-jb ${iouSummary.theyOwe >= iouSummary.iOwe ? "text-los-green" : "text-los-orange"}`}>
             {sym}{Math.abs(iouSummary.net)}
           </div>
-          <div className="text-[8px] text-muted-foreground">{iouSummary.net > 0 ? "净欠我" : iouSummary.net < 0 ? "净欠人" : "借还平衡"}</div>
+          <div className="text-[8px] text-muted-foreground">{iouSummary.net > 0 ? t("wealth.net_owed_to_me") : iouSummary.net < 0 ? t("wealth.net_i_owe") : t("wealth.net_balanced")}</div>
         </div>
       </div>
 
@@ -197,14 +203,14 @@ export default function WealthPage() {
               {(["week", "month", "all"] as const).map(k => (
                 <button key={k} onClick={() => setPeriod(k)}
                   className={`text-xs px-3 py-1 rounded-full transition ${period === k ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                  {k === "week" ? "本周" : k === "month" ? "本月" : "全部"}
+                  {k === "week" ? t("wealth.week") : k === "month" ? t("wealth.month") : t("wealth.all")}
                 </button>
               ))}
             </div>
 
             {categoryData.length > 0 && (
               <div className="bg-card border border-border rounded-xl p-3 mb-3">
-                <h2 className="text-[10px] text-muted-foreground mb-2">支出分布</h2>
+                <h2 className="text-[10px] text-muted-foreground mb-2">{t("wealth.expense_category")}</h2>
                 <div className="flex gap-3 items-center">
                   <div className="w-[80px] h-[80px] flex-shrink-0">
                     <ResponsiveContainer width="100%" height="100%">
@@ -230,13 +236,13 @@ export default function WealthPage() {
             )}
 
             <div className="bg-card border border-border rounded-xl p-3 mb-4">
-              <h2 className="text-[10px] text-muted-foreground mb-2">流水记录</h2>
+              <h2 className="text-[10px] text-muted-foreground mb-2">{t("wealth.records")}</h2>
               {filtered.length === 0 ? (
                 <div className="text-center py-6">
-                  <p className="text-caption text-muted-foreground">还没有账单记录</p>
-                  <p className="text-caption text-muted-foreground/60 mt-1 mb-3">在主页和导师说话，会自动记录</p>
+                  <p className="text-caption text-muted-foreground">{t("wealth.no_bill_records")}</p>
+                  <p className="text-caption text-muted-foreground/60 mt-1 mb-3">{t("wealth.no_records")}</p>
                   <div className="flex gap-2 justify-center flex-wrap">
-                    {["花了50块吃饭", "收到工资5000", "打车花了30"].map(eg => (
+                    {[t("wealth.eg_expense_meal"), t("wealth.eg_income_salary"), t("wealth.eg_expense_taxi")].map(eg => (
                       <span key={eg} className="text-caption bg-surface-2 border border-border px-2.5 py-1 rounded-full text-muted-foreground">
                         「{eg}」
                       </span>
@@ -253,7 +259,7 @@ export default function WealthPage() {
                           <input value={editNote} onChange={e => setEditNote(e.target.value)} className="flex-1 bg-muted border border-border rounded px-1 py-0.5 text-xs text-foreground" />
                           <button onClick={() => {
                             const amount = parsePositiveAmount(editAmount);
-                            if (amount === null) { toast.error("金额需要是大于0的数字", { id: "edit-amount-invalid" }); return; }
+                            if (amount === null) { toast.error(t("wealth.err_amount_invalid"), { id: "edit-amount-invalid" }); return; }
                             updateFinanceEntry(f.id, { amount, note: editNote });
                             setEditingId(null);
                           }} className="text-los-green"><Check size={12} /></button>
@@ -280,13 +286,13 @@ export default function WealthPage() {
             <div className="bg-card border border-primary/20 rounded-xl p-4 mb-4">
               <div className="flex items-center gap-2 mb-2">
                 <BookOpen size={14} className="text-primary" />
-                <span className="text-xs text-primary font-serif-sc">{stats.net <= 0 ? "生存期" : stats.net < 5000 ? "积累期" : stats.net < 20000 ? "增长期" : "自由期"}</span>
+                <span className="text-xs text-primary font-serif-sc">{stats.net <= 0 ? t("wealth.stage_survival") : stats.net < 5000 ? t("wealth.stage_accumulation") : stats.net < 20000 ? t("wealth.stage_growth") : t("wealth.stage_freedom")}</span>
               </div>
               <p className="text-xs text-foreground leading-[1.8]">
-                {stats.net <= 0 ? "支出≥收入，优先「50-30-20法则」：50%必需、30%想要、20%储蓄" :
-                 stats.net < 5000 ? "有储蓄是好的开始。建立3个月应急金，然后了解指数基金定投" :
-                 stats.net < 20000 ? "有了积累，考虑被动收入：课程、内容、数字产品" :
-                 "优化资产配置，让钱为你工作。关注被动收入是否覆盖支出"}
+                {stats.net <= 0 ? t("wealth.advice_survival") :
+                 stats.net < 5000 ? t("wealth.advice_accumulation") :
+                 stats.net < 20000 ? t("wealth.advice_growth") :
+                 t("wealth.advice_freedom")}
               </p>
             </div>
           </>
@@ -296,9 +302,9 @@ export default function WealthPage() {
         {tab === "budget" && (
           <>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] text-muted-foreground">设置月度预算上限，实时追踪进度</p>
+              <p className="text-[10px] text-muted-foreground">{t("wealth.budget_desc")}</p>
               <button onClick={() => setShowBudgetForm(v => !v)} className="flex items-center gap-1 text-[10px] text-primary bg-primary/10 px-2.5 py-1.5 rounded-lg">
-                <Plus size={11} /> 新增预算
+                <Plus size={11} /> {t("wealth.add_budget")}
               </button>
             </div>
 
@@ -306,21 +312,21 @@ export default function WealthPage() {
               <div className="bg-card border border-border rounded-xl p-4 mb-3">
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <div>
-                    <label className="text-[9px] text-muted-foreground mb-1 block">类别</label>
+                    <label className="text-[9px] text-muted-foreground mb-1 block">{t("wealth.category")}</label>
                     <select value={budgetCategory} onChange={e => setBudgetCategory(e.target.value)}
                       className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none">
                       {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-[9px] text-muted-foreground mb-1 block">月度上限（元）</label>
+                    <label className="text-[9px] text-muted-foreground mb-1 block">{t("wealth.budget_limit_label")}</label>
                     <input value={budgetLimit} onChange={e => setBudgetLimit(e.target.value)} type="number" placeholder="1000"
                       className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none" />
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={handleAddBudget} disabled={parsePositiveAmount(budgetLimit) === null} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-xs disabled:opacity-30">保存</button>
-                  <button onClick={() => setShowBudgetForm(false)} className="px-4 bg-muted text-muted-foreground py-2 rounded-lg text-xs">取消</button>
+                  <button onClick={handleAddBudget} disabled={parsePositiveAmount(budgetLimit) === null} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-xs disabled:opacity-30">{t("wealth.save")}</button>
+                  <button onClick={() => setShowBudgetForm(false)} className="px-4 bg-muted text-muted-foreground py-2 rounded-lg text-xs">{t("wealth.cancel")}</button>
                 </div>
               </div>
             )}
@@ -328,8 +334,8 @@ export default function WealthPage() {
             {budgetUtil.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Target size={32} className="mx-auto mb-3 opacity-30" />
-                <p className="text-sm">还没有预算</p>
-                <p className="text-xs mt-1 opacity-60">设置后可以看到每个类别还剩多少</p>
+                <p className="text-sm">{t("wealth.no_budgets")}</p>
+                <p className="text-xs mt-1 opacity-60">{t("wealth.no_budgets_desc")}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -338,14 +344,14 @@ export default function WealthPage() {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-serif-sc text-foreground">{b.category}</span>
-                        {b.status === "exceeded" && <span className="text-[9px] bg-destructive/20 text-destructive px-1.5 py-0.5 rounded-full">超支</span>}
-                        {b.status === "warning" && <span className="text-[9px] bg-los-orange/20 text-los-orange px-1.5 py-0.5 rounded-full">接近上限</span>}
+                        {b.status === "exceeded" && <span className="text-[9px] bg-destructive/20 text-destructive px-1.5 py-0.5 rounded-full">{t("wealth.exceeded")}</span>}
+                        {b.status === "warning" && <span className="text-[9px] bg-los-orange/20 text-los-orange px-1.5 py-0.5 rounded-full">{t("wealth.near_limit")}</span>}
                       </div>
                       <button onClick={() => deleteBudget(b.id)} className="text-muted-foreground/40 hover:text-destructive"><Trash2 size={12} /></button>
                     </div>
                     <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1.5">
-                      <span>已用 {sym}{b.spent}</span>
-                      <span>上限 {sym}{b.limit} · 剩余 {sym}{Math.max(b.limit - b.spent, 0)}</span>
+                      <span>{t("wealth.used")} {sym}{b.spent}</span>
+                      <span>{t("wealth.limit_label")} {sym}{b.limit} · {t("wealth.remaining")} {sym}{Math.max(b.limit - b.spent, 0)}</span>
                     </div>
                     <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                       <div className="h-full rounded-full transition-all" style={{
@@ -353,13 +359,13 @@ export default function WealthPage() {
                         background: b.status === "exceeded" ? "hsl(0,65%,55%)" : b.status === "warning" ? "hsl(26,78%,57%)" : "hsl(142,60%,45%)"
                       }} />
                     </div>
-                    <div className="text-right text-[9px] text-muted-foreground mt-1">{b.pct}% 已用</div>
+                    <div className="text-right text-[9px] text-muted-foreground mt-1">{b.pct}% {t("wealth.used")}</div>
                   </div>
                 ))}
                 <div className="bg-card border border-border rounded-xl p-3 text-xs">
-                  <div className="flex justify-between"><span className="text-muted-foreground">预算总额</span><span className="font-mono-jb">{sym}{budgets.reduce((s, b) => s + b.limit, 0)}</span></div>
-                  <div className="flex justify-between mt-1"><span className="text-muted-foreground">已支出</span><span className="font-mono-jb text-los-orange">{sym}{budgetUtil.reduce((s, b) => s + b.spent, 0)}</span></div>
-                  <div className="flex justify-between mt-1"><span className="text-muted-foreground">剩余</span>
+                  <div className="flex justify-between"><span className="text-muted-foreground">{t("wealth.budget_total")}</span><span className="font-mono-jb">{sym}{budgets.reduce((s, b) => s + b.limit, 0)}</span></div>
+                  <div className="flex justify-between mt-1"><span className="text-muted-foreground">{t("wealth.spent_label")}</span><span className="font-mono-jb text-los-orange">{sym}{budgetUtil.reduce((s, b) => s + b.spent, 0)}</span></div>
+                  <div className="flex justify-between mt-1"><span className="text-muted-foreground">{t("wealth.remaining")}</span>
                     <span className={`font-mono-jb ${budgets.reduce((s, b) => s + b.limit, 0) >= budgetUtil.reduce((s, b) => s + b.spent, 0) ? "text-los-green" : "text-destructive"}`}>
                       {sym}{budgets.reduce((s, b) => s + b.limit, 0) - budgetUtil.reduce((s, b) => s + b.spent, 0)}
                     </span>
@@ -376,17 +382,17 @@ export default function WealthPage() {
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="bg-card border border-border rounded-xl p-3 text-center">
                 <div className="text-lg font-mono-jb text-foreground">{sym}{Math.round(subStats.monthlyTotal)}</div>
-                <div className="text-[8px] text-muted-foreground">每月固定支出</div>
+                <div className="text-[8px] text-muted-foreground">{t("wealth.monthly_fixed_expense")}</div>
               </div>
               <div className="bg-card border border-border rounded-xl p-3 text-center">
                 <div className="text-lg font-mono-jb text-foreground">{sym}{Math.round(subStats.yearlyTotal)}</div>
-                <div className="text-[8px] text-muted-foreground">每年固定支出</div>
+                <div className="text-[8px] text-muted-foreground">{t("wealth.yearly_fixed_expense")}</div>
               </div>
             </div>
 
             {dueSoon.length > 0 && (
               <div className="bg-los-orange/10 border border-los-orange/30 rounded-xl p-3 mb-3">
-                <p className="text-[10px] text-los-orange font-serif-sc mb-1">⏰ 7天内续费</p>
+                <p className="text-[10px] text-los-orange font-serif-sc mb-1">{t("wealth.renew_within_7days")}</p>
                 {dueSoon.map(s => (
                   <div key={s.id} className="flex items-center justify-between text-xs py-0.5">
                     <span>{s.emoji} {s.name}</span>
@@ -397,29 +403,29 @@ export default function WealthPage() {
             )}
 
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] text-muted-foreground">{subStats.count} 个活跃订阅</span>
+              <span className="text-[10px] text-muted-foreground">{t("wealth.active_subs_count", { count: subStats.count })}</span>
               <button onClick={() => setShowSubForm(v => !v)} className="flex items-center gap-1 text-[10px] text-primary bg-primary/10 px-2.5 py-1.5 rounded-lg">
-                <Plus size={11} /> 添加订阅
+                <Plus size={11} /> {t("wealth.add_subscription")}
               </button>
             </div>
 
             {showSubForm && (
               <div className="bg-card border border-border rounded-xl p-4 mb-3">
                 <div className="grid grid-cols-2 gap-2 mb-2">
-                  <div><label className="text-[9px] text-muted-foreground mb-1 block">名称</label>
+                  <div><label className="text-[9px] text-muted-foreground mb-1 block">{t("wealth.name_label")}</label>
                     <input value={subName} onChange={e => setSubName(e.target.value)} placeholder="Netflix" className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none" /></div>
-                  <div><label className="text-[9px] text-muted-foreground mb-1 block">金额（元）</label>
+                  <div><label className="text-[9px] text-muted-foreground mb-1 block">{t("wealth.amount_label")}</label>
                     <input value={subAmount} onChange={e => setSubAmount(e.target.value)} type="number" placeholder="39" className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none" /></div>
-                  <div><label className="text-[9px] text-muted-foreground mb-1 block">付款周期</label>
+                  <div><label className="text-[9px] text-muted-foreground mb-1 block">{t("wealth.billing_cycle_label")}</label>
                     <select value={subCycle} onChange={e => setSubCycle(e.target.value as BillingCycle)} className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none">
                       {(["monthly", "yearly", "quarterly"] as BillingCycle[]).map(c => <option key={c} value={c}>{BILLING_LABELS[c]}</option>)}
                     </select></div>
-                  <div><label className="text-[9px] text-muted-foreground mb-1 block">下次续费日</label>
+                  <div><label className="text-[9px] text-muted-foreground mb-1 block">{t("wealth.next_renewal_label")}</label>
                     <input value={subNextDate} onChange={e => { setSubNextDate(e.target.value); setSubNextDateTouched(true); }} type="date" className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none" /></div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={handleAddSub} disabled={!subName.trim() || parsePositiveAmount(subAmount) === null} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-xs disabled:opacity-30">保存</button>
-                  <button onClick={() => setShowSubForm(false)} className="px-4 bg-muted text-muted-foreground py-2 rounded-lg text-xs">取消</button>
+                  <button onClick={handleAddSub} disabled={!subName.trim() || parsePositiveAmount(subAmount) === null} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-xs disabled:opacity-30">{t("wealth.save")}</button>
+                  <button onClick={() => setShowSubForm(false)} className="px-4 bg-muted text-muted-foreground py-2 rounded-lg text-xs">{t("wealth.cancel")}</button>
                 </div>
               </div>
             )}
@@ -427,8 +433,8 @@ export default function WealthPage() {
             {subscriptions.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <CreditCard size={32} className="mx-auto mb-3 opacity-30" />
-                <p className="text-sm text-muted-foreground">暂无订阅记录</p>
-                  <p className="text-caption text-muted-foreground/60 mt-1">例如：Netflix 39元/月、健身房 199元/月</p>
+                <p className="text-sm text-muted-foreground">{t("wealth.no_subs")}</p>
+                  <p className="text-caption text-muted-foreground/60 mt-1">{t("wealth.no_subs_example")}</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -442,15 +448,15 @@ export default function WealthPage() {
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[10px] font-mono-jb text-primary">{sym}{s.amount}</span>
-                        <span className="text-[9px] text-muted-foreground">下次 {s.nextDate}</span>
+                        <span className="text-[9px] text-muted-foreground">{t("wealth.next_label")} {s.nextDate}</span>
                       </div>
                     </div>
                     <div className="flex gap-1 items-center">
-                      <button onClick={() => renewSubscription(s.id)} className="text-muted-foreground hover:text-primary p-2 -m-1" title="标记已续费"><RefreshCw size={13} /></button>
-                      <button onClick={() => toggleActive(s.id)} className={`text-[9px] px-2 py-1 rounded-full ${s.active ? "bg-los-green/20 text-los-green" : "bg-muted text-muted-foreground"}`}>{s.active ? "活跃" : "停用"}</button>
+                      <button onClick={() => renewSubscription(s.id)} className="text-muted-foreground hover:text-primary p-2 -m-1" title={t("wealth.mark_renewed")}><RefreshCw size={13} /></button>
+                      <button onClick={() => toggleActive(s.id)} className={`text-[9px] px-2 py-1 rounded-full ${s.active ? "bg-los-green/20 text-los-green" : "bg-muted text-muted-foreground"}`}>{s.active ? t("wealth.active_status") : t("wealth.inactive_status")}</button>
                       <button
-                        onClick={() => { if (confirm(`确定删除订阅"${s.name}"吗？`)) deleteSubscription(s.id); }}
-                        className="text-muted-foreground/40 hover:text-destructive p-2 -m-1" title="删除">
+                        onClick={() => { if (confirm(t("wealth.confirm_delete_sub", { name: s.name }))) deleteSubscription(s.id); }}
+                        className="text-muted-foreground/40 hover:text-destructive p-2 -m-1" title={t("wealth.delete_label")}>
                         <Trash2 size={12} />
                       </button>
                     </div>
@@ -467,38 +473,38 @@ export default function WealthPage() {
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="bg-los-green/10 border border-los-green/30 rounded-xl p-3 text-center">
                 <div className="text-lg font-mono-jb text-los-green">{sym}{iouSummary.theyOwe}</div>
-                <div className="text-[8px] text-muted-foreground">别人欠我</div>
+                <div className="text-[8px] text-muted-foreground">{t("wealth.they_owe_me")}</div>
               </div>
               <div className="bg-los-orange/10 border border-los-orange/30 rounded-xl p-3 text-center">
                 <div className="text-lg font-mono-jb text-los-orange">{sym}{iouSummary.iOwe}</div>
-                <div className="text-[8px] text-muted-foreground">我欠别人</div>
+                <div className="text-[8px] text-muted-foreground">{t("wealth.i_owe_them")}</div>
               </div>
             </div>
 
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] text-muted-foreground">{iouSummary.pendingCount} 笔未结清</span>
+              <span className="text-[10px] text-muted-foreground">{t("wealth.pending_count", { count: iouSummary.pendingCount })}</span>
               <button onClick={() => setShowIouForm(v => !v)} className="flex items-center gap-1 text-[10px] text-primary bg-primary/10 px-2.5 py-1.5 rounded-lg">
-                <Plus size={11} /> 记一笔
+                <Plus size={11} /> {t("wealth.add_record")}
               </button>
             </div>
 
             {showIouForm && (
               <div className="bg-card border border-border rounded-xl p-4 mb-3">
                 <div className="flex gap-2 mb-3">
-                  <button onClick={() => setIouDir("they_owe")} className={`flex-1 py-2 rounded-lg text-xs transition ${iouDir === "they_owe" ? "bg-los-green/20 text-los-green" : "bg-muted text-muted-foreground"}`}>别人欠我</button>
-                  <button onClick={() => setIouDir("i_owe")} className={`flex-1 py-2 rounded-lg text-xs transition ${iouDir === "i_owe" ? "bg-los-orange/20 text-los-orange" : "bg-muted text-muted-foreground"}`}>我欠别人</button>
+                  <button onClick={() => setIouDir("they_owe")} className={`flex-1 py-2 rounded-lg text-xs transition ${iouDir === "they_owe" ? "bg-los-green/20 text-los-green" : "bg-muted text-muted-foreground"}`}>{t("wealth.they_owe_me")}</button>
+                  <button onClick={() => setIouDir("i_owe")} className={`flex-1 py-2 rounded-lg text-xs transition ${iouDir === "i_owe" ? "bg-los-orange/20 text-los-orange" : "bg-muted text-muted-foreground"}`}>{t("wealth.i_owe_them")}</button>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mb-2">
-                  <div><label className="text-[9px] text-muted-foreground mb-1 block">对方</label>
-                    <input value={iouPerson} onChange={e => setIouPerson(e.target.value)} placeholder="小明" className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none" /></div>
-                  <div><label className="text-[9px] text-muted-foreground mb-1 block">金额（元）</label>
+                  <div><label className="text-[9px] text-muted-foreground mb-1 block">{t("wealth.person_label")}</label>
+                    <input value={iouPerson} onChange={e => setIouPerson(e.target.value)} placeholder={t("wealth.person_placeholder")} className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none" /></div>
+                  <div><label className="text-[9px] text-muted-foreground mb-1 block">{t("wealth.amount_label")}</label>
                     <input value={iouAmount} onChange={e => setIouAmount(e.target.value)} type="number" placeholder="200" className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none" /></div>
                 </div>
-                <div className="mb-2"><label className="text-[9px] text-muted-foreground mb-1 block">原因</label>
-                  <input value={iouReason} onChange={e => setIouReason(e.target.value)} placeholder="上次聚餐AA" className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none" /></div>
+                <div className="mb-2"><label className="text-[9px] text-muted-foreground mb-1 block">{t("wealth.reason_label")}</label>
+                  <input value={iouReason} onChange={e => setIouReason(e.target.value)} placeholder={t("wealth.reason_placeholder")} className="w-full bg-muted border border-border rounded-lg px-2 py-2 text-xs text-foreground focus:outline-none" /></div>
                 <div className="flex gap-2">
-                  <button onClick={handleAddIou} disabled={!iouPerson.trim() || parsePositiveAmount(iouAmount) === null || !iouReason.trim()} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-xs disabled:opacity-30">保存</button>
-                  <button onClick={() => setShowIouForm(false)} className="px-4 bg-muted text-muted-foreground py-2 rounded-lg text-xs">取消</button>
+                  <button onClick={handleAddIou} disabled={!iouPerson.trim() || parsePositiveAmount(iouAmount) === null || !iouReason.trim()} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-xs disabled:opacity-30">{t("wealth.save")}</button>
+                  <button onClick={() => setShowIouForm(false)} className="px-4 bg-muted text-muted-foreground py-2 rounded-lg text-xs">{t("wealth.cancel")}</button>
                 </div>
               </div>
             )}
@@ -506,8 +512,8 @@ export default function WealthPage() {
             {ious.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Users size={32} className="mx-auto mb-3 opacity-30" />
-                <p className="text-sm text-muted-foreground">暂无借还记录</p>
-                  <p className="text-caption text-muted-foreground/60 mt-1">朋友请你吃饭帮垫款，点「记一笔」开始记录</p>
+                <p className="text-sm text-muted-foreground">{t("wealth.no_ious")}</p>
+                  <p className="text-caption text-muted-foreground/60 mt-1">{t("wealth.no_ious_desc")}</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -516,20 +522,20 @@ export default function WealthPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-mono-jb ${iou.direction === "they_owe" ? "bg-los-green/20 text-los-green" : "bg-los-orange/20 text-los-orange"}`}>
-                          {iou.direction === "they_owe" ? "↑欠我" : "↓我欠"}
+                          {iou.direction === "they_owe" ? t("wealth.badge_they_owe") : t("wealth.badge_i_owe")}
                         </span>
                         <span className="text-sm text-foreground">{iou.person}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`text-sm font-mono-jb ${iou.direction === "they_owe" ? "text-los-green" : "text-los-orange"}`}>{sym}{iou.amount}</span>
                         {iou.status === "pending" && (
-                          <button onClick={() => markPaid(iou.id)} className="text-[9px] bg-primary/10 text-primary px-2 py-1 rounded-full"><Check size={10} className="inline mr-0.5" />还清</button>
+                          <button onClick={() => markPaid(iou.id)} className="text-[9px] bg-primary/10 text-primary px-2 py-1 rounded-full"><Check size={10} className="inline mr-0.5" />{t("wealth.mark_paid")}</button>
                         )}
                         <button onClick={() => deleteIou(iou.id)} className="text-muted-foreground/40 hover:text-destructive"><Trash2 size={12} /></button>
                       </div>
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-1">{iou.reason} · {iou.createdAt.slice(0, 10)}</p>
-                    {iou.status === "paid" && <span className="text-[9px] text-los-green">✓ 已结清</span>}
+                    {iou.status === "paid" && <span className="text-[9px] text-los-green">{t("wealth.paid_status")}</span>}
                   </div>
                 ))}
               </div>

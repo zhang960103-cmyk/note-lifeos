@@ -13,6 +13,7 @@ import {
   Bold, Italic, List, ListOrdered, CheckSquare,
   Quote, Heading2, Minus, Undo, Redo
 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface JournalEditorProps {
   content?: string;
@@ -26,9 +27,11 @@ export default function JournalEditor({
   content = "",
   onChange,
   onSave,
-  placeholder = "今天想写什么…（支持 **加粗**、- 列表、[ ] 任务）",
+  placeholder,
   readonly = false,
 }: JournalEditorProps) {
+  const { t } = useLanguage();
+  const resolvedPlaceholder = placeholder ?? t("journal_editor.placeholder");
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -36,7 +39,7 @@ export default function JournalEditor({
       }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      Placeholder.configure({ placeholder }),
+      Placeholder.configure({ placeholder: resolvedPlaceholder }),
       Underline,
     ],
     content,
@@ -66,43 +69,43 @@ export default function JournalEditor({
     <div className="bg-card border border-border rounded-xl overflow-hidden">
       {!readonly && (
         <div className="flex items-center gap-0.5 px-3 py-2 border-b border-border flex-wrap">
-          <ToolButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="加粗">
+          <ToolButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title={t("journal_editor.toolbar.bold")}>
             <Bold size={13} />
           </ToolButton>
-          <ToolButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="斜体">
+          <ToolButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title={t("journal_editor.toolbar.italic")}>
             <Italic size={13} />
           </ToolButton>
-          <ToolButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="下划线">
+          <ToolButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title={t("journal_editor.toolbar.underline")}>
             <Minus size={13} />
           </ToolButton>
           <div className="w-px h-4 bg-border mx-1" />
-          <ToolButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="标题">
+          <ToolButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title={t("journal_editor.toolbar.heading")}>
             <Heading2 size={13} />
           </ToolButton>
-          <ToolButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="无序列表">
+          <ToolButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title={t("journal_editor.toolbar.bullet_list")}>
             <List size={13} />
           </ToolButton>
-          <ToolButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="有序列表">
+          <ToolButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title={t("journal_editor.toolbar.ordered_list")}>
             <ListOrdered size={13} />
           </ToolButton>
-          <ToolButton onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive("taskList")} title="任务列表">
+          <ToolButton onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive("taskList")} title={t("journal_editor.toolbar.task_list")}>
             <CheckSquare size={13} />
           </ToolButton>
-          <ToolButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title="引用">
+          <ToolButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title={t("journal_editor.toolbar.quote")}>
             <Quote size={13} />
           </ToolButton>
           <div className="flex-1" />
-          <ToolButton onClick={() => editor.chain().focus().undo().run()} active={false} title="撤销">
+          <ToolButton onClick={() => editor.chain().focus().undo().run()} active={false} title={t("journal_editor.toolbar.undo")}>
             <Undo size={13} />
           </ToolButton>
-          <ToolButton onClick={() => editor.chain().focus().redo().run()} active={false} title="重做">
+          <ToolButton onClick={() => editor.chain().focus().redo().run()} active={false} title={t("journal_editor.toolbar.redo")}>
             <Redo size={13} />
           </ToolButton>
           {onSave && (
             <button
               onMouseDown={e => { e.preventDefault(); onSave(editor.getHTML()); }}
               className="ml-2 text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition">
-              保存
+              {t("journal_editor.save")}
             </button>
           )}
         </div>
