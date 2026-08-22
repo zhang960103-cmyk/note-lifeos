@@ -853,18 +853,19 @@ const HomePage = () => {
                   {msg.content}
                 </div>
                 {/* #11: Go Deeper — 字号提升到 11px */}
-                {/* BUG-10：文字本身只有约 19px 高，之前只有 px-1 的横向内边距，纵向
-                    完全没有触控冗余。用负外边距抵消正内边距的经典技巧扩大点击热区、
-                    同时不改变文字在消息列表里的视觉位置和行间距（如果直接加大
-                    padding 不做负边距抵消，每条 AI 消息下面都会多出一截空白，
-                    整个对话列表会明显变"松"——这是不希望看到的副作用）。这里选的
-                    -my-2.5/py-2.5 组合能把纵向热区从约 19px 提到约 39px，没有完全
-                    打满 44px（再加大负边距会导致相邻消息气泡的点击热区开始重叠，
-                    风险大于收益），这是一个需要你确认是否接受的折中，详见验收报告。 */}
+                {/* BUG-10 二次整改（方案A）：文字本身只有约 19px 高。第一版用
+                    负外边距抵消正内边距的技巧把热区做到约 39px，没有完全打满
+                    44px——因为再加大负边距，热区会开始视觉重叠进相邻消息气泡的
+                    渲染框里，点击命中可能落到错误的元素上，属于"看起来达标、实际
+                    埋雷"的做法。这里改用真实 padding（py-3.5，不再用负边距抵消），
+                    纵向热区做满 47px（19.2px 文字 + 28px 内边距），稳稳超过 44px，
+                    不存在重叠风险。代价是每条 AI 回复下方会比之前多出一截真实可见
+                    的留白，对话列表会比原来略"松"一点——这是刻意接受的视觉取舍，
+                    不是遗漏。 */}
                 {msg.role === "assistant" && !isLoading && (
                   <button
                     onClick={() => handleGoDeeper(msg.content)}
-                    className="text-caption text-muted-foreground/50 hover:text-gold cursor-pointer -mx-1 -my-2.5 px-2 py-2.5 mt-1 transition-colors"
+                    className="text-caption text-muted-foreground/50 hover:text-gold cursor-pointer px-2 py-3.5 mt-1 transition-colors"
                     aria-label={t("home.go_deeper_aria")}
                   >
                     {t("home.go_deeper")}

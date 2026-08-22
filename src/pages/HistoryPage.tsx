@@ -10,9 +10,9 @@ const HistoryPage = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [touchStart, setTouchStart] = useState(0);
+  const [justJumpedId, setJustJumpedId] = useState<string | null>(null);
 
   // 365-day heatmap data
   const heatmapData = useMemo(() => {
@@ -65,7 +65,35 @@ const HistoryPage = () => {
     return "bg-los-red/60";
   };
 
-  const selectedEntry = selectedDate ? entries.find(e => e.date === selectedDate) : null;
+  // BUG-09 二次整改（方案C）：热力图色块本身维持 8×8px 不放大——365 天放大到
+  // 44×44px 会让热力图宽度超过 16000px，直接毁掉"一眼看全年"这个功能的存在
+  // 意义。但 WCAG 2.5.8（AA）的目标尺寸要求允许一种例外：只要同一页面上有
+  // 另一个尺寸达标、功能等效的控件能完成同样的事，小尺寸控件本身可以不达标。
+  // 下面的"按记录列表"（Day list）里每一条都是 px-4 py-3 的整行按钮，实测
+  // 高度远超 44px，而且展示的内容比色块点击后的迷你卡片更完整（能看到全部
+  // 对话，不只是前两条摘要）。所以这里不再让色块弹出一个自己的迷你详情卡片，
+  // 改为点击色块直接跳到（展开+滚动定位）下方列表里对应的那一条——色块的
+  // 触摸精度不再是"看到这天详情"的唯一路径，44px 达标的入口本来就在页面上，
+  // 而不是"技术上有豁免条款但实际上没有对应功能"这种打擦边球的做法。
+  const jumpToEntry = (date: string) => {
+    const entry = entries.find(e => e.date === date);
+    if (!entry) return;
+    setExpandedId(entry.id);
+    setJustJumpedId(entry.id);
+    const scrollToTarget = () => {
+      const el = document.getElementById(`history-entry-${date}`);
+      if (el && typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    };
+    // 测试环境（jsdom）不一定实现 requestAnimationFrame，降级为同步执行
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(scrollToTarget);
+    } else {
+      scrollToTarget();
+    }
+    setTimeout(() => setJustJumpedId(null), 1500);
+  };
 
   // 之前这里从全量financeEntries里取前5条，标题却写"本月财务"——如果本月
   // 消费记录不足5条，列表会用上个月甚至更早的记录悄悄补齐，用户看到的
@@ -154,12 +182,10 @@ const HistoryPage = () => {
                   return (
                     <button
                       key={di}
-                      onClick={() => setSelectedDate(day.date === selectedDate ? null : day.date)}
-                      className={`w-[8px] h-[8px] rounded-[1px] transition-all ${getHeatColor(day.score, day.hasEntry)} ${
-                        day.date === selectedDate ? "ring-1 ring-gold scale-150" : ""
-                      }`}
+                      onClick={() => jumpToEntry(day.date)}
+                      className={`w-[8px] h-[8px] rounded-[1px] transition-all ${getHeatColor(day.score, day.hasEntry)}`}
                       title={`${day.date} ${day.score ? `(${day.score}/10)` : t("history.no_record")}`}
-                      aria-label={`${day.date}${day.score !== null ? ` ${day.score}/10` : ""}`}
+                      aria-label={`${day.date}${day.score !== null ? ` ${day.score}/10` : ""} ${t("history.heatmap_cell_jump_hint")}`}
                     />
                   );
                 })}
@@ -178,29 +204,9 @@ const HistoryPage = () => {
           <span>{t("history.legend_high")}</span>
           <span className="ml-2">□ {t("history.no_record")}</span>
         </div>
+        <p className="text-[8px] text-muted-foreground/70 mt-1.5">{t("history.heatmap_hint")}</p>
       </div>
       <div id="history-heatmap-end" />
-
-      {/* Selected day detail */}
-      {selectedEntry && (
-        <div className="bg-surface-2 border border-gold-border rounded-xl p-4 mb-4 animate-in fade-in">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-foreground font-serif-sc">{format(parseISO(selectedEntry.date), t("history.date_format"))}</span>
-            <span className="text-xs text-gold font-mono-jb">{selectedEntry.emotionScore}/10</span>
-          </div>
-          {selectedEntry.emotionTags.length > 0 && (
-            <div className="flex gap-1 flex-wrap mb-2">
-              {selectedEntry.emotionTags.map(t => (
-                <span key={t} className="text-[9px] bg-surface-3 text-muted-foreground px-1.5 py-0.5 rounded">{t}</span>
-              ))}
-            </div>
-          )}
-          {selectedEntry.messages.filter(m => m.role === "user").slice(0, 2).map((m, i) => (
-            <p key={i} className="text-xs text-muted-foreground leading-[1.8] truncate">{m.content.slice(0, 80)}</p>
-          ))}
-          <button onClick={() => setSelectedDate(null)} className="text-[10px] text-gold mt-2">{t("history.close")} ×</button>
-        </div>
-      )}
 
       {/* Finance Panel */}
       {(monthFinanceStats.count > 0) && (
@@ -253,7 +259,13 @@ const HistoryPage = () => {
             const preview = userMsgs[0]?.content.slice(0, 60) || t("history.no_content");
 
             return (
-              <div key={entry.id} className="bg-surface-2 border border-border rounded-xl overflow-hidden">
+              <div
+                key={entry.id}
+                id={`history-entry-${entry.date}`}
+                className={`bg-surface-2 border rounded-xl overflow-hidden transition-colors ${
+                  justJumpedId === entry.id ? "border-gold" : "border-border"
+                }`}
+              >
                 <button onClick={() => setExpandedId(isExpanded ? null : entry.id)} className="w-full flex items-center gap-3 px-4 py-3 text-left">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">

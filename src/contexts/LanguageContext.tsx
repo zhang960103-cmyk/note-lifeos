@@ -111,6 +111,10 @@ const zh: Record<string, string> = {
   "settings.export_csv": "导出待办 (CSV)",
 
   // BUG-04: i18n retrofit — 14 个此前未接入翻译的页面新增的 key（自动合并自并行 agent 产出）
+  "history.heatmap_hint": "色块较小不便触摸，点击后会在下方列表里定位到对应日记，列表逐条可点区域更大",
+  "history.heatmap_cell_jump_hint": "点击跳转到下方对应记录",
+
+  // BUG-04: i18n retrofit — 14 个此前未接入翻译的页面新增的 key（自动合并自并行 agent 产出）
   "home.go_deeper_aria": "针对这条回复深入追问",
 
   // BUG-04: i18n retrofit — 14 个此前未接入翻译的页面新增的 key（自动合并自并行 agent 产出）
@@ -1273,6 +1277,10 @@ const en: Record<string, string> = {
   "settings.regional": "Region & Language",
   "settings.export_json": "Export all data (JSON)",
   "settings.export_csv": "Export todos (CSV)",
+
+  // BUG-04: i18n retrofit — new keys for the 14 pages that previously had zero useLanguage()/t() usage
+  "history.heatmap_hint": "The color cells are small — tap one to jump to the matching entry in the list below, where each row is a larger, easier target",
+  "history.heatmap_cell_jump_hint": "tap to jump to the matching entry below",
 
   // BUG-04: i18n retrofit — new keys for the 14 pages that previously had zero useLanguage()/t() usage
   "home.go_deeper_aria": "Ask a deeper follow-up on this reply",
