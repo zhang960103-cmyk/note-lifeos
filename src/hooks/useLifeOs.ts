@@ -223,7 +223,7 @@ export function useDayEntries(userId: string | undefined) {
           });
       }
     });
-  }, [userId, entries.length, todayKey]); // eslint-disable-line
+  }, [userId, entries.length, todayKey]);
 
   const ensureEntry = useCallback(async (date: string): Promise<string> => {
     if (!userId) throw new Error("Not authenticated");

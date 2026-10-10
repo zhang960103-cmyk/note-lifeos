@@ -75,7 +75,6 @@ export function LifeOsProvider({ children, userId }: { children: ReactNode; user
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useLifeOs() {
   const ctx = useContext(LifeOsContext);
   if (!ctx) throw new Error("useLifeOs must be used within LifeOsProvider");

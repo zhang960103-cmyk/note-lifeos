@@ -84,7 +84,7 @@ const WheelPage = () => {
     const msgCount = entries.slice(0, 30)
       .reduce((acc, e) => acc + e.messages.filter(m => m.role === "user").length, 0);
     if (msgCount >= 3 && !isInferring) handleInfer();
-  }, [entries.length]); // eslint-disable-line
+  }, [entries.length]);
 
   const handleInfer = async () => {
     setIsInferring(true);
