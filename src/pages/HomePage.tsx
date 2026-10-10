@@ -557,9 +557,8 @@ const HomePage = () => {
               });
               const total = meta.financeHints.reduce((s, h) => s + h.amount, 0);
               const types = meta.financeHints.map(h => h.type === "income" ? t("home.finance.income") : t("home.finance.expense")).join(t("home.list_separator"));
-              setFinanceToast(true);
               setTodoToast(t("home.finance_auto_recorded", { types, total }));
-              setTimeout(() => { setFinanceToast(false); setTodoToast(null); }, 3000);
+              setTimeout(() => setTodoToast(null), 3000);
             }
 
             // Auto-link KR progress from goalHints

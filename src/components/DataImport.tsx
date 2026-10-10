@@ -391,7 +391,7 @@ export function FinanceCsvImport({ onImported }: { onImported?: (count: number) 
       .filter(r => r.length > 3 && r[typeIdx])
       .map(r => ({
         date: r[dateIdx]?.slice(0, 10) || new Date().toISOString().slice(0, 10),
-        type: (r[typeIdx]?.includes("收入") || r[typeIdx]?.includes("收款")) ? "income" : "expense",
+        type: (r[typeIdx]?.includes("收入") || r[typeIdx]?.includes("收款")) ? "income" as const : "expense" as const,
         amount: Math.abs(parseFloat(r[amtIdx]?.replace(/[¥,]/g, "") || "0")),
         category: r[catIdx]?.trim() || "其他",
         note: r[noteIdx]?.trim() || "",
@@ -411,7 +411,7 @@ export function FinanceCsvImport({ onImported }: { onImported?: (count: number) 
       .filter(r => r.length > 3 && r[typeIdx])
       .map(r => ({
         date: r[dateIdx]?.slice(0, 10) || new Date().toISOString().slice(0, 10),
-        type: r[typeIdx]?.includes("收入") ? "income" : "expense",
+        type: r[typeIdx]?.includes("收入") ? "income" as const : "expense" as const,
         amount: Math.abs(parseFloat(r[amtIdx]?.replace(/[¥,]/g, "") || "0")),
         category: "其他",
         note: r[noteIdx]?.trim() || "",
