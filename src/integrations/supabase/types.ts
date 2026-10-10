@@ -318,6 +318,7 @@ export type Database = {
           id: string
           note: string | null
           priority: string
+          project_id: string | null
           recur: string
           recur_days: number[] | null
           reminder_minutes: number | null
@@ -339,6 +340,7 @@ export type Database = {
           id?: string
           note?: string | null
           priority?: string
+          project_id?: string | null
           recur?: string
           recur_days?: number[] | null
           reminder_minutes?: number | null
@@ -360,6 +362,7 @@ export type Database = {
           id?: string
           note?: string | null
           priority?: string
+          project_id?: string | null
           recur?: string
           recur_days?: number[] | null
           reminder_minutes?: number | null
@@ -380,6 +383,105 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      review_letters: {
+        Row: {
+          user_id: string
+          type: string
+          period: string
+          content: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          type: string
+          period: string
+          content: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          type?: string
+          period?: string
+          content?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_places: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          lat: number
+          lng: number
+          emoji: string
+          note: string | null
+          visited_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          lat: number
+          lng: number
+          emoji?: string
+          note?: string | null
+          visited_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          lat?: number
+          lng?: number
+          emoji?: string
+          note?: string | null
+          visited_at?: string
+        }
+        Relationships: []
+      }
+      health_metrics: {
+        Row: {
+          user_id: string
+          date: string
+          sleep_hrs: number | null
+          sleep_eff: number | null
+          hrv: number | null
+          rhr: number | null
+          steps: number | null
+          active_min: number | null
+          readiness_score: number | null
+          energy_level: string | null
+          source: string
+        }
+        Insert: {
+          user_id: string
+          date: string
+          sleep_hrs?: number | null
+          sleep_eff?: number | null
+          hrv?: number | null
+          rhr?: number | null
+          steps?: number | null
+          active_min?: number | null
+          readiness_score?: number | null
+          energy_level?: string | null
+          source?: string
+        }
+        Update: {
+          user_id?: string
+          date?: string
+          sleep_hrs?: number | null
+          sleep_eff?: number | null
+          hrv?: number | null
+          rhr?: number | null
+          steps?: number | null
+          active_min?: number | null
+          readiness_score?: number | null
+          energy_level?: string | null
+          source?: string
+        }
+        Relationships: []
       }
       wheel_scores: {
         Row: {
