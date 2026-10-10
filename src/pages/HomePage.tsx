@@ -6,7 +6,7 @@ import JournalEditor from "@/components/JournalEditor";
 import { streamChat, extractMeta, StreamChatError, type ChatMsg, type ExtractResult } from "@/lib/streamChat";
 import { recognizeIntent, detectPlanGaps, generateDayPlan, formatDayPlan } from "@/lib/intentEngine";
 import { extractTimeBlocks, hasTimeHints } from "@/lib/timeExtractor"; // 本地快速时间提取
-import { updateKRProgressFromGoalHints } from "@/pages/GoalsPage";
+import { updateKRProgressFromGoalHints } from "@/lib/goalProgress";
 import { buildMemoryContext, getKeyPatterns } from "@/lib/memoryEngine";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { useAuth } from "@/hooks/useAuth";

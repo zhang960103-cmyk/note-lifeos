@@ -54,14 +54,12 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
 import { initSupabaseHealth } from "@/integrations/supabase/validate";
-// HomePage/TodoPage 是绝大多数用户(包括手机上的家人)打开app后最先/最常停留的页面，
-// 保持同步加载，避免多一次网络请求的白屏等待；其余页面按路由懒加载，减小首屏 JS 体积。
-import HomePage from "@/pages/HomePage";
-import TodoPage from "@/pages/TodoPage";
-import AuthPage from "@/pages/AuthPage";
-import PrivacyPage from "@/pages/PrivacyPage";
-import ResetPasswordPage from "@/pages/ResetPasswordPage";
-import NotFound from "@/pages/NotFound";
+const HomePage = lazy(() => import("@/pages/HomePage"));
+const TodoPage = lazy(() => import("@/pages/TodoPage"));
+const AuthPage = lazy(() => import("@/pages/AuthPage"));
+const PrivacyPage = lazy(() => import("@/pages/PrivacyPage"));
+const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
 
 const HistoryPage = lazy(() => import("@/pages/HistoryPage"));
 const ReviewPage = lazy(() => import("@/pages/ReviewPage"));
@@ -215,14 +213,16 @@ const App = () => (
       <LanguageProvider>
         <ThemeProvider>
           <ErrorBoundary>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <Routes>
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
-                <Route path="*" element={<AuthGate />} />
-              </Routes>
-            </TooltipProvider>
+            <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-gold" size={24} /></div>}>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <Routes>
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
+                  <Route path="*" element={<AuthGate />} />
+                </Routes>
+              </TooltipProvider>
+            </Suspense>
           </ErrorBoundary>
         </ThemeProvider>
       </LanguageProvider>
