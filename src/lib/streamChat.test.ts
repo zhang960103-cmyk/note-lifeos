@@ -123,7 +123,7 @@ describe("extractMeta", () => {
 
   it("响应 JSON 解析失败：按可重试错误处理，重试后成功", async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200, statusText: "OK", json: async () => { throw new SyntaxError("Unexpected token"); } } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, statusText: "OK", json: async () => { throw new SyntaxError("Unexpected token"); } } satisfies Pick<Response, "ok" | "status" | "statusText" | "json">)
       .mockResolvedValueOnce(jsonResponse({ emotionTags: [], topicTags: [], todos: [], completedTodoIds: [], emotionScore: 5, financeHints: [] }));
     vi.stubGlobal("fetch", fetchMock);
 
