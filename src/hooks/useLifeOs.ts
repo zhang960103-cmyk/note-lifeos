@@ -92,6 +92,8 @@ export function useOnboarding(userId: string | undefined) {
 
 export function useDayEntries(userId: string | undefined) {
   const [entries, setEntries] = useState<DayEntry[]>([]);
+  const [reloadVersion, setReloadVersion] = useState(0);
+  const refreshEntries = useCallback(() => setReloadVersion(value => value + 1), []);
   const entriesRef = useRef<DayEntry[]>([]);
   useEffect(() => { entriesRef.current = entries; }, [entries]);
   const todayKey = format(new Date(), "yyyy-MM-dd");
@@ -141,7 +143,7 @@ export function useDayEntries(userId: string | undefined) {
       setEntries(mapped);
     };
     load();
-  }, [userId]);
+  }, [userId, reloadVersion]);
 
   // Auto-generate recurring todos for today if not yet present
   useEffect(() => {
@@ -517,7 +519,7 @@ export function useDayEntries(userId: string | undefined) {
   const todayEntry = entries.find(e => e.date === todayKey) || null;
 
   return {
-    entries, todayEntry, todayKey, addMessage,
+    entries, todayEntry, todayKey, addMessage, refreshEntries,
     updateDayMeta, toggleTodo, updateTodo, addTodoToDate, deleteEntry, deleteTodo, setFocusTodo, allTodos,
   };
 }
@@ -803,3 +805,4 @@ export function useHabits(userId: string | undefined) {
 
   return { habits, addHabit, checkIn, deleteHabit };
 }
+

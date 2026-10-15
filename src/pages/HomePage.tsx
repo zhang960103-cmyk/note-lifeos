@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, parseISO } from "date-fns";
 import type { TodoItem } from "@/types/lifeOs";
 import { toast } from "sonner";
+import { visibleCoachContent } from "@/lib/actionCoach";
 
 // EnergyLog.level 存的是中文（'高'|'中'|'低'|'透支'），ENERGY_LEVELS 这个UI常量
 // 用的是英文 value——两边转换要一致，否则"选中态"高亮和写入的记录会对不上。
@@ -479,7 +480,7 @@ const HomePage = () => {
 
     let full = "";
     const allMsgs: ChatMsg[] = [
-      ...messagesRef.current.map(m => ({ role: m.role, content: m.content })),
+      ...messagesRef.current.map(m => ({ role: m.role, content: visibleCoachContent(m.content) })),
       { role: "user" as const, content: text },
     ];
 
@@ -661,6 +662,11 @@ const HomePage = () => {
       </div>
 
       {/* Messages */}
+      <button onClick={() => navigate("/action")}
+        className="mx-4 mb-2 px-4 py-3 min-h-11 rounded-xl border border-gold/25 bg-gold/5 text-left flex items-center justify-between gap-3">
+        <span><span className="block text-xs text-gold">先动一下 · 早晚会</span><span className="block text-[10px] text-muted-foreground mt-1">从待办选第一步，做两分钟，再把进展带回晚会。</span></span>
+        <span className="text-gold" aria-hidden="true">↗</span>
+      </button>
       <div className="flex-1 overflow-y-auto px-4 py-2">
         {displayMessages.length === 0 && (
           <div className="flex items-center justify-center h-full">
@@ -1145,3 +1151,4 @@ const HomePage = () => {
 };
 
 export default HomePage;
+

@@ -20,6 +20,7 @@ const MORE_GROUPS = [
   {
     labelKey: "tab.group_growth",
     items: [
+      { path: "/action", icon: <Target size={16} />, labelKey: "tab.action_coach" },
       { path: "/time-stats", icon: <BarChart2 size={16} />, labelKey: "tab.time_stats" },
       { path: "/wheel",      icon: <Target size={16} />,    labelKey: "tab.life_wheel" },
       { path: "/goals",      icon: <Star size={16} />,      labelKey: "tab.goals_okr" },
@@ -118,3 +119,4 @@ export default function TabBar() {
     </>
   );
 }
+

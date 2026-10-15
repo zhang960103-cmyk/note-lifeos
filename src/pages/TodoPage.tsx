@@ -286,6 +286,8 @@ const TodoPage = () => {
 
       {/* Quick access row */}
       <div className="px-4 flex gap-2 mb-3 overflow-x-auto scrollbar-none">
+        <button onClick={() => navigate("/action")}
+          className="text-[11px] min-h-11 px-3 rounded-full border border-gold/30 text-gold flex-shrink-0">↗ 先动两分钟</button>
         <button onClick={() => setShowHabits(!showHabits)}
           className={`text-[11px] px-3 py-1.5 rounded-full border transition flex items-center gap-1 flex-shrink-0 ${showHabits ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
           <Zap size={12} /> {t("todo.habits")}
@@ -929,3 +931,4 @@ function InlineTimeline({ entries, allTodos, todayKey, updateTodo }: {
 }
 
 export default TodoPage;
+
