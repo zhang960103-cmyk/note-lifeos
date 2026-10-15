@@ -32,9 +32,19 @@ function CoachWorkspace({ userId }: { userId: string }) {
   const sessionKey = `lifeos-coach-session-${userId}`;
   const queueKey = `lifeos-coach-outbox-${userId}`;
   const draftKey = `lifeos-coach-meeting-draft-${userId}`;
+  const builderKey = `lifeos-coach-builder-${userId}`;
   const sessionStorageHealthy = useRef(true);
   const queueStorageHealthy = useRef(true);
   const draftStorageHealthy = useRef(true);
+  const builderStorageHealthy = useRef(true);
+  const [builderDraft] = useState(() => {
+    try {
+      const value = JSON.parse(localStorage.getItem(builderKey) || 'null');
+      if (!value) return {};
+      if (value.version !== 1 || typeof value.selected !== 'string' || typeof value.task !== 'string' || typeof value.step !== 'string') throw new Error();
+      return value;
+    } catch { builderStorageHealthy.current = false; return {}; }
+  });
   const [session, setSession] = useState<SavedSession | null>(() => {
     try { const raw = localStorage.getItem(sessionKey); return raw ? validateSession(JSON.parse(raw)) : null; }
     catch { sessionStorageHealthy.current = false; return null; }
@@ -57,10 +67,11 @@ function CoachWorkspace({ userId }: { userId: string }) {
   const requestedTab = searchParams.get('tab');
   const [tab, setTab] = useState<Tab>(requestedTab === 'morning' || requestedTab === 'evening' || requestedTab === 'connect' ? requestedTab : 'action');
   const initialTask = searchParams.get('task');
-  const [selected, setSelected] = useState(initialTask ? `lifeos:${initialTask}` : 'free');
-  const [task, setTask] = useState(session?.task || '');
-  const [step, setStep] = useState(session?.step || '');
-  const [duration, setDuration] = useState(120);
+  const useBuilderDraft = !initialTask || builderDraft.selected === `lifeos:${initialTask}`;
+  const [selected, setSelected] = useState(initialTask ? `lifeos:${initialTask}` : builderDraft.selected || 'free');
+  const [task, setTask] = useState(session?.task || (useBuilderDraft ? builderDraft.task : '') || '');
+  const [step, setStep] = useState(session?.step || (useBuilderDraft ? builderDraft.step : '') || '');
+  const [duration, setDuration] = useState([120,600,1500].includes(builderDraft.duration) ? builderDraft.duration : 120);
   const [now, setNow] = useState(Date.now());
   const [reflecting, setReflecting] = useState(!!session?.pendingRecord);
   const [saving, setSaving] = useState(false);
@@ -101,6 +112,12 @@ function CoachWorkspace({ userId }: { userId: string }) {
     catch { setStorageIssue(true); }
   }, [draftKey, meetingId, mainline, domain, top3, resources, energy, sleep, achieved, obstacle, optimize, meetingAttempt]);
   useEffect(() => {
+    if (!builderStorageHealthy.current) { setStorageIssue(true); return; }
+    if (session) return;
+    try { localStorage.setItem(builderKey, JSON.stringify({ version: 1, selected, task, step, duration })); }
+    catch { builderStorageHealthy.current = false; setStorageIssue(true); }
+  }, [builderKey, selected, task, step, duration, session]);
+  useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(interval);
   }, []);
@@ -127,7 +144,7 @@ function CoachWorkspace({ userId }: { userId: string }) {
     if (!top3) setTop3(morning.top3.join('\n'));
   }, [recordsToday]);
 
-  const appliedSelection = useRef('');
+  const appliedSelection = useRef(useBuilderDraft && builderDraft.step ? builderDraft.selected : '');
   useEffect(() => {
     if (session) return;
     if (selected === 'free') { appliedSelection.current = ''; return; }
@@ -190,6 +207,8 @@ function CoachWorkspace({ userId }: { userId: string }) {
   function start() {
     if (!task.trim() || !step.trim()) { toast.info('先写一件事，再把第一步写小一点。'); return; }
     if (latestSession.current) return;
+    if (selected.startsWith('lifeos:') && !allTodos.some(todo => todo.id === selected.slice(7))) { toast.info('暂时找不到这条待办，请等加载完成，或重新选择。'); return; }
+    if (selected.startsWith('sheet:') && !sheetTasks.some(todo => todo.id === selected.slice(6))) { toast.info('请先连接并刷新人生表格，或选择自己写一件事。'); return; }
     const source: ActionSource = selected.startsWith('lifeos:') ? { kind: 'lifeos', taskId: selected.slice(7) }
       : selected.startsWith('sheet:') ? { kind: 'sheet', taskId: selected.slice(6), spreadsheetId: sheet.connection.config.spreadsheetId } : { kind: 'free' };
     setSession({ id: crypto.randomUUID(), task: task.trim(), step: step.trim(), source, duration,

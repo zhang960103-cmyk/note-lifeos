@@ -31,7 +31,7 @@ try {
   }
   assert.ok(ready, serverOutput);
   browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'zh-CN', timezoneId: 'Asia/Dubai', reducedMotion: 'reduce' });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'zh-CN', timezoneId: 'Asia/Dubai', reducedMotion: 'reduce', serviceWorkers: 'block' });
   const user = { id: uid, email: 'browser-test@example.invalid', aud: 'authenticated', role: 'authenticated', app_metadata: {provider:'email'}, user_metadata: {}, created_at: new Date().toISOString() };
   const enc = value => Buffer.from(JSON.stringify(value)).toString('base64url');
   const accessToken = `${enc({alg:'HS256',typ:'JWT'})}.${enc({sub:uid,aud:'authenticated',exp:Math.floor(Date.now()/1000)+86400,iss:'https://test-project.supabase.co/auth/v1'})}.${Buffer.from('browser-mock').toString('base64url')}`;
@@ -72,11 +72,15 @@ try {
   page.setDefaultNavigationTimeout(20000);
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(String(error)));
-  await page.goto(`${origin}/action`);
+  await page.goto(`${origin}/todos`);
+  await page.getByRole('button',{name:'从两分钟开始：完成本周方案'}).click();
   await expect(page.getByRole('heading', {name:'先动一下 · 早晚会'})).toBeVisible();
   await page.getByLabel('从哪里开始？').selectOption(`lifeos:${taskId}`);
   await expect(page.getByLabel('第一步，小到现在能做')).toHaveValue('写一个标题');
   await page.getByLabel('第一步，小到现在能做').fill('只写一个草稿标题');
+  await page.reload();
+  await expect(page.getByLabel('从哪里开始？')).toHaveValue(`lifeos:${taskId}`);
+  await expect(page.getByLabel('第一步，小到现在能做')).toHaveValue('只写一个草稿标题');
   pass('existing Life OS auth, task loading and concrete first step');
 
   await page.getByRole('button',{name:'就从这一步开始'}).click();
