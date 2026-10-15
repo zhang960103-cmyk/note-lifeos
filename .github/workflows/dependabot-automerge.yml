@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Never check out or execute pull request code in this privileged workflow.
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v9
         with:
           script: |
             const {owner, repo} = context.repo;
