@@ -1,0 +1,41 @@
+name: Action coach checks
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package*.json'
+      - '.github/workflows/action-coach.yml'
+permissions:
+  contents: read
+concurrency:
+  group: lifeos-coach-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --experimental-transform-types tests/coach-core.check.mjs
+      - run: npx tsc --noEmit -p tsconfig.app.json
+      - run: npm test
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://test-project.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: test-build-placeholder
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium
+      - name: Exercise Life OS action workflow
+        run: node tests/coach-browser.mjs
+        timeout-minutes: 5
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lifeos-action-browser-checks
+          path: artifacts/coach-browser/
+          if-no-files-found: ignore

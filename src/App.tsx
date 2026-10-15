@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 const DESKTOP_NAV = [
   { path: "/", icon: "🧭", label: "今日" },
   { path: "/todos", icon: "✅", label: "待办" },
+  { path: "/action", icon: "↗", label: "行动与早晚会" },
   { path: "/calendar", icon: "📅", label: "日历" },
   { path: "/time-stats", icon: "⏰", label: "时间" },
   { path: "/wheel", icon: "⚖️", label: "生命之轮" },
@@ -64,6 +65,7 @@ import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import NotFound from "@/pages/NotFound";
 
 const HistoryPage = lazy(() => import("@/pages/HistoryPage"));
+const ActionPage = lazy(() => import("@/pages/ActionPage"));
 const ReviewPage = lazy(() => import("@/pages/ReviewPage"));
 const WheelPage = lazy(() => import("@/pages/WheelPage"));
 const WealthPage = lazy(() => import("@/pages/WealthPage"));
@@ -126,6 +128,7 @@ const AppInner = () => {
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/todos" element={<TodoPage />} />
+                <Route path="/action" element={<ActionPage />} />
                 <Route path="/history" element={<HistoryPage />} />
                 <Route path="/review" element={<ReviewPage />} />
                 <Route path="/wheel" element={<WheelPage />} />
@@ -231,3 +234,4 @@ const App = () => (
 );
 
 export default App;
+

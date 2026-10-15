@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { parseCoachMessage } from "@/lib/actionCoach";
 import { Upload, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
@@ -91,11 +92,16 @@ async function importBackup(
 
     // 先删旧消息再批量插（幂等，可重复导入）
     await supabase.from("chat_messages").delete().eq("entry_id", e.id);
-    const msgs = safeArray<any>(e.messages).map((m: any) => ({
-      entry_id: e.id, user_id: userId,
-      role: m.role, content: m.content,
-      timestamp: m.timestamp || new Date().toISOString(),
-    }));
+    const msgs = safeArray<any>(e.messages).map((m: any) => {
+      const action = parseCoachMessage({ content: String(m.content || '') });
+      const stableId = action?.id.match(/^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i) ? action.id : undefined;
+      return {
+        ...(stableId ? { id: stableId } : {}),
+        entry_id: e.id, user_id: userId,
+        role: m.role, content: m.content,
+        timestamp: m.timestamp || new Date().toISOString(),
+      };
+    });
     if (msgs.length > 0) {
       const { error: msgErr } = await supabase.from("chat_messages").insert(msgs);
       if (msgErr) warn("chat_messages", msgErr.message);
@@ -550,3 +556,4 @@ export function FinanceCsvImport({ onImported }: { onImported?: (count: number) 
     </div>
   );
 }
+

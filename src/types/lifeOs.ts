@@ -1,3 +1,5 @@
+import type { CoachRecord } from '@/lib/actionCoach';
+
 export type LifeDomain =
   | "学习成长"
   | "感情婚姻"
@@ -15,6 +17,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  coachRecord?: CoachRecord;
 }
 
 export interface DayEntry {
@@ -147,3 +150,4 @@ export interface ResourceRecommendation {
   url?: string;
   description: string;
 }
+

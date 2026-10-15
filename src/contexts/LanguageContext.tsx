@@ -77,6 +77,7 @@ const zh: Record<string, string> = {
   "tab.group_records": "记录",
   "tab.group_help": "帮助",
   "tab.time_stats": "时间分析",
+  "tab.action_coach": "行动与早晚会",
   "tab.life_wheel": "生命之轮",
   "tab.goals_okr": "目标 OKR",
   "tab.diary_wall": "日记墙",
@@ -1246,6 +1247,7 @@ const en: Record<string, string> = {
   "tab.group_records": "Records",
   "tab.group_help": "Help",
   "tab.time_stats": "Time Stats",
+  "tab.action_coach": "Action & Check-ins",
   "tab.life_wheel": "Life Wheel",
   "tab.goals_okr": "Goals (OKR)",
   "tab.diary_wall": "Diary Wall",
@@ -2549,3 +2551,4 @@ export function useLanguage() {
   if (!ctx) throw new Error("useLanguage must be used within LanguageProvider");
   return ctx;
 }
+

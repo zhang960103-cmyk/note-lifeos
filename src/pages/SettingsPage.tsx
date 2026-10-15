@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
 import DataExport from "@/components/DataExport";
+import GoogleLifeSheetSettings from "@/components/GoogleLifeSheetSettings";
 import DataImport, { FinanceCsvImport } from "@/components/DataImport";
 import GlobalSearch from "@/components/GlobalSearch";
 import { useModelProfiles, type ModelProfile } from "@/hooks/useModelProfiles";
@@ -210,6 +211,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-24 space-y-3">
+        <GoogleLifeSheetSettings />
         {/* Search */}
         <button onClick={() => setShowSearch(true)}
           className="w-full bg-muted border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 hover:bg-accent transition">
@@ -683,3 +685,4 @@ function FieldInput({ label, value, placeholder, type, onChange }: {
     </div>
   );
 }
+

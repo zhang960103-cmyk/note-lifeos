@@ -286,6 +286,8 @@ const TodoPage = () => {
 
       {/* Quick access row */}
       <div className="px-4 flex gap-2 mb-3 overflow-x-auto scrollbar-none">
+        <button onClick={() => navigate("/action")}
+          className="text-[11px] min-h-11 px-3 rounded-full border border-gold/30 text-gold flex-shrink-0">↗ 先动两分钟</button>
         <button onClick={() => setShowHabits(!showHabits)}
           className={`text-[11px] px-3 py-1.5 rounded-full border transition flex items-center gap-1 flex-shrink-0 ${showHabits ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
           <Zap size={12} /> {t("todo.habits")}
@@ -531,6 +533,7 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
 }) {
   const { t } = useLanguage();
   const { defaultModelProfileId } = useLifeOs();
+  const navigate = useNavigate();
   const isDone = todo.status === "done";
   const isDoing = todo.status === "doing";
   const [editText, setEditText] = useState(todo.text);
@@ -581,6 +584,9 @@ function TodoRow({ todo, onToggle, onMove, expanded, onExpand, celebrating, edit
         </button>
         {/* Quick actions - always visible */}
         <div className="flex items-center gap-0.5">
+          {!isDone && <button onClick={() => navigate(`/action?task=${encodeURIComponent(todo.id)}`)}
+            className="min-h-11 min-w-11 px-2 rounded-lg bg-gold/5 text-gold text-[10px] hover:bg-gold/10"
+            aria-label={`从两分钟开始：${todo.text}`} title="只做第一步，先动两分钟">2分 ↗</button>}
           {!isDone && !isDoing && (
             <button onClick={() => onMove(todo, "doing")} className="p-1.5 rounded-lg hover:bg-muted transition text-muted-foreground hover:text-los-orange" title={t("todo.action.start")}>
               <Play size={12} />
@@ -929,3 +935,4 @@ function InlineTimeline({ entries, allTodos, todayKey, updateTodo }: {
 }
 
 export default TodoPage;
+
