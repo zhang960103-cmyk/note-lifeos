@@ -75,7 +75,6 @@ function encode(value: unknown): string {
   const bytes = new TextEncoder().encode(JSON.stringify(value));
   return btoa(Array.from(bytes, byte => String.fromCharCode(byte)).join(''));
 }
-function literal(value: string): string { return value.replace(/[\\`*_{}[\]<>#|]/g, char => `\\${char}`); }
 export function formatCoachMessage(record: CoachRecord): string {
   const lines = record.kind === 'action'
     ? [ACTION_PREFIX, `事项：${record.task}`, `这一小步：${record.step}`, `做到：${record.evidence || '已亲手确认完成这一小步'}`,
@@ -84,10 +83,10 @@ export function formatCoachMessage(record: CoachRecord): string {
       `领域：${record.domain || '未指定'}`, ...record.top3.map((task, index) => `${index + 1}. ${task}`),
       ...(record.kind === 'morning' ? [`方法与资源：${record.resources || '先做眼前第一步'}`, `精力：${record.energy}/5；睡眠：${record.sleep || '未填写'}`]
         : [`Top3 达成：${record.achieved}/3`, `未完成主因：${record.obstacle}`, `明天优化：${record.optimize || '把第一步再缩小一点'}`])];
-  return lines.map(literal).join('  \n') + `\n\n<!--${MARKER}${encode(record)}-->`;
+  return lines.join('\n') + `\n\n<!--${MARKER}${encode(record)}-->`;
 }
 export function parseCoachMessage(message: Pick<ChatMessage, 'content'>): CoachRecord | null {
-  const match = message.content.match(/<!--lifeos-coach-v1:([A-Za-z0-9+/=]+)-->/);
+  const match = message.content.match(/<!--lifeos-coach-v1:([A-Za-z0-9+/=]+)-->\s*$/);
   if (!match || match[1].length > 30000) return null;
   try {
     const decoded = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(match[1]), c => c.charCodeAt(0))));
@@ -106,10 +105,10 @@ export function parseCoachMessage(message: Pick<ChatMessage, 'content'>): CoachR
   return null;
 }
 export function visibleCoachContent(content: string): string {
-  return content.replace(/\s*<!--lifeos-coach-v1:[A-Za-z0-9+/=]+-->/g, '').trimEnd();
+  return content.replace(/\s*<!--lifeos-coach-v1:[A-Za-z0-9+/=]+-->\s*$/, '').trimEnd();
 }
 export function coachRecords(messages: ChatMessage[]): CoachRecord[] {
   const unique = new Map<string, CoachRecord>();
-  for (const message of messages) { const record = parseCoachMessage(message); if (record) unique.set(record.id, record); }
+  for (const message of messages) { const record = message.coachRecord || parseCoachMessage(message); if (record) unique.set(record.id, record); }
   return [...unique.values()].sort((a, b) => b.completedAt.localeCompare(a.completedAt));
 }

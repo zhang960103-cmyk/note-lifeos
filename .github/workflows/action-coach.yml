@@ -25,3 +25,14 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://test-project.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: test-build-placeholder
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium
+      - name: Exercise Life OS action workflow
+        run: node tests/coach-browser.mjs
+        timeout-minutes: 5
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lifeos-action-browser-checks
+          path: artifacts/coach-browser/
+          if-no-files-found: ignore

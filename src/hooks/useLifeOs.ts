@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { DayEntry, WheelScore, ChatMessage, TodoItem, FinanceEntry, HabitItem } from "@/types/lifeOs";
 import { format, addDays, nextSunday, subDays } from "date-fns";
 import { toast } from "sonner";
+import { parseCoachMessage, visibleCoachContent } from "@/lib/actionCoach";
 
 // 之前这里的写操作全部"发出去就不管了"——网络波动/RLS拒绝时 UI 已经乐观更新，
 // 但数据库其实没变，用户完全无感知，换设备/刷新后才发现数据"凭空消失"。
@@ -130,8 +131,9 @@ export function useDayEntries(userId: string | undefined) {
         date: d.date,
         messages: (msgs || []).filter(m => m.entry_id === d.id).map(m => ({
           role: m.role as "user" | "assistant",
-          content: m.content,
+          content: visibleCoachContent(m.content),
           timestamp: m.timestamp,
+          coachRecord: parseCoachMessage({ content: m.content }) || undefined,
         })),
         emotionTags: d.emotion_tags || [],
         topicTags: d.topic_tags || [],
