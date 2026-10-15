@@ -3,6 +3,7 @@ import { Download, Loader2 } from "lucide-react";
 import { useLifeOs } from "@/contexts/LifeOsContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
+import { backupCoachMessage } from "@/lib/actionCoach";
 
 // 备份文件的数据结构版本——独立于App显示版本号(2.2.0那种)，只在导入/导出
 // 需要判断"这份JSON我认不认识"的时候用。只要以后新增字段用的是"多了就多了、
@@ -45,7 +46,7 @@ export default function DataExport() {
         exportDate: new Date().toISOString(),
         schemaVersion: BACKUP_SCHEMA_VERSION,
         appVersion: "2.2.0",
-        entries,
+        entries: entries.map(entry => ({ ...entry, messages: entry.messages.map(backupCoachMessage) })),
         todos: allTodos,
         financeEntries,
         habits,
@@ -129,3 +130,4 @@ export default function DataExport() {
     </div>
   );
 }
+

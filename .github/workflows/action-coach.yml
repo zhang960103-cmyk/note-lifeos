@@ -8,6 +8,9 @@ on:
       - '.github/workflows/action-coach.yml'
 permissions:
   contents: read
+concurrency:
+  group: lifeos-coach-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   verify:
     runs-on: ubuntu-latest

@@ -1,3 +1,4 @@
+/* global localStorage, window, document, innerWidth */
 import { chromium, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -14,6 +15,7 @@ let serverOutput = '';
 const server = spawn('npm', ['run', 'dev', '--', '--host', '127.0.0.1', '--port', '4173'], {
   env: { ...process.env, VITE_SUPABASE_URL: 'https://test-project.supabase.co', VITE_SUPABASE_PUBLISHABLE_KEY: 'test-browser-only-placeholder' },
   stdio: ['ignore', 'pipe', 'pipe'],
+  detached: true,
 });
 server.stdout.on('data', data => { serverOutput += data; });
 server.stderr.on('data', data => { serverOutput += data; });
@@ -66,6 +68,8 @@ try {
     return respond([]);
   });
   const page = await context.newPage();
+  page.setDefaultTimeout(15000);
+  page.setDefaultNavigationTimeout(20000);
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(String(error)));
   await page.goto(`${origin}/action`);
@@ -162,5 +166,7 @@ try {
   throw error;
 } finally {
   await browser?.close();
-  server.kill('SIGTERM');
+  try { process.kill(-server.pid, 'SIGTERM'); } catch { server.kill('SIGTERM'); }
+  server.stdout.destroy();
+  server.stderr.destroy();
 }

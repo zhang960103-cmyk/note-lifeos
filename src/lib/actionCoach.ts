@@ -107,6 +107,9 @@ export function parseCoachMessage(message: Pick<ChatMessage, 'content'>): CoachR
 export function visibleCoachContent(content: string): string {
   return content.replace(/\s*<!--lifeos-coach-v1:[A-Za-z0-9+/=]+-->\s*$/, '').trimEnd();
 }
+export function backupCoachMessage(message: ChatMessage): ChatMessage {
+  return message.coachRecord ? { ...message, content: formatCoachMessage(message.coachRecord) } : message;
+}
 export function coachRecords(messages: ChatMessage[]): CoachRecord[] {
   const unique = new Map<string, CoachRecord>();
   for (const message of messages) { const record = message.coachRecord || parseCoachMessage(message); if (record) unique.set(record.id, record); }

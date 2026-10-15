@@ -67,12 +67,12 @@ export function useGoogleLifeSheet(userId = '') {
   function saveConfig(config: SheetConfig) {
     if (!userId) throw new Error('请先登录 Life OS。');
     const normalized = { spreadsheetId: spreadsheetId(config.spreadsheetId), clientId: config.clientId.trim() };
-    if (!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(normalized.clientId)) throw new Error('请填写 Google OAuth 网页客户端 ID（以 apps.googleusercontent.com 结尾）。');
+    if (normalized.clientId && !/^[\w.-]+\.apps\.googleusercontent\.com$/.test(normalized.clientId)) throw new Error('Google OAuth 网页客户端 ID 应以 apps.googleusercontent.com 结尾。');
     localStorage.setItem(`lifeos-sheet-${userId}`, JSON.stringify(normalized));
     const current = slot(userId); current.token = ''; current.expiresAt = 0;
     update(userId, { config: normalized, connected: false, canWrite: false, snapshot: null, error: '' });
     // Prepare the SDK after explicit configuration, keeping the next click direct.
-    void loadGoogle().catch(() => undefined);
+    if (normalized.clientId) void loadGoogle().catch(() => undefined);
   }
   async function connect(write = false) {
     const current = slot(userId);

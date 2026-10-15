@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { remainingMs, pauseAction, resumeAction, toActionRecord, validateSession,
-  formatCoachMessage, parseCoachMessage, coachRecords, visibleCoachContent, nextAction, localDay } from '../src/lib/actionCoach.ts';
+  formatCoachMessage, parseCoachMessage, coachRecords, visibleCoachContent, backupCoachMessage, nextAction, localDay } from '../src/lib/actionCoach.ts';
 import { GoogleLifeSheet, parseTasks, meetingRow, spreadsheetId } from '../src/lib/googleLifeSheet.ts';
 
 const start = Date.parse('2026-10-15T10:00:00Z');
@@ -87,6 +87,13 @@ test('morning and evening meetings round-trip with exactly three priorities at m
     assert.deepEqual(parseCoachMessage({content:formatCoachMessage(record)}),record);
   }
   assert.equal(parseCoachMessage({content:formatCoachMessage({...meeting(),top3:['a','b','c','d']})}),null);
+});
+test('readable cloud messages retain their structured action through an existing JSON backup', () => {
+  const record = toActionRecord(session(),'留下了证据','继续',start+1000);
+  const loaded = {role:'user',content:visibleCoachContent(formatCoachMessage(record)),timestamp:record.completedAt,coachRecord:record};
+  const restored = JSON.parse(JSON.stringify(backupCoachMessage(loaded)));
+  assert.deepEqual(parseCoachMessage(restored),record);
+  assert.equal(restored.timestamp,loaded.timestamp);
 });
 test('action suggestions prefer existing subtasks, keeping original task status untouched', () => {
   const todo = {text:'写报告',status:'todo',subTasks:[{text:'第一项已做',done:true},{text:'核对一个数字',done:false}]};

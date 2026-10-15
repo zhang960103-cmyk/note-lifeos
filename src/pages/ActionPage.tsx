@@ -65,7 +65,7 @@ function CoachWorkspace({ userId }: { userId: string }) {
   const [reflecting, setReflecting] = useState(!!session?.pendingRecord);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [syncWanted, setSyncWanted] = useState(!!sheet.connection.config.spreadsheetId);
+  const [syncWanted, setSyncWanted] = useState(sheet.connection.canWrite);
   const [barrier, setBarrier] = useState('big');
   const draftText = (key: string) => typeof draft[key] === 'string' ? draft[key] : '';
   const [meetingId, setMeetingId] = useState(draftText('meetingId') || crypto.randomUUID());
@@ -270,6 +270,15 @@ function CoachWorkspace({ userId }: { userId: string }) {
         <section className="rounded-2xl border border-gold/20 bg-gold/5 p-5">
           <p className="text-[10px] text-gold tracking-wider">现在只做眼前这一小步</p><h2 className="font-serif-sc text-2xl leading-relaxed mt-2">不用等状态，先动一下。</h2>
           <p className="text-xs leading-6 text-muted-foreground mt-2">今天已亲手确认 {actionsToday.length} 次小行动。推进了一步，不等于整件事都完成。</p>
+          {!session && firstThree(top3)[0] && <button className={`${buttonClass} mt-3 text-gold`} onClick={() => {
+            const first = firstThree(top3)[0];
+            const local = activeTodos.find(todo => first.includes(todo.text));
+            const remote = sheetTasks.find(todo => first.includes(todo.title));
+            if (local) setSelected(`lifeos:${local.id}`);
+            else if (remote) setSelected(`sheet:${remote.id}`);
+            else { setSelected('free'); setTask(mainline || '今天的第一项重点'); setStep(first); }
+            setDuration(120);
+          }}>用早会第一项开始 ↗</button>}
         </section>
         {!session && <section className="bg-card border border-border rounded-2xl p-4 space-y-4">
           <Field label="从哪里开始？"><select className={inputClass} value={selected} onChange={event => { setSelected(event.target.value); if (event.target.value === 'free') { setTask(''); setStep(''); } }}>

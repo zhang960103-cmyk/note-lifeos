@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 export default function GoogleLifeSheetSettings() {
   const { user } = useAuth();
   const { connection, saveConfig, connect, disconnect, refresh } = useGoogleLifeSheet(user?.id);
-  const [link, setLink] = useState(connection.config.spreadsheetId);
+  const [link, setLink] = useState(() => new URLSearchParams(window.location.search).get('sheet') || connection.config.spreadsheetId);
   const [clientId, setClientId] = useState(connection.config.clientId);
   const run = async (operation: () => Promise<void>) => {
     try { await operation(); } catch (error) { toast.error((error as Error).message); }
@@ -24,7 +24,7 @@ export default function GoogleLifeSheetSettings() {
     </details>
     <div className="flex flex-wrap gap-2">
       <button className="min-h-11 px-4 rounded-lg bg-surface-2 border border-border text-xs" disabled={connection.busy} onClick={() => {
-        try { saveConfig({ spreadsheetId: link, clientId }); toast.success('连接设置已保存。现在可以授权 Google。'); }
+        try { saveConfig({ spreadsheetId: link, clientId }); toast.success(clientId ? '连接设置已保存。现在可以授权 Google。' : '表格链接已保存。配置 Google 网页客户端后即可在软件里读取。'); }
         catch (error) { toast.error((error as Error).message); }
       }}>保存连接设置</button>
       <button className="min-h-11 px-4 rounded-lg bg-gold/15 text-gold border border-gold/25 text-xs" disabled={connection.busy || !connection.config.clientId || !connection.config.spreadsheetId}
@@ -34,10 +34,13 @@ export default function GoogleLifeSheetSettings() {
         <button className="min-h-11 px-4 rounded-lg border border-border text-xs" disabled={connection.busy} onClick={() => run(refresh)}>刷新表格</button>
         <button className="min-h-11 px-3 text-xs text-muted-foreground" onClick={disconnect}>断开 Google</button>
       </>}
+      {connection.config.spreadsheetId && <a className="min-h-11 px-3 inline-flex items-center text-xs text-gold underline"
+        href={`https://docs.google.com/spreadsheets/d/${connection.config.spreadsheetId}/edit`} target="_blank" rel="noopener noreferrer">在 Google 中打开原表 ↗</a>}
     </div>
     <div role="status" className="text-xs leading-6 text-muted-foreground">
       {connection.snapshot ? <p>已读取「{connection.snapshot.title}」· {connection.canWrite ? '可按操作写回' : '只读'}<br />
         {connection.snapshot.tasks.length} 条待办 · 表格时区 {connection.snapshot.timeZone}</p> : <p>尚未读取表格。连接成功前，仍可使用 Life OS 自己的待办和行动记录。</p>}
+      {connection.config.spreadsheetId && !connection.config.clientId && <p>已保存表格位置；还需一次性配置 Google 网页客户端 ID，才能在 Life OS 内读取或写回。</p>}
       {connection.error && <p className="text-los-orange">{connection.error}</p>}
     </div>
     <p className="text-[10px] leading-5 text-muted-foreground">Google 授权只保留在当前页面会话内，不存储访问令牌。刷新后需重新授权。连接不要求把私人表格公开；写回仅更新你明确选择的操作，不自动覆盖其他页面。</p>

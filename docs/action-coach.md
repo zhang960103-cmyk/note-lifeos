@@ -23,6 +23,8 @@ ChatGPT 内的 Google Drive 连接不等于 Life OS 网页已经获得 Google �
 4. 将公开客户端 ID 设置为部署环境变量 `VITE_GOOGLE_CLIENT_ID`，或在 Life OS 的“表格连接 → 首次连接设置”填写。**不要填写 Client Secret、密码或 API Key**。
 5. 在软件中填写自己的私人表格链接，保存连接设置，点击“只读连接 Google”，由 Google 弹窗选择有访问权限的账号。
 
+也可以先只保存表格链接，通过“在 Google 中打开原表”继续使用；网页内的读取和写回需等客户端 ID 配置完成。`/action?tab=connect&sheet=<表格ID>` 可为自己预填表格地址，代码不会把某个私人表格硬编码为所有人的默认值。
+
 只读连接使用 `spreadsheets.readonly`。需要写回时，点击“允许写回表格”追加 `spreadsheets` 授权。Google 授权令牌只在内存中保留，刷新、过期、断开后需要重新授权。表格无需公开。
 
 参考：[Google 网页客户端设置](https://developers.google.com/identity/oauth2/web/guides/get-google-api-clientid)、[Google Sheets 读写值](https://developers.google.com/workspace/sheets/api/guides/values)。
@@ -71,3 +73,5 @@ npm run build
 ```
 
 新增 CI 对 PR 运行核心测试、TypeScript、现有 Vitest 和生产构建。Google OAuth 的真实同意流程、个人表格写入与生产发布仍需在相应账号配置下验证；模拟测试不会调用个人表格。
+
+`tests/coach-browser.mjs` 在隔离浏览器中使用合成账号和模拟 Supabase，验证任务进入、计时刷新/暂停恢复、手动完成、响应不确定时重试、早晚会衔接、原日记显示，以及 320 / 390 / 768 / 1280 像素布局。CI 保存截图和结果文件；测试不读取任何真人账号。
