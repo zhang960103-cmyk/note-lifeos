@@ -1,0 +1,38 @@
+name: Dependabot auto-merge
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  merge:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      # Never check out or execute pull request code in this privileged workflow.
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            for (const candidate of context.payload.workflow_run.pull_requests) {
+              const {data: pr} = await github.rest.pulls.get({owner, repo, pull_number: candidate.number});
+              if (pr.user.login !== 'dependabot[bot]' || pr.state !== 'open' || pr.draft ||
+                  pr.head.repo.full_name !== `${owner}/${repo}` ||
+                  pr.head.sha !== context.payload.workflow_run.head_sha) continue;
+              const {data: files} = await github.rest.pulls.listFiles({owner, repo, pull_number: pr.number, per_page: 100});
+              if (pr.changed_files > 100 || !files.every(f =>
+                  ['package.json', 'package-lock.json'].includes(f.filename) ||
+                  f.filename.startsWith('.github/workflows/'))) continue;
+              // Dependabot's signed commit trailer carries per-dependency update types,
+              // including grouped PRs. Missing metadata or any major update fails closed.
+              const commits = await github.paginate(github.rest.pulls.listCommits, {owner, repo, pull_number: pr.number});
+              const perCommit = commits.map(c => [...c.commit.message.matchAll(/update-type:\s*(version-update:semver-[a-z]+)/g)].map(m => m[1]));
+              if (!commits.length || commits.some(c => c.author?.login !== 'dependabot[bot]') || perCommit.some(types => !types.length || types.some(t => !['version-update:semver-minor', 'version-update:semver-patch'].includes(t)))) continue;
+              const {data: checks} = await github.rest.checks.listForRef({owner, repo, ref: pr.head.sha, per_page: 100});
+              if (checks.total_count > 100 || !checks.check_runs.length || checks.check_runs.some(c => c.status !== 'completed' || !['success', 'neutral', 'skipped'].includes(c.conclusion))) continue;
+              const {data: statuses} = await github.rest.repos.getCombinedStatusForRef({owner, repo, ref: pr.head.sha});
+              if (statuses.total_count && statuses.state !== 'success') continue;
+              await github.rest.pulls.merge({owner, repo, pull_number: pr.number, sha: pr.head.sha, merge_method: 'squash'});
+            }
